@@ -113,8 +113,84 @@ def _add_body_text(doc, text):
     run.font.color.rgb = _SODA_TEXT
     _remove_space_after(p)
 
-def export_markdown(data, title):
-    _ensure_export_dir()
+def _resolve_path(path, fallback_dir, title, ext):
+    if path:
+        p = Path(str(path).replace("~", str(Path.home())))
+        if p.suffix:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            return p
+        p.mkdir(parents=True, exist_ok=True)
+        return p / f"{title}{ext}"
+    fallback_dir.mkdir(parents=True, exist_ok=True)
+    return fallback_dir / f"{title}{ext}"
+
+def export_json(data, title, path=None):
+    rows = _data_to_rows(data)
+    out = _resolve_path(path, EXPORT_DIR, title, ".json")
+    out.write_text(json.dumps(rows if len(rows) > 1 else data, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+    return {"success": True, "path": str(out), "message": f"Saved JSON with {len(rows)} records"}
+
+def export_html(data, title, path=None):
+    rows = _data_to_rows(data)
+    scores = data.get("scores", {}) if isinstance(data, dict) else {}
+    vitals = data.get("vitals", {}) if isinstance(data, dict) else {}
+    opportunities = data.get("opportunities", []) if isinstance(data, dict) else []
+    passed_audits = data.get("passed_audits", []) if isinstance(data, dict) else []
+    url = data.get("url", "") if isinstance(data, dict) else ""
+    strategy = data.get("strategy", "desktop") if isinstance(data, dict) else ""
+    scoreColor = lambda v: "#00ff88" if v >= 90 else "#ffaa00" if v >= 50 else "#ff3355"
+    parts = ['<!DOCTYPE html><html><head><meta charset="utf-8"><title>PageSpeed Report</title>']
+    parts.append("<style>body{font-family:monospace;background:#0a0a0f;color:#e0e0e0;padding:20px;max-width:800px;margin:0 auto}")
+    parts.append("h1{color:#00f0ff;border-bottom:1px solid #1e1e2e;padding-bottom:8px}")
+    parts.append("h2{color:#00f0ff;margin-top:24px}")
+    parts.append("table{width:100%;border-collapse:collapse;margin:8px 0}")
+    parts.append("td,th{border:1px solid #1e1e2e;padding:6px 10px;text-align:left;font-size:13px}")
+    parts.append("th{color:#666680;text-transform:uppercase;font-size:11px}")
+    parts.append(".pass{color:#00ff88}.fail{color:#ff3355}.warn{color:#ffaa00}")
+    parts.append("</style></head><body>")
+    if url:
+        parts.append(f"<h1>PageSpeed Insights Report</h1>")
+        parts.append(f'<p style="color:#666680">{url} | {strategy}</p>')
+        if scores:
+            parts.append("<h2>Scores</h2><table>")
+            for k, v in scores.items():
+                c = scoreColor(v)
+                parts.append(f'<tr><td>{k.replace("_"," ").upper()}</td><td><span style="background:{c}20;color:{c};padding:2px 8px;font-weight:700">{v}%</span></td></tr>')
+            parts.append("</table>")
+        if vitals:
+            parts.append("<h2>Core Web Vitals</h2><table>")
+            for k, v in vitals.items():
+                parts.append(f"<tr><td>{k.upper()}</td><td>{v}</td></tr>")
+            parts.append("</table>")
+        if opportunities:
+            parts.append(f"<h2>Optimization Opportunities ({len(opportunities)})</h2>")
+            for o in opportunities:
+                parts.append(f'<div style="border:1px solid #1e1e2e;padding:10px;margin:6px 0;background:#0a0a0f">')
+                parts.append(f'<span style="font-weight:700;color:#fff">{o.get("title","")}</span> <span style="color:#ff3355;float:right">-{o.get("score_impact",0)}pt</span>')
+                if o.get("issue"):
+                    parts.append(f'<br><span style="color:#b0b0cc;font-size:12px">{o["issue"]}</span>')
+                parts.append("</div>")
+        if passed_audits:
+            parts.append(f"<h2>Passed Audits ({len(passed_audits)})</h2><ul>")
+            for t in passed_audits:
+                parts.append(f'<li style="color:#00ff88">{t}</li>')
+            parts.append("</ul>")
+    else:
+        parts.append(f"<h1>{title}</h1>")
+        if len(rows) == 1 and list(rows[0].keys()) == ["content"]:
+            parts.append(f"<pre>{rows[0]['content']}</pre>")
+        else:
+            headers = list(rows[0].keys())
+            parts.append("<table><tr>" + "".join(f"<th>{h.replace('_',' ').title()}</th>" for h in headers) + "</tr>")
+            for row in rows:
+                parts.append("<tr>" + "".join(f"<td>{str(row.get(h,''))}</td>" for h in headers) + "</tr>")
+            parts.append("</table>")
+    parts.append("</body></html>")
+    out = _resolve_path(path, EXPORT_DIR, title, ".html")
+    out.write_text("\n".join(parts), encoding="utf-8")
+    return {"success": True, "path": str(out), "message": f"Saved HTML with {len(rows)} records"}
+
+def export_markdown(data, title, path=None):
     rows = _data_to_rows(data)
     lines = [f"# {title}", "", "---", ""]
     if len(rows) == 1 and list(rows[0].keys()) == ["content"]:
@@ -130,28 +206,26 @@ def export_markdown(data, title):
         lines.append("")
         lines.append(f"*{len(rows)} records*")
         lines.append("")
-    path = EXPORT_DIR / f"{title}.md"
-    path.write_text("\n".join(lines), encoding="utf-8")
-    return {"success": True, "path": str(path), "message": f"Saved markdown with {len(rows)} records"}
+    out = _resolve_path(path, EXPORT_DIR, title, ".md")
+    out.write_text("\n".join(lines), encoding="utf-8")
+    return {"success": True, "path": str(out), "message": f"Saved markdown with {len(rows)} records"}
 
-def export_csv(data, title):
-    _ensure_export_dir()
+def export_csv(data, title, path=None):
     rows = _data_to_rows(data)
-    path = EXPORT_DIR / f"{title}.csv"
+    out = _resolve_path(path, EXPORT_DIR, title, ".csv")
     if not rows:
-        path.write_text("", encoding="utf-8")
-        return {"success": True, "path": str(path), "message": "Empty CSV"}
+        out.write_text("", encoding="utf-8")
+        return {"success": True, "path": str(out), "message": "Empty CSV"}
     headers = list(rows[0].keys())
-    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+    with open(out, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.DictWriter(f, fieldnames=headers)
         w.writeheader()
         w.writerows({h: row.get(h, "") for h in headers} for row in rows)
-    return {"success": True, "path": str(path), "message": f"Saved CSV with {len(rows)} records"}
+    return {"success": True, "path": str(out), "message": f"Saved CSV with {len(rows)} records"}
 
-def export_docx(data, title):
-    _ensure_export_dir()
+def export_docx(data, title, path=None):
     rows = _data_to_rows(data)
-    path = EXPORT_DIR / f"{title}.docx"
+    out = _resolve_path(path, EXPORT_DIR, title, ".docx")
     doc = Document()
     _set_page_background(doc, "0A0E17")
     for section in doc.sections:
@@ -189,20 +263,24 @@ def export_docx(data, title):
         run.font.name = "Consolas"
         run.font.size = Pt(8)
         run.font.color.rgb = _SODA_LINE
-    doc.save(str(path))
-    return {"success": True, "path": str(path), "message": f"Saved DOCX with {len(rows)} records"}
+    doc.save(str(out))
+    return {"success": True, "path": str(out), "message": f"Saved DOCX with {len(rows)} records"}
 
-async def export_data(data, export_format, title):
+async def export_data(data, export_format, title, path=None):
     if not title:
         title = "soda_export"
     title = "".join(c if c.isalnum() or c in " _-" else "_" for c in title)[:60]
     export_format = export_format.lower().strip()
-    if export_format in ("md", "markdown", "mdown"):
-        return export_markdown(data, title)
+    if export_format in ("json",):
+        return export_json(data, title, path)
+    elif export_format in ("html", "htm"):
+        return export_html(data, title, path)
+    elif export_format in ("md", "markdown", "mdown"):
+        return export_markdown(data, title, path)
     elif export_format in ("csv",):
-        return export_csv(data, title)
+        return export_csv(data, title, path)
     elif export_format in ("docx", "doc", "word"):
-        result = await asyncio.to_thread(export_docx, data, title)
+        result = await asyncio.to_thread(export_docx, data, title, path)
         return result
     else:
-        return {"success": False, "message": f"Unsupported format: {export_format}. Use markdown, csv, or docx."}
+        return {"success": False, "message": f"Unsupported format: {export_format}. Use json, html, markdown, csv, or docx."}

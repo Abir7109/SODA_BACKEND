@@ -978,7 +978,7 @@ async def list_files(path: str = "", search: str = "") -> dict:
                 for d in drives:
                     root = d.get('Name', '')
                     if root:
-                        items.append({"name": root, "type": "folder", "size": 0, "modified": "", "ext": "", "path": root})
+                        items.append({"number": len(items) + 1, "name": root, "type": "folder", "size": 0, "modified": "", "ext": "", "path": root})
                 return {"success": True, "path": "Available Drives", "items": items}
             except Exception:
                 return {"success": False, "path": "drives", "items": [], "error": "Could not enumerate drives"}
@@ -1264,6 +1264,95 @@ async def search_and_send_telegram(query: str, num_results: int = 8) -> dict:
     }
 
 
+async def get_pagespeed_insights(url: str, strategy: str = "desktop"):
+    """Fetches Lighthouse SEO/performance audit from Google PageSpeed Insights API (free)."""
+    base_url = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+    params = {"url": url, "strategy": strategy}
+    api_key = os.getenv("GOOGLE_API_KEY", "")
+    if api_key:
+        params["key"] = api_key
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            resp = await client.get(base_url, params=params)
+            if resp.status_code != 200:
+                return {"error": f"Google API Error: {resp.status_code} — {resp.text[:200]}"}
+            data = resp.json()
+            lh = data.get("lighthouseResult", {})
+            cat = lh.get("categories", {})
+            audits = lh.get("audits", {})
+
+            scores = {
+                "seo": int((cat.get("seo", {}).get("score") or 0) * 100),
+                "performance": int((cat.get("performance", {}).get("score") or 0) * 100),
+                "accessibility": int((cat.get("accessibility", {}).get("score") or 0) * 100),
+                "best_practices": int((cat.get("best-practices", {}).get("score") or 0) * 100),
+            }
+
+            vitals = {
+                "lcp": audits.get("largest-contentful-paint", {}).get("displayValue", "N/A"),
+                "cls": audits.get("cumulative-layout-shift", {}).get("displayValue", "N/A"),
+                "tbt": audits.get("total-blocking-time", {}).get("displayValue", "N/A"),
+                "fcp": audits.get("first-contentful-paint", {}).get("displayValue", "N/A"),
+                "si": audits.get("speed-index", {}).get("displayValue", "N/A"),
+            }
+
+            opportunities = []
+            for aid, a in audits.items():
+                s = a.get("score")
+                if s is not None and s < 0.90:
+                    desc = a.get("description", "")
+                    opportunities.append({
+                        "title": a.get("title", aid),
+                        "issue": desc.split("[")[0].strip(),
+                        "score_impact": int((1 - s) * 100),
+                        "category": aid,
+                    })
+            opportunities.sort(key=lambda x: x["score_impact"], reverse=True)
+
+            passed = [a.get("title", aid) for aid, a in audits.items()
+                      if a.get("score") is not None and a.get("score") >= 0.90][:15]
+
+            return {
+                "url": url,
+                "strategy": strategy,
+                "scores": scores,
+                "vitals": vitals,
+                "opportunities": opportunities[:25],
+                "passed_audits": passed,
+                "total_audits": len(audits),
+            }
+        except httpx.TimeoutException:
+            return {"error": "Google API timed out (60s). Try a smaller page or add a paid API key."}
+        except Exception as e:
+            return {"error": f"PageSpeed audit failed: {str(e)}"}
+
+
+get_pagespeed_insights_tool = {
+    "name": "get_pagespeed_insights",
+    "description": (
+        "Run a free Google Lighthouse SEO & performance audit on any public URL. "
+        "Returns Core Web Vitals (LCP, CLS, TBT, FCP), category scores (SEO, performance, "
+        "accessibility, best practices), and ranked optimization opportunities with score impact. "
+        "Example: get_pagespeed_insights(url='https://example.com', strategy='desktop')"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "url": {
+                "type": "STRING",
+                "description": "Full URL of the page to audit (e.g. 'https://example.com')"
+            },
+            "strategy": {
+                "type": "STRING",
+                "description": "Device strategy: 'desktop' or 'mobile' (default 'desktop')"
+            }
+        },
+        "required": ["url"]
+    }
+}
+
+
 shutdown_soda_tool = {
     "name": "shutdown_soda",
     "description": (
@@ -1386,32 +1475,62 @@ list_drives_tool = {
     }
 }
 
+scroll_file_list_tool = {
+    "name": "scroll_file_list",
+    "description": (
+        "Scroll the file browser panel in the specified direction. "
+        "Use when user says 'scroll down', 'scroll up', 'scroll down a bit', "
+        "'scroll to bottom', 'go to the bottom', 'stop scrolling'. "
+        "The file list must be visible first (call list_files or list_drives)."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "Scroll action: 'up' (scroll up a bit), "
+                               "'down' (scroll down a bit), 'bottom' (jump to last item), "
+                               "'stop' (stop any ongoing scroll animation)"
+            }
+        },
+        "required": ["action"]
+    }
+}
+
 export_data_tool = {
     "name": "export_data",
     "description": (
         "Export scraped or structured data to a formatted file. "
-        "Call this AFTER scrape_site when the user says 'save this', 'export', "
+        "Call this when the user says 'save this', 'export', "
         "'make a doc', 'make a csv', 'save as markdown', 'save as word', "
-        "'create a report', or similar. The exported file is automatically opened "
+        "'create a report', 'download', or similar. The exported file is automatically opened "
         "in the SODA viewer so the user can see it immediately. "
-        "Supported formats: markdown (table), csv (spreadsheet), docx (Word with HUD styling). "
-        "Examples: 'export as markdown', 'save as csv', 'make a word doc of this', "
-        "'save to a file'. The title becomes the filename."
+        "Supported formats: json, html, markdown (table), csv (spreadsheet), docx (Word with HUD styling). "
+        "Examples: 'export as markdown', 'save as csv', 'download as html to desktop', "
+        "'save as json to downloads folder'. "
+        "The title becomes the filename. If the user specifies a save location, "
+        "fill the path parameter (e.g. '~/Downloads/report.json', 'C:/Users/Abir/Desktop/report.md')."
     ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
             "data": {
                 "type": "STRING",
-                "description": "The data to export — can be a JSON string (dict or list of dicts), or plain text. Usually pass the raw scrape result."
+                "description": "The data to export — can be a JSON string (dict or list of dicts), or plain text. Usually pass the raw scrape result or PageSpeed data."
             },
             "format": {
                 "type": "STRING",
-                "description": "Export format: 'markdown', 'csv', or 'docx'"
+                "description": "Export format: 'json', 'html', 'markdown', 'csv', or 'docx'"
             },
             "title": {
                 "type": "STRING",
                 "description": "Filename title (without extension). e.g. 'Laptop Prices 2026'"
+            },
+            "path": {
+                "type": "STRING",
+                "description": "(Optional) Full save path including filename and extension. "
+                               "Examples: 'C:/Users/Abir/Desktop/report.md', '~/Downloads/scores.json'. "
+                               "Use ~ for home directory. If omitted, saves to Desktop/soda_exports/."
             }
         },
         "required": ["data", "format", "title"]

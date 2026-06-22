@@ -7,3 +7,6 @@ __pycache__/
 temp/
 .DS_Store
 *.log
+
+# Local Netlify folder
+.netlify

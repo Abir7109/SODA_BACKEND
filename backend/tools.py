@@ -32,6 +32,29 @@ read_file_tool = {
     }
 }
 
+edit_file_tool = {
+    "name": "edit_file",
+    "description": "Edit an existing file by finding and replacing exact text. Use this instead of write_file when you only need to change part of a file — it preserves everything else. The old_string must match the existing content exactly, including whitespace and indentation.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "path": {
+                "type": "STRING",
+                "description": "The full path of the file to edit."
+            },
+            "old_string": {
+                "type": "STRING",
+                "description": "The exact existing text to find and replace. Must match whitespace and indentation exactly."
+            },
+            "new_string": {
+                "type": "STRING",
+                "description": "The new text to replace it with."
+            }
+        },
+        "required": ["path", "old_string", "new_string"]
+    }
+}
+
 execute_command_tool = {
     "name": "execute_command",
     "description": "Executes a system command or opens an application. Use this when the user asks to run programs, open applications, execute system commands, or perform any system operations.",
@@ -99,12 +122,15 @@ from external_apis import (
     show_agents_tool,
     shutdown_soda_tool,
     delete_items_tool,
+    get_pagespeed_insights_tool,
     rename_item_tool,
     copy_item_tool,
     move_item_tool,
     list_drives_tool,
+    scroll_file_list_tool,
     scrape_site_tool,
     export_data_tool,
+    get_pagespeed_insights_tool,
 )
 from workbase import (
     workbase_list_tool,
@@ -992,7 +1018,12 @@ shutdown_system_tool = {
 
 plan_tasks_tool = {
     "name": "plan_tasks",
-    "description": "Create a structured plan with multiple tasks. Each task can be tracked as pending/running/done/failed.",
+    "description": (
+        "Create a structured plan with multiple TODO items. Call this IMMEDIATELY when the user gives 2+ commands "
+        "or a multi-step request (e.g. 'do X, then Y, then Z'). Breaks the request into numbered steps. "
+        "A panel slides from the left showing the plan with checkboxes. "
+        "Each task is tracked as pending/running/done/failed."
+    ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
@@ -1015,7 +1046,11 @@ plan_tasks_tool = {
 
 update_task_tool = {
     "name": "update_task",
-    "description": "Update the status of a task in the active plan. Status can be 'running', 'done', or 'failed'.",
+    "description": (
+        "Update the status of a task in the active plan. Call after completing each step. "
+        "Status: 'running' when you start working on a task, 'done' when completed, "
+        "'failed' if it couldn't be done."
+    ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
@@ -1029,7 +1064,10 @@ update_task_tool = {
 
 cancel_plan_tool = {
     "name": "cancel_plan",
-    "description": "Cancel the currently active plan. All pending tasks will be marked as cancelled.",
+    "description": (
+        "Cancel/dismiss the current task plan. Call when the user says 'cancel', 'dismiss tasks', "
+        "'forget the tasks', or when ALL tasks are done and the panel should close."
+    ),
     "parameters": {
         "type": "OBJECT",
         "properties": {},
@@ -1039,7 +1077,11 @@ cancel_plan_tool = {
 
 get_plan_tool = {
     "name": "get_plan",
-    "description": "Get the current active plan with all tasks and their statuses.",
+    "description": (
+        "Get the current active plan with all tasks and their statuses. "
+        "Call when resuming work after a reset to recover the task list "
+        "and continue from the first task that isn't 'done'."
+    ),
     "parameters": {
         "type": "OBJECT",
         "properties": {},
@@ -1245,6 +1287,29 @@ open_app_tool = {
     }
 }
 
+webview_action_tool = {
+    "name": "webview_action",
+    "description": "Interact with a webview window that's currently open in SODA. Use for actions like clicking elements, typing text, scrolling, navigating, or running JavaScript inside an open webview. Requires a valid webview ID (from open_browser or similar).",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "id": {
+                "type": "STRING",
+                "description": "The webview instance ID (e.g. from open_browser or previous webview_action responses)."
+            },
+            "action": {
+                "type": "STRING",
+                "description": "Action to perform: 'click' (click a CSS selector), 'type' (type text into an input), 'scroll' (scroll by x,y pixels), 'getContent' (get page text/links/URL), 'getUrl' (get current URL), 'goBack' / 'goForward' (navigation), 'navigate' (load a new URL), 'waitForLoad' (wait for page load), 'executeJS' (run JS code)."
+            },
+            "params": {
+                "type": "STRING",
+                "description": "JSON string of action-specific parameters. For 'click': {\"selector\": \"#button\"}. For 'type': {\"selector\": \"#input\", \"text\": \"hello\"}. For 'navigate': {\"url\": \"https://...\"}. For 'executeJS': {\"code\": \"document.title\"}. For 'scroll': {\"x\": 0, \"y\": 100}."
+            }
+        },
+        "required": ["id", "action"]
+    }
+}
+
 take_photo_tool = {
     "name": "take_photo",
     "description": "Capture a live photo from the camera and send it to the AI for visual analysis. "
@@ -1280,9 +1345,64 @@ start_workflow_tool = {
     }
 }
 
+pentest_target_tool = {
+    "name": "pentest_target",
+    "description": (
+        "Run a full penetration testing pipeline against a target (IP, domain, or URL). "
+        "This runs nmap, whois, dnsrecon, whatweb, gobuster, nikto, searchsploit, "
+        "theHarvester, sublist3r, and vulnerability scanning automatically. "
+        "Results are compiled into a report with risk breakdown and recommendations. "
+        "Use when the user asks to 'pentest', 'hack', 'scan', 'test security', "
+        "'penetration test', or 'check vulnerabilities' on a target. "
+        "HIGH RISK: This tool actively probes the target. Only call when user explicitly provides a target."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "target": {
+                "type": "STRING",
+                "description": "Target IP address, domain name, or URL to test"
+            },
+            "scan_type": {
+                "type": "STRING",
+                "description": "Scan type: 'auto' (default, detects playbook from target type), 'quick' (fast scan)"
+            }
+        },
+        "required": ["target"]
+    }
+}
+
+open_pastebox_tool = {
+    "name": "open_pastebox",
+    "description": "Show a floating text box where the user can paste or type content for SODA to read, analyze, or process. Returns the pasted content as text. Use when user says 'open paste box', 'show paste box', 'I need to paste something', 'open a text box', 'I want to paste text'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
+pentest_browser_target_tool = {
+    "name": "pentest_browser_target",
+    "description": (
+        "Run a full penetration test on the URL currently open in the user's browser/webview. "
+        "This grabs the current page URL from the frontend and runs the full pentest pipeline "
+        "(nmap, whois, dnsrecon, whatweb, gobuster, nikto, theHarvester, searchsploit) on it. "
+        "Use ONLY when the user says 'pentest this', 'test this site', 'hack this website', "
+        "'check this URL', or 'scan the current page'. "
+        "Do NOT use if the user specifies a target by name — use pentest_target instead."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
 tools_list = [{"function_declarations": [
     write_file_tool,
     read_file_tool,
+    edit_file_tool,
     execute_command_tool,
     terminal_execute_tool,
     weather_tool,
@@ -1374,8 +1494,10 @@ tools_list = [{"function_declarations": [
     copy_item_tool,
     move_item_tool,
     list_drives_tool,
+    scroll_file_list_tool,
     scrape_site_tool,
     export_data_tool,
+    get_pagespeed_insights_tool,
     show_agents_tool,
     shutdown_soda_tool,
     shutdown_system_tool,
@@ -1394,6 +1516,7 @@ tools_list = [{"function_declarations": [
     list_scheduled_tasks_tool,
     delete_scheduled_task_tool,
     open_app_tool,
+    webview_action_tool,
     take_photo_tool,
     welcome_home_tool,
     play_music_tool,
@@ -1401,5 +1524,8 @@ tools_list = [{"function_declarations": [
     control_system_tool,
     *FEELINGS_TOOLS_SCHEMA,
     *IELTS_TOOLS,
+    pentest_target_tool,
+    pentest_browser_target_tool,
+    open_pastebox_tool,
 ]}]
 

@@ -18,8 +18,11 @@ import ScrapedDataPanel from './components/panels/ScrapedDataPanel'
 import ProcessListPanel from './components/panels/ProcessListPanel'
 import NetworkInfoPanel from './components/panels/NetworkInfoPanel'
 import TaskTerminalPanel from './components/panels/TaskTerminalPanel'
+import PentestResultsPanel from './components/panels/PentestResultsPanel'
+import PentestProgressIndicator from './components/PentestProgressIndicator'
 import GitHubPanel from './components/panels/GitHubPanel'
 import DeployPanel from './components/panels/DeployPanel'
+import PageSpeedPanel from './components/panels/PageSpeedPanel'
 import IELTSDashboardPanel from './components/panels/IELTSDashboardPanel'
 import IELTSWritingPanel from './components/panels/IELTSWritingPanel'
 import IELTSSpeakingPanel from './components/panels/IELTSSpeakingPanel'
@@ -34,6 +37,7 @@ import HolographicOrb from './components/HolographicOrb'
 import WorkflowOverlay from './components/workflows/WorkflowOverlay'
 import Notepad from './components/Notepad'
 import BackgroundWidget from './components/BackgroundWidget'
+import PasteBox from './components/pastebox/PasteBox'
 // --- Frontend Error Logging ---
 if (typeof socket !== 'undefined') {
   window.onerror = (msg, url, line, col, err) => {
@@ -357,7 +361,7 @@ function FloatingContent({ content }) {
           <div className="sp-file-list">
             {(content.items || []).map((item, i) => (
               <div key={i} className="sp-file-item" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderBottom: '1px solid rgba(0,251,251,0.05)' }}>
-                <span className="sp-file-number">{i + 1}</span>
+                <span className="sp-file-number">{item.number || i + 1}</span>
                 <span className="sp-file-name" style={{ fontSize: 12, flex: 1 }}>{item.name || item}</span>
                 {item.type && <span className="sp-file-meta" style={{ fontSize: 10, opacity: 0.5 }}>{item.type}</span>}
                 {item.size && <span className="sp-file-meta" style={{ fontSize: 10, opacity: 0.5 }}>{item.size}</span>}
@@ -417,6 +421,9 @@ function FloatingContent({ content }) {
 
     case 'schedule':
       return <ScheduleWindow data={content.data} />
+
+    case 'pastebox':
+      return <PasteBox id={content.id} />
 
     default:
       return (
@@ -501,7 +508,7 @@ export default function App() {
   const webpageTimerRef = useRef(null)
 
   // File browser panel state (bottom)
-  const [fileBrowser, setFileBrowser] = useState({ visible: false, path: '', items: [], success: null, searchQuery: '', scrollStop: 0 })
+  const [fileBrowser, setFileBrowser] = useState({ visible: false, path: '', items: [], success: null, searchQuery: '' })
   const fileBrowserTimerRef = useRef(null)
   const toolTimerRef = useRef(null)
   const clearTaskTimeoutRef = useRef(null)
@@ -521,8 +528,13 @@ export default function App() {
   const [processPanel, setProcessPanel] = useState({ visible: false, data: null })
   const [networkPanel, setNetworkPanel] = useState({ visible: false, data: null })
   const [taskTerminalVisible, setTaskTerminalVisible] = useState(false)
+  const [pentestVisible, setPentestVisible] = useState(false)
+  const [pentestActive, setPentestActive] = useState(false)
+  const [pentestProgress, setPentestProgress] = useState(null)
+  const [pentestResult, setPentestResult] = useState(null)
   const [gitHubPanel, setGitHubPanel] = useState({ visible: false, data: null })
   const [deployPanel, setDeployPanel] = useState({ visible: false, data: null })
+  const [pageSpeedPanel, setPageSpeedPanel] = useState({ visible: false, data: null })
   const [ieltsDashboard, setIeltsDashboard] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsWriting, setIeltsWriting] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsSpeaking, setIeltsSpeaking] = useState({ visible: false, data: null, direction: 'right' })
@@ -835,6 +847,9 @@ export default function App() {
           case 'DeployPanel':
             setDeployPanel({ visible: true, data: result })
             return
+          case 'PageSpeedPanel':
+            setPageSpeedPanel({ visible: true, data: result })
+            return
         }
       }
 
@@ -948,11 +963,11 @@ export default function App() {
           if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
           setSearch(prev => ({ ...prev, visible: false }))
           break
+        case 'task_terminal':
+          setTaskTerminalVisible(false)
+          break
         case 'scraped':
           setScrapedData(prev => ({ ...prev, visible: false }))
-          break
-        case 'file_scroll':
-          setFileBrowser(prev => ({ ...prev, scrollStop: prev.scrollStop + 1 }))
           break
         case 'file':
           if (fileTimerRef.current) clearTimeout(fileTimerRef.current)
@@ -988,6 +1003,7 @@ export default function App() {
           setTaskTerminalVisible(false)
           setGitHubPanel(prev => ({ ...prev, visible: false }))
           setDeployPanel(prev => ({ ...prev, visible: false }))
+          setPageSpeedPanel(prev => ({ ...prev, visible: false }))
           setIeltsDashboard(prev => ({ ...prev, visible: false }))
           setIeltsWriting(prev => ({ ...prev, visible: false }))
           setIeltsSpeaking(prev => ({ ...prev, visible: false }))
@@ -1047,6 +1063,15 @@ export default function App() {
       }
     }
     socket.on('task_plan_update', onTaskPlanUpdate)
+    const onPentestOutput = (data) => {
+      if (data?.report) {
+        setPentestResult(data)
+        setPentestActive(false)
+        setPentestProgress(null)
+        setPentestVisible(true)
+      }
+    }
+    socket.on('pentest_output', onPentestOutput)
     const onOpenUrl = (data) => {
       if (data && data.url) openUrlInFloatingWindow(data.url, data.webview_id)
     }
@@ -1064,6 +1089,11 @@ export default function App() {
     }
     socket.on('open_notepad', onOpenNotepad)
 
+    const onOpenPastebox = () => {
+      openFloatingWindow('pastebox', 'PASTE BOX', { type: 'pastebox' }, 300, 150, 520, 380)
+    }
+    socket.on('open_pastebox', onOpenPastebox)
+
     const onViewFile = (data) => {
       if (!data || !data.payload) return
       const { payload } = data
@@ -1074,6 +1104,14 @@ export default function App() {
     socket.on('view_file_content', onViewFile)
 
     const onWorkflowStart = (data) => {
+      if (data?.workflow === 'pentest-scan') {
+        setPentestActive(true)
+        setPentestProgress({
+          phase: 'INIT', tool: '', status: 'starting',
+          message: data?.target ? `Target: ${data.target}` : 'Initializing...',
+        })
+        return
+      }
       if (data && data.workflow) {
         setWorkflow(data)
         workflowRef.current = data
@@ -1082,9 +1120,14 @@ export default function App() {
     }
     socket.on('workflow_start', onWorkflowStart)
 
+    const onPentestProgress = (data) => {
+      if (data) setPentestProgress(data)
+    }
+    socket.on('pentest_scan_progress', onPentestProgress)
+
     const onUserTranscription = () => {
       if (workflowRef.current) {
-        const animated = ['news-briefing', 'memory-view', 'ielts-speaking', 'ielts-mock']
+        const animated = ['news-briefing', 'memory-view', 'ielts-speaking', 'ielts-mock', 'pentest-scan']
         if (animated.includes(workflowRef.current.workflow)) return
         if (workflowDismissRef.current) clearTimeout(workflowDismissRef.current)
         workflowDismissRef.current = setTimeout(() => {
@@ -1136,6 +1179,29 @@ export default function App() {
       socket.emit('webview_action_result', { id, action, result })
     }
     socket.on('webview_action', onWebviewAction)
+
+    const onRequestBrowserUrl = async () => {
+      let foundUrl = ''
+      for (const fw of floatingWindows) {
+        if (fw.content?.type === 'web' && fw.content?.id && fw.content?.url) {
+          const result = await WebviewActionService.getUrl(fw.content.id)
+          if (result?.success && result?.result?.url) {
+            foundUrl = result.result.url
+            break
+          }
+        }
+      }
+      if (!foundUrl) {
+        for (const fw of floatingWindows) {
+          if (fw.content?.type === 'web' && fw.content?.url) {
+            foundUrl = fw.content.url
+            break
+          }
+        }
+      }
+      socket.emit('browser_url_response', { url: foundUrl })
+    }
+    socket.on('request_browser_url', onRequestBrowserUrl)
 
     socket.on('window_minimize', () => {
       if (window.electron?.minimize) window.electron.minimize()
@@ -1226,6 +1292,8 @@ export default function App() {
       socket.off('stop_audio', stopAudio)
       socket.off('soda_remote_count', onRemoteCount)
       socket.off('workflow_start', onWorkflowStart)
+      socket.off('pentest_scan_progress', onPentestProgress)
+      socket.off('pentest_output', onPentestOutput)
       socket.off('transcription', onUserTranscription)
       socket.off('news_briefing_control', onNewsBriefingControl)
       if (clearTaskTimeoutRef.current) clearTimeout(clearTaskTimeoutRef.current)
@@ -1498,7 +1566,6 @@ export default function App() {
         items={fileBrowser.items}
         success={fileBrowser.success}
         searchQuery={fileBrowser.searchQuery}
-        scrollStop={fileBrowser.scrollStop}
         onClose={closeFileBrowser}
       />
 
@@ -1526,6 +1593,8 @@ export default function App() {
         onClose={() => setGitHubPanel(prev => ({ ...prev, visible: false }))} />
       <DeployPanel visible={deployPanel.visible} data={deployPanel.data}
         onClose={() => setDeployPanel(prev => ({ ...prev, visible: false }))} />
+      <PageSpeedPanel visible={pageSpeedPanel.visible} data={pageSpeedPanel.data}
+        onClose={() => setPageSpeedPanel(prev => ({ ...prev, visible: false }))} />
 
       {/* ── IELTS Panels ── */}
       <SlidePanel visible={ieltsDashboard.visible} direction={ieltsDashboard.direction}
@@ -1561,6 +1630,12 @@ export default function App() {
 
       {/* ── Task Terminal Panel (centered bottom) ── */}
       <TaskTerminalPanel visible={taskTerminalVisible} onClose={() => setTaskTerminalVisible(false)} />
+
+      {/* ── Pentest Progress Indicator (top-left) ── */}
+      {pentestActive && <PentestProgressIndicator progress={pentestProgress} onDismiss={() => { setPentestActive(false); setPentestProgress(null) }} />}
+
+      {/* ── Pentest Results Panel ── */}
+      <PentestResultsPanel visible={pentestVisible} result={pentestResult} onClose={() => { setPentestVisible(false); setPentestResult(null) }} />
 
       {/* ── Floating Windows (draggable, anywhere on screen) ── */}
       {floatingWindows.map(fw => (

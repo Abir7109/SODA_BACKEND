@@ -10,53 +10,37 @@ function formatSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
-export default function FileBrowserPanel({ visible, path, items, success, searchQuery: initialSearch, scrollStop, onClose }) {
+export default function FileBrowserPanel({ visible, path, items, success, searchQuery: initialSearch, onClose }) {
   const scrollRef = useRef(null)
-  const [autoScroll, setAutoScroll] = useState(true)
-  const autoScrollRef = useRef(true)
   const [searchQuery, setSearchQuery] = useState(initialSearch || '')
   const searchInputRef = useRef(null)
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const newFolderInputRef = useRef(null)
 
-  const stopAutoScroll = useCallback(() => {
-    setAutoScroll(false)
-    autoScrollRef.current = false
-  }, [])
-
-  useEffect(() => {
-    if (scrollStop > 0) stopAutoScroll()
-  }, [scrollStop, stopAutoScroll])
-
-  // Auto-scroll through file items once
-  useEffect(() => {
-    if (!visible || !items || items.length === 0) return
-    autoScrollRef.current = true
-    setAutoScroll(true)
-
-    const el = scrollRef.current
-    if (!el) return
-
-    let scrollIndex = 0
-    let timer
-
-    const step = () => {
-      if (!autoScrollRef.current) return
-      const itemEls = el.querySelectorAll('.sp-file-item')
-      if (scrollIndex >= itemEls.length) return
-      itemEls[scrollIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      scrollIndex++
-      timer = setTimeout(step, 600)
-    }
-
-    timer = setTimeout(step, 400)
-    return () => clearTimeout(timer)
-  }, [visible, items])
-
   useEffect(() => {
     setSearchQuery(initialSearch || '')
   }, [visible, path, initialSearch])
+
+  useEffect(() => {
+    if (!visible) return
+    const handler = (data) => {
+      const el = scrollRef.current
+      if (!el) return
+      if (data.action === 'bottom') {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+      } else if (data.action === 'down') {
+        el.scrollBy({ top: el.clientHeight * 0.5, behavior: 'smooth' })
+      } else if (data.action === 'up') {
+        el.scrollBy({ top: -el.clientHeight * 0.5, behavior: 'smooth' })
+      } else if (data.action === 'stop') {
+        el.style.overflow = 'hidden'
+        el.style.overflow = ''
+      }
+    }
+    socket.on('file_scroll', handler)
+    return () => socket.off('file_scroll', handler)
+  }, [visible])
 
   const filtered = items
     ? items.filter(item =>
@@ -109,7 +93,7 @@ export default function FileBrowserPanel({ visible, path, items, success, search
             type="text"
             placeholder="Search files..."
             value={searchQuery}
-            onChange={e => { setSearchQuery(e.target.value); stopAutoScroll() }}
+            onChange={e => setSearchQuery(e.target.value)}
             onKeyDown={handleSearchKeyDown}
             spellCheck={false}
           />
@@ -138,7 +122,7 @@ export default function FileBrowserPanel({ visible, path, items, success, search
         </div>
       )}
 
-      <div ref={scrollRef} onMouseDown={stopAutoScroll} onTouchStart={stopAutoScroll}
+      <div ref={scrollRef}
         style={{ maxHeight: '35vh', overflowY: 'auto' }}>
         {!success ? (
           <div className="sp-empty">Could not list directory.</div>
@@ -150,7 +134,7 @@ export default function FileBrowserPanel({ visible, path, items, success, search
           <div className="sp-file-list">
             {filtered.map((item, i) => (
               <div key={i} className="sp-file-item">
-                <div className="sp-file-number">{i + 1}</div>
+                <div className="sp-file-number">{item.number}</div>
                 <div className="sp-file-icon">
                   {item.type === 'folder' ? <Folder size={13} /> : <FileText size={13} />}
                 </div>
@@ -169,7 +153,6 @@ export default function FileBrowserPanel({ visible, path, items, success, search
 
       {items && items.length > 0 && !searchQuery && (
         <div className="sp-search-prompt">
-          {autoScroll ? 'Auto-scrolling — touch to stop · ' : ''}
           Tell SODA which file to open (e.g., "open the first file")
         </div>
       )}

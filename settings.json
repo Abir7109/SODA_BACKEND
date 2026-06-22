@@ -32,7 +32,8 @@
         "netlify_get_site": true,
         "netlify_deploy": true,
         "netlify_create_site": true,
-        "netlify_list_deploys": true
+        "netlify_list_deploys": true,
+        "pentest_target": false
     },
     "camera_flipped": false,
     "user_native_lang": "en",

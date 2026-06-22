@@ -113,6 +113,9 @@ FEELINGS_TOOLS_SCHEMA = [
     {
         "name": "feelings_store_episode",
         "description": (
+            "IMPORTANT: Do NOT call this tool before responding with empathy. "
+            "Comfort, listen, and acknowledge FIRST — this is a background "
+            "storage action, never your primary response. "
             "Store an emotionally significant moment in long-term memory. "
             "Call this when the user reveals genuine pain — grief, heartbreak, "
             "depression, anxiety, loneliness, shame, exhaustion, or anger. "

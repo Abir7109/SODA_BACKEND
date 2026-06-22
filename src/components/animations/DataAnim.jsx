@@ -242,18 +242,70 @@ export default function DataAnim({ status, variant = 'weather', data = null }) {
         )
       }
 
-      case 'showcase':
+      case 'speed': {
+        const seo = data?.scores?.seo ?? 0
+        const perf = data?.scores?.performance ?? 0
+        const a11y = data?.scores?.accessibility ?? 0
+        const bp = data?.scores?.best_practices ?? 0
+        const opps = data?.opportunities?.length ?? 0
+        const arcs = [
+          { angle: 20, score: seo, label: 'SEO' },
+          { angle: 80, score: perf, label: 'PERF' },
+          { angle: 140, score: a11y, label: 'A11Y' },
+          { angle: 200, score: bp, label: 'BP' },
+        ]
+        const cx = 70, cy = 62
         return (
           <g>
-            {[0, 1, 2, 3].map((row) =>
-              [0, 1, 2, 3].map((col) => (
-                <rect key={`${row}-${col}`} x={30 + col * 22} y={30 + row * 22} width="16" height="16" rx="2"
-                  fill={stroke} fillOpacity={0.06} stroke={stroke} strokeWidth="0.6" strokeOpacity="0.15"
-                  style={isRunning ? { animation: `hud-card-in 0.25s ${(row * 4 + col) * 0.04}s ease-out both` } : {}} />
-              ))
+            {/* Scan line (radar sweep) */}
+            {isRunning && (
+              <line x1={cx} y1={cy} x2={cx + 48} y2={cy}
+                stroke={stroke} strokeWidth="1" strokeOpacity="0.35"
+                style={{ transformOrigin: `${cx}px ${cy}px`, animation: 'soda-sun-rotate 2.5s linear infinite' }} />
+            )}
+            {/* Grid rings */}
+            {[16, 32, 48].map((r) => (
+              <circle key={r} cx={cx} cy={cy} r={r} fill="none" stroke={stroke} strokeWidth="0.5" strokeOpacity="0.1" />
+            ))}
+            {/* Score arcs */}
+            {arcs.map((a, i) => {
+              const rad = ((a.angle - 90) * Math.PI) / 180
+              const x = cx + 44 * Math.cos(rad)
+              const y = cy + 44 * Math.sin(rad)
+              const color = a.score >= 90 ? '#00ff88' : a.score >= 50 ? '#ffaa00' : '#ff3355'
+              return (
+                <g key={i}>
+                  <circle cx={x} cy={y} r="5" fill={color} fillOpacity={isRunning ? 0.2 : 0.4}
+                    stroke={color} strokeWidth="1"
+                    style={isRunning ? { animation: `hud-glow-pulse 1.5s ${i * 0.3}s ease-in-out infinite` } : {}} />
+                  {isDone && (
+                    <g>
+                      <text x={x} y={y - 9} textAnchor="middle" fill={color} fontSize="5" fontFamily="monospace" fontWeight="700">{a.score}</text>
+                      <text x={x} y={y + 13} textAnchor="middle" fill={color} fillOpacity="0.5" fontSize="3" fontFamily="monospace">{a.label}</text>
+                    </g>
+                  )}
+                  {isRunning && <text x={x} y={y + 13} textAnchor="middle" fill={stroke} fillOpacity="0.3" fontSize="3" fontFamily="monospace">{a.label}</text>}
+                </g>
+              )
+            })}
+            {/* Center glow */}
+            <circle cx={cx} cy={cy} r="8" fill="none" stroke={stroke} strokeWidth="1.2" strokeOpacity="0.2"
+              style={isRunning ? { transformOrigin: `${cx}px ${cy}px`, animation: 'soda-glow-pulse 2s ease-in-out infinite' } : {}} />
+            <circle cx={cx} cy={cy} r="3" fill={stroke} fillOpacity="0.3" />
+            {/* Bottom stats */}
+            {isDone && (
+              <g>
+                <text x={cx} y={cy + 22} textAnchor="middle" fill={stroke} fillOpacity="0.4" fontSize="3.5" fontFamily="monospace">
+                  {opps} optimization{opps !== 1 ? 's' : ''} found
+                </text>
+                <text x={cx} y={cy + 30} textAnchor="middle" fill={stroke} fillOpacity="0.2" fontSize="2.8" fontFamily="monospace">
+                  Core Web Vitals analyzed
+                </text>
+              </g>
             )}
           </g>
         )
+      }
 
       default:
         return (

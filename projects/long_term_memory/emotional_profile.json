@@ -1,0 +1,21 @@
+{
+  "baseline_mood": "neutral",
+  "common_stressors": [],
+  "common_joys": [],
+  "support_preferences": {
+    "prefers_listening_first": true,
+    "welcomes_gentle_challenge": false,
+    "likes_distraction": false,
+    "wants_practical_help": true
+  },
+  "total_episodes": 1,
+  "episodes_by_category": {
+    "exhaustion": 1
+  },
+  "average_intensity": 2.0,
+  "last_low_point": null,
+  "is_night_owl": false,
+  "shares_proactively": true,
+  "fastest_recovery_days": null,
+  "average_recovery_days": null
+}

@@ -142,12 +142,14 @@ import scheduler_service as scheduler
 import workflow_intent
 import workflow_data
 import workflow_memory
+from pentest import PentestOrchestrator
 from external_apis import (
     get_weather, get_ip_info, get_exchange_rate, get_news_briefing,
     define_word, get_wikipedia_summary, web_search_live,
     fetch_webpage, list_files, open_file,
     get_system_status, close_window, create_folder,
     search_and_send_telegram,
+    get_pagespeed_insights,
 )
 
 SODA_WAKE_PATTERN = re.compile(
@@ -266,10 +268,24 @@ def _build_system_prompt():
         "Do not explain what you could do — just do it. "
         "If the request is ambiguous, make a reasonable assumption and proceed anyway. "
         "If you need information not covered by a dedicated tool, use web_search_live to find it. "
-        "FILE SELECTION — CRITICAL: When the user picks a file by number (e.g. 'open number 3', 'open the third one', 'open file 7'), "
-        "look at the `number` field in each item from the most recent list_files result — NOT the array index. "
-        "The number field starts at 1 and matches what the user sees on screen. "
-        "For example, if item has `\"number\": 3`, that's the one the user means when they say 'number 3'.\n"
+        "FILE SELECTION — CRITICAL: When the user picks a file or folder by number (e.g. 'open number 3', 'open the third one', 'open file 7', "
+        "'open the 12th folder'), look at the `number` field in each item from the most recent list_files result — NOT the array index. "
+        "The `number` field is 1-indexed and matches the number the user sees on screen. "
+        "Do NOT subtract 1, do NOT use the array position. If the item has `\"number\": 12`, that's what the user means by 'number 12' or 'the 12th one'. "
+        "For drives, the same `number` field applies. When the user says a specific number, find the item where `item['number'] == that number`.\n"
+        "FILE EDITING — For changing part of an existing file, use edit_file (find and replace exact text). "
+        "Do NOT use write_file to overwrite an entire file when only a small change is needed. "
+        "For webview interaction (clicking buttons, typing into inputs, scrolling, running JS inside an open webpage), "
+        "use webview_action. First call open_browser to open the page, then use webview_action with the returned ID.\n"
+        "TASK PLANNING — When the user gives 2+ commands or a multi-step request "
+        "(e.g. 'do X, then Y, then Z', 'first... then... after that...'), "
+        "call plan_tasks to break it down into TODO items immediately. "
+        "A panel slides from the left showing the plan. "
+        "After completing each step, call update_task with its task_id and status='done'. "
+        "If a step fails, call update_task with status='failed' and a result describing the issue. "
+        "When all tasks are complete, call cancel_plan to dismiss the panel. "
+        "If you resume after a reset and see an existing plan, use get_plan to recover the task list "
+        "and continue from the first task that isn't 'done'.\n"
         "SEARCH WORKFLOW — CRITICAL: When the user asks you to search the web:\n"
         "1. Call web_search_live with their query — this displays the results visually to the user.\n"
         "2. Do NOT read the results aloud, do NOT summarize them, do NOT comment on them.\n"
@@ -284,6 +300,9 @@ def _build_system_prompt():
         "10. After scraping succeeds, say 'Done, sir. I extracted [N] items. Should I save this as a markdown file, CSV, or a Word doc?'\n"
         "11. When user picks a format → call export_data(data=<the scraped data>, format=..., title=<descriptive title>). "
         "Pass the data as a JSON string — it can be the raw scrape result or a subset. "
+        "If the user says where to save (e.g. 'to Downloads', 'to the desktop', 'to a specific folder'), "
+        "also pass the path parameter set to the full save path including filename (e.g. '~/Downloads/report.json'). "
+        "Use ~ for home directory. Supported formats: json, html, markdown, csv, docx. "
         "The exported file opens automatically in SODA's viewer.\n"
         "12. If user declines scraping, move on. Do NOT ask repeatedly.\n"
         "Never narrate the search results list. Only speak about the specific page the user asked you to open.\n"
@@ -415,6 +434,7 @@ def _build_system_prompt():
         ctx = memory_store.build_context_block()
         if ctx:
             base += "\n\n" + ctx
+            base += "\n\nREMINDER: Do NOT call show_memory, get_news, or start_workflow tools during this turn. Continue the conversation naturally."
     except Exception:
         pass
     try:
@@ -452,6 +472,7 @@ FUNDAMENTAL RULES:
 8. SILENCE is okay. 'Take your time.' and wait.
 9. CHECK IN later on things that mattered.
 10. KNOW WHEN IT'S BEYOND YOU — if someone is in crisis, acknowledge their pain gently and mention trusted people or crisis lines as care, not dismissal.
+11. TOOL USE RULE: When the user shares emotional content, respond with empathy FIRST. Do NOT call feelings_store_episode or any other tool before acknowledging their feelings naturally.
 
 GRIEF PATTERNS TO RECOGNIZE:
 When the user says things like:
@@ -538,12 +559,16 @@ class AudioLoop:
         self._last_workflow_fire = 0
         self.wf_memory = workflow_memory.WorkflowMemory()
         self._turn_count = 0
-        self._context_refresh_interval = 12
+        self._context_refresh_interval = 999
         self._last_refresh_turn = 0
         self._exchange_history = []
         self._context_history_path = str(Path.home() / ".soda" / "context_history.json")
         self._load_context_history()
         self.gesture_detector = GestureDetector() if os.getenv("GESTURE_ENABLED", "true").lower() == "true" else None
+        self._pending_browser_url = None
+        self._pending_pastebox = None
+        self._pastebox_content = ""
+        self._pentest_background_task = None
         log.info(f"Skipping learned keyword injection — threshold-based matching is sufficient")
 
     def _load_context_history(self):
@@ -752,7 +777,7 @@ class AudioLoop:
         try:
             await self.session.send_client_content(
                 turns=types.Content(role='user', parts=[types.Part(text=summary)]),
-                turn_complete=False,
+                turn_complete=True,
             )
             self._last_refresh_turn = self._turn_count
             log.info(f"Context refresh injected at turn {self._turn_count}")
@@ -971,7 +996,7 @@ class AudioLoop:
                     asyncio.TaskGroup() as tg,
                 ):
                     self.session = session
-                    self.audio_in_queue = asyncio.Queue()
+                    self.audio_in_queue = asyncio.Queue(maxsize=200)
                     self.audio_queue = asyncio.Queue(maxsize=500)
                     self.video_queue = asyncio.Queue(maxsize=5)
                     self._model_is_speaking = False
@@ -1020,7 +1045,7 @@ class AudioLoop:
                                     role='user',
                                     parts=[types.Part(text=context)]
                                 ),
-                                turn_complete=False,
+                                turn_complete=True,
                             )
                             log.info(f"Injected {len(context_lines)} context lines on reconnect")
 
@@ -1277,6 +1302,102 @@ class AudioLoop:
             log.error(f"Workflow emit failed: {e}")
             traceback.print_exc()
 
+    async def _run_pentest_background(self, target):
+        try:
+            if self.sio:
+                await self.sio.emit("workflow_start", {
+                    "workflow": "pentest-scan",
+                    "target": target,
+                })
+            from pentest import PentestOrchestrator
+            from pentest.pentest_report import export_txt
+            orchestrator = PentestOrchestrator()
+
+            async def on_progress(data):
+                if self.sio:
+                    try:
+                        await self.sio.emit("pentest_scan_progress", data)
+                    except Exception:
+                        pass
+
+            orchestrator.set_progress_callback(on_progress)
+            if self.sio:
+                await self.sio.emit("pentest_scan_progress", {
+                    "phase": "INIT", "tool": "", "status": "starting",
+                    "message": f"Pentest initialized for {target}",
+                })
+
+            r = await orchestrator.run(target)
+
+            if r.get("report"):
+                report = r["report"]
+                summary = r.get("summary", "")
+
+                # build a detailed brief for Gemini
+                brief_lines = [f"[Pentest results for {target}]:", f"Duration: {r.get('duration_seconds', 0)}s"]
+                rb = report.get("summary", {}).get("risk_breakdown", {})
+                brief_lines.append(f"Total findings: {report['summary']['total_findings']}  Critical: {rb.get('critical',0)}  High: {rb.get('high',0)}  Medium: {rb.get('medium',0)}  Low: {rb.get('low',0)}")
+                for phase in report.get("phases", []):
+                    for tool in phase.get("tools", []):
+                        tn = tool.get("tool", "?")
+                        if tool.get("findings"):
+                            brief_lines.append(f"  {tn}: {len(tool['findings'])} findings")
+                            for f in tool["findings"][:3]:
+                                desc = f.get("message") or f.get("title") or f.get("service") or f.get("url") or f.get("key","") + "=" + f.get("value","") if f.get("value") else ""
+                                if desc:
+                                    brief_lines.append(f"    - {desc}")
+                        elif not tool.get("success"):
+                            brief_lines.append(f"  {tn}: FAILED — {tool.get('summary','')}")
+                recs = report.get("summary", {}).get("recommendations", [])
+                if recs:
+                    brief_lines.append(f"  Top recs: {'; '.join(recs[:3])}")
+                if len(recs) > 3:
+                    brief_lines.append(f"  (+{len(recs)-3} more recommendations)")
+                brief = "\n".join(brief_lines)
+
+                self._exchange_history.append({"model": brief})
+                self._save_context_history()
+                await self._inject_context_refresh()
+
+                # auto-save txt report to Downloads folder
+                try:
+                    txt = export_txt(report)
+                    safe_target = "".join(c if c.isalnum() or c in "-_." else "_" for c in str(target))[:40]
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    downloads = os.path.expanduser("~/Downloads")
+                    fname = f"pentest_{safe_target}_{ts}.txt"
+                    fpath = os.path.join(downloads, fname)
+                    with open(fpath, "w", encoding="utf-8") as f:
+                        f.write(txt)
+                    log.info(f"Pentest report saved to {fpath}")
+                except Exception as save_err:
+                    log.warning(f"Failed to save pentest report: {save_err}")
+
+                await self.sio.emit("pentest_output", {
+                    "target": target,
+                    "report": report,
+                    "summary": summary,
+                })
+                await self.sio.emit("pentest_scan_progress", {
+                    "phase": "REPORT", "tool": "", "status": "complete",
+                    "message": f"Pentest complete — {report['summary']['total_findings']} findings",
+                })
+            else:
+                await self.sio.emit("pentest_scan_progress", {
+                    "phase": "REPORT", "tool": "", "status": "failed",
+                    "message": r.get("error", "Scan failed"),
+                })
+        except asyncio.CancelledError:
+            log.info("Background pentest cancelled")
+        except Exception as e:
+            log.error(f"Background pentest failed: {e}")
+            try:
+                await self.sio.emit("pentest_scan_progress", {
+                    "phase": "REPORT", "tool": "", "status": "failed", "message": str(e),
+                })
+            except Exception:
+                pass
+
     async def _dispatch_tool(self, fc):
         name = fc.name
         args = fc.args
@@ -1291,6 +1412,14 @@ class AudioLoop:
 
         elif name == "get_exchange_rate":
             r = await get_exchange_rate(args.get("from_curr", ""), args.get("to_curr", ""))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "get_pagespeed_insights":
+            url = args.get("url", "")
+            strategy = args.get("strategy", "desktop")
+            r = await get_pagespeed_insights(url, strategy)
+            self._last_scraped_data = r
+            self._last_scraped_url = url
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         elif name == "get_news":
@@ -1403,6 +1532,12 @@ class AudioLoop:
             if self.sio:
                 await self.sio.emit("close_panel", {"panel": panel})
             return types.FunctionResponse(id=fc.id, name=name, response={"result": "Closed."})
+
+        elif name == "scroll_file_list":
+            action = args.get("action", "down")
+            if self.sio:
+                await self.sio.emit("file_scroll", {"action": action})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Scrolled {action}"})
 
         elif name == "show_tools":
             decls = tools_list[0]["function_declarations"] if isinstance(tools_list, list) and len(tools_list) > 0 and isinstance(tools_list[0], dict) and "function_declarations" in tools_list[0] else tools_list
@@ -1691,14 +1826,23 @@ class AudioLoop:
 
         elif name == "plan_tasks":
             r = task_planner.plan_tasks(args.get("title", ""), args.get("tasks", []))
+            if self.sio:
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("task_plan_update", r))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         elif name == "update_task":
             r = task_planner.update_task(args.get("task_id", ""), args.get("status", ""), args.get("result"))
+            if self.sio:
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("task_plan_update", r))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         elif name == "cancel_plan":
             r = task_planner.cancel_plan()
+            if self.sio:
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("close_panel", {"panel": "task_terminal"}))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         elif name == "get_plan":
@@ -1775,6 +1919,78 @@ class AudioLoop:
         elif name == "netlify_list_deploys":
             r = netlify_tools.list_deploys(args.get("site_id", ""))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "pentest_target":
+            if not hasattr(self, '_pentest_orchestrator'):
+                    self._pentest_orchestrator = PentestOrchestrator()
+            target = args.get("target", "")
+            log.info(f"pentest_target: launching background scan on {target}")
+
+            if self._pentest_background_task and not self._pentest_background_task.done():
+                self._pentest_background_task.cancel()
+            self._pentest_background_task = asyncio.create_task(
+                self._run_pentest_background(target)
+            )
+
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": {
+                "status": "started",
+                "target": target,
+                "message": f"Penetration test started on {target}. Results will appear on your HUD.",
+            }})
+
+        elif name == "pentest_browser_target":
+            log.info("pentest_browser_target: requesting URL from frontend")
+            loop = asyncio.get_event_loop()
+            future = loop.create_future()
+            self._pending_browser_url = future
+            if self.sio:
+                await self.sio.emit("request_browser_url", {"id": "pentest"})
+            try:
+                target_url = await asyncio.wait_for(future, timeout=15)
+                log.info(f"pentest_browser_target: got URL {target_url}")
+            except asyncio.TimeoutError:
+                log.warning("pentest_browser_target: timeout waiting for URL")
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": {
+                    "success": False, "error": "Could not get browser URL. Open a website in the browser first."
+                }})
+
+            if self._pentest_background_task and not self._pentest_background_task.done():
+                self._pentest_background_task.cancel()
+            self._pentest_background_task = asyncio.create_task(
+                self._run_pentest_background(target_url)
+            )
+
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": {
+                "status": "started",
+                "target": target_url,
+                "message": f"Penetration test started on {target_url}. Results will appear on your HUD.",
+            }})
+
+        elif name == "open_pastebox":
+            log.info("open_pastebox: showing paste box to user")
+            loop = asyncio.get_event_loop()
+            future = loop.create_future()
+            self._pending_pastebox = future
+            if self.sio:
+                await self.sio.emit("open_pastebox", {})
+            try:
+                pasted_text = await asyncio.wait_for(future, timeout=300)
+                self._pastebox_content = pasted_text
+                log.info(f"open_pastebox: received {len(pasted_text)} chars")
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": {
+                    "success": True,
+                    "text": pasted_text,
+                    "char_count": len(pasted_text),
+                    "message": f"Received {len(pasted_text)} characters from paste box.",
+                }})
+            except asyncio.TimeoutError:
+                self._pending_pastebox = None
+                log.warning("open_pastebox: timeout waiting for paste content")
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": {
+                    "success": False,
+                    "text": "",
+                    "message": "Paste box timed out. No content was submitted.",
+                }})
 
         elif name == "notepad_open":
             if self.sio:
@@ -2021,6 +2237,27 @@ class AudioLoop:
                 r = str(e)
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
+        elif name == "edit_file":
+            path = args.get("path", "")
+            old = args.get("old_string", "")
+            new = args.get("new_string", "")
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                if old not in content:
+                    r = {"success": False, "error": "old_string not found in file"}
+                else:
+                    content = content.replace(old, new, 1)
+                    with open(path, "w", encoding="utf-8") as f:
+                        f.write(content)
+                    r = {"success": True, "path": path}
+                    if self.sio:
+                        loop = asyncio.get_event_loop()
+                        loop.create_task(self.sio.emit("view_file_content", {"path": path}))
+            except Exception as e:
+                r = {"success": False, "error": str(e)}
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
         elif name == "read_file":
             path = args.get("path", "")
             try:
@@ -2094,13 +2331,14 @@ class AudioLoop:
             data = args.get("data", "")
             fmt = args.get("format", "markdown")
             title = args.get("title", "soda_export")
+            path = args.get("path", None)
             if isinstance(data, str):
                 import json
                 try:
                     data = json.loads(data)
                 except (json.JSONDecodeError, TypeError):
                     pass
-            r = await _export(data, fmt, title)
+            r = await _export(data, fmt, title, path)
             if r.get("success") and r.get("path"):
                 if self.sio:
                     loop = asyncio.get_event_loop()

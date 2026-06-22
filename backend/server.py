@@ -154,6 +154,21 @@ SETTINGS["tool_permissions"] = {}
 
 # tool_permissions is now SETTINGS["tool_permissions"]
 
+async def _wake_wsl():
+    """Wake up Kali WSL on server startup (non-blocking, fire-and-forget)."""
+    try:
+        proc = await asyncio.create_subprocess_shell(
+            "wsl -d kali-linux -- bash -c 'echo kali_ready'",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await asyncio.wait_for(proc.wait(), timeout=15)
+        print("[WSL] Kali Linux is ready")
+    except FileNotFoundError:
+        print("[WSL] WSL not found — pentest tools will not work. Install WSL 2 + Kali Linux.")
+    except Exception as e:
+        print(f"[WSL] Could not start Kali: {e}")
+
 @app.get("/status")
 async def status():
     return {"status": "running", "service": "S.O.D.A Backend"}
@@ -290,6 +305,9 @@ async def start_audio(sid, data=None):
 
         print("Creating asyncio task for AudioLoop.run()")
         loop_task = asyncio.create_task(audio_loop.run())
+
+        # Wake Kali WSL in background (non-blocking, proper event loop)
+        asyncio.create_task(_wake_wsl())
 
         # Start scheduler background task
         global _scheduler_task
@@ -747,6 +765,7 @@ async def force_tool(sid, data):
             from export_service import export_data as _export
             fmt = args.get('format', 'markdown')
             title = args.get('title', 'soda_export')
+            path = args.get('path', None)
             data = getattr(audio_loop, '_last_scraped_data', None) if audio_loop else None
             if data is None:
                 await sio.emit('error', {'msg': 'No scraped data available. Search and scrape something first.'}, room=sid)
@@ -755,7 +774,7 @@ async def force_tool(sid, data):
                     import json
                     try: data = json.loads(data)
                     except: pass
-                r = await _export(data, fmt, title)
+                r = await _export(data, fmt, title, path)
                 if r.get('success') and r.get('path'):
                     mime = 'text/markdown' if fmt == 'markdown' else 'text/csv' if fmt == 'csv' else 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                     await sio.emit('view_file_content', {'payload': {'type': 'text', 'content': None, 'mime': mime, 'path': r['path']}})
@@ -1121,9 +1140,8 @@ async def create_folder(sid, data=None):
             'output': f'Created folder: {folder_path}',
             'success': True
         })
-        # Refresh file browser to show new folder + stop auto-scroll
+        # Refresh file browser to show new folder
         from external_apis import list_files
-        await sio.emit('close_panel', {'panel': 'file_scroll'})
         parent = os.path.dirname(folder_path.rstrip('/\\'))
         list_result = await list_files(parent)
         await sio.emit('file_list', {
@@ -1187,6 +1205,37 @@ async def face_frame_response(sid, data=None):
             future.set_result(data.get('image'))
     else:
         print(f"[SERVER] audio_loop has no _pending_face_frames")
+
+
+@sio.event
+async def browser_url_response(sid, data=None):
+    """Receive active browser URL from the frontend for pentesting."""
+    url = (data or {}).get("url", "")
+    if not url:
+        return
+    if hasattr(audio_loop, '_pending_browser_url') and audio_loop._pending_browser_url is not None:
+        future = audio_loop._pending_browser_url
+        if not future.done():
+            future.set_result(url)
+        audio_loop._pending_browser_url = None
+    else:
+        print("[SERVER] No pending browser URL request")
+
+
+@sio.event
+async def pastebox_content(sid, data=None):
+    """Receive pasted content from the frontend paste box."""
+    text = (data or {}).get("text", "")
+    if not text:
+        return
+    if hasattr(audio_loop, '_pending_pastebox') and audio_loop._pending_pastebox is not None:
+        future = audio_loop._pending_pastebox
+        if not future.done():
+            future.set_result(text)
+        audio_loop._pending_pastebox = None
+        print(f"[SERVER] pastebox_content: received {len(text)} chars")
+    else:
+        print("[SERVER] No pending pastebox request")
 
 
 if __name__ == "__main__":

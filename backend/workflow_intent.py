@@ -61,6 +61,21 @@ class WorkflowIntentMatcher:
                 ],
                 "catch": r"\b((take|need|time for) a (break|rest)|break time|lunch|coffee break|rest|pause|stretch|grab a coffee|time to eat|বিরতি|ব্রেক|বিশ্রাম|লাঞ্চ)\b",
             },
+            "pentest-scan": {
+                "phrases": [
+                    "penetration test", "pentest", "run pentest",
+                    "vulnerability scan", "hack this",
+                    "check vulnerabilities",
+                    "scan for vulnerabilities", "run a security scan",
+                    "penetration testing", "hack that",
+                    "pentest this",
+                ],
+                "keywords": [
+                    "pentest", "penetration", "vulnerability",
+                    "hack", "exploit",
+                ],
+                "catch": r"\b(?:pentest|penetration\s?test|vulnerability\s?scan|hack\s+(?:this|that))\b",
+            },
         }
 
         self.context_window = []

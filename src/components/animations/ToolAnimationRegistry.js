@@ -88,6 +88,7 @@ export const TOOL_ANIMATIONS = {
   get_ip_info:           { component: 'DataAnim', variant: 'network',  panel: 'NetworkInfoPanel',  panelDir: 'top' },
   define_word:           { component: 'DataAnim', variant: 'define' },
   get_wikipedia_summary: { component: 'DataAnim', variant: 'wiki' },
+  get_pagespeed_insights: { component: 'DataAnim', variant: 'speed', panel: 'PageSpeedPanel', panelDir: 'right' },
 
   // ── Webview ──────────────────────────────────────────────────
   webview_action: { component: 'WebpageAnim', variant: 'open' },

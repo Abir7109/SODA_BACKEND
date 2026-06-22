@@ -27,6 +27,9 @@
 - `video_frame` (camera frame capture — payload `{data: base64}`)
 - Translation events are no longer in use (removed)
 
+### Tools (Backend -> Gemini Function Declarations)
+- `get_pagespeed_insights` — calls Google PageSpeed Insights API (free), returns Lighthouse SEO/performance/accessibility scores, Core Web Vitals, and ranked optimization opportunities. Registered in `backend/tools.py` as function declaration, dispatched in `backend/soda.py:_dispatch_tool`. Panel: `PageSpeedPanel` (slide-right).
+
 ### Webview Action Service (`src/services/WebviewActionService.js`)
 Singleton managing webview instances. Actions:
 - `click(id, selector)` — click an element
