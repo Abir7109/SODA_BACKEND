@@ -29,6 +29,25 @@ _script_dir = os.path.dirname(os.path.abspath(__file__))
 if _script_dir not in sys.path:
     sys.path.insert(0, _script_dir)
 
+# ── File Logging (pythonw.exe has no console, so log() is invisible) ──
+_agent_log_file = os.path.join(os.path.dirname(_script_dir), "agent.log")
+
+def log(msg):
+    """Write to both stdout AND agent.log (pythonw.exe-safe)."""
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{timestamp}] {msg}"
+    # Print still works when running with python.exe (for testing)
+    try:
+        log(line, flush=True)
+    except:
+        pass
+    # Always write to file (works with pythonw.exe too)
+    try:
+        with open(_agent_log_file, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except:
+        pass
+
 BACKEND_URL = os.getenv("BACKEND_URL", "https://soda-backend-rdvz.onrender.com")
 AGENT_TOKEN = os.getenv("AGENT_TOKEN", "soda-local-agent-default")
 MACHINE_ID = os.getenv(
@@ -118,24 +137,24 @@ def _check_deps():
 
 @sio.event
 def connect():
-    print(f"[LocalAgent] Connected to {BACKEND_URL}")
+    log(f"[LocalAgent] Connected to {BACKEND_URL}")
     sio.emit("agent_register", {
         "token": AGENT_TOKEN,
         "machine_id": MACHINE_ID,
         "platform": sys.platform,
         "tools": LOCAL_TOOLS,
     })
-    print(f"[LocalAgent] Registered as {MACHINE_ID}")
+    log(f"[LocalAgent] Registered as {MACHINE_ID}")
 
 
 @sio.event
 def connect_error(data):
-    print(f"[LocalAgent] Connection error: {data}")
+    log(f"[LocalAgent] Connection error: {data}")
 
 
 @sio.event
 def disconnect():
-    print(f"[LocalAgent] Disconnected")
+    log(f"[LocalAgent] Disconnected")
 
 
 @sio.on("agent_execute")
@@ -144,7 +163,7 @@ def on_agent_execute(data):
     args = data.get("args", {})
     callback_id = data.get("callback_id", "")
 
-    print(f"[LocalAgent] Executing: {tool}({json.dumps(args)[:200]})")
+    log(f"[LocalAgent] Executing: {tool}({json.dumps(args)[:200]})")
 
     try:
         result = _dispatch(tool, args)
@@ -156,8 +175,8 @@ def on_agent_execute(data):
         })
     except Exception as e:
         tb = traceback.format_exc()
-        print(f"[LocalAgent] Error executing {tool}: {e}")
-        print(tb)
+        log(f"[LocalAgent] Error executing {tool}: {e}")
+        log(tb)
         sio.emit("agent_tool_result", {
             "callback_id": callback_id,
             "tool": tool,
@@ -168,7 +187,7 @@ def on_agent_execute(data):
 
 @sio.on("agent_status")
 def on_agent_status(data):
-    print(f"[LocalAgent] Status: {data}")
+    log(f"[LocalAgent] Status: {data}")
 
 
 def _dispatch(tool, args):
@@ -1265,39 +1284,39 @@ def _heartbeat_loop():
     while True:
         time.sleep(30)
         if sio.connected:
-            print(f"[LocalAgent] ⚡ Alive — connected to {BACKEND_URL} | {len(LOCAL_TOOLS)} tools loaded")
+            log(f"[LocalAgent] ⚡ Alive — connected to {BACKEND_URL} | {len(LOCAL_TOOLS)} tools loaded")
         else:
-            print(f"[LocalAgent] ❌ Disconnected. Attempting reconnect...")
+            log(f"[LocalAgent] ❌ Disconnected. Attempting reconnect...")
             break
 
 
 if __name__ == "__main__":
     _check_deps()
 
-    print("=" * 50)
-    print("  SODA Local Agent")
-    print("=" * 50)
-    print(f"  Machine:  {MACHINE_ID}")
-    print(f"  Backend:  {BACKEND_URL}")
-    print(f"  Platform: {sys.platform}")
-    print(f"  Tools:    {len(LOCAL_TOOLS)}")
-    print(f"  Deps:     pyautogui={'OK' if HAS_PYAUTOGUI else 'MISS'}, "
+    log("=" * 50)
+    log("  SODA Local Agent")
+    log("=" * 50)
+    log(f"  Machine:  {MACHINE_ID}")
+    log(f"  Backend:  {BACKEND_URL}")
+    log(f"  Platform: {sys.platform}")
+    log(f"  Tools:    {len(LOCAL_TOOLS)}")
+    log(f"  Deps:     pyautogui={'OK' if HAS_PYAUTOGUI else 'MISS'}, "
           f"mss={'OK' if HAS_MSS else 'MISS'}, "
           f"pyperclip={'OK' if HAS_PYPERCLIP else 'MISS'}, "
           f"psutil={'OK' if HAS_PSUTIL else 'MISS'}")
-    print("=" * 50)
+    log("=" * 50)
 
     try:
         sio.connect(BACKEND_URL, transports=["websocket", "polling"], wait_timeout=10)
         # Start heartbeat in background
         threading.Thread(target=_heartbeat_loop, daemon=True).start()
-        print(f"[LocalAgent] ✅ ALIVE — waiting for commands from backend...")
-        print(f"[LocalAgent] 💡 Say something to SODA in the browser, like 'open notepad' or 'list my desktop files'")
+        log(f"[LocalAgent] ✅ ALIVE — waiting for commands from backend...")
+        log(f"[LocalAgent] 💡 Say something to SODA in the browser, like 'open notepad' or 'list my desktop files'")
         sio.wait()
     except KeyboardInterrupt:
-        print("\n[LocalAgent] Shutting down")
+        log("\n[LocalAgent] Shutting down")
         sio.disconnect()
     except Exception as e:
-        print(f"[LocalAgent] Failed: {e}")
+        log(f"[LocalAgent] Failed: {e}")
         traceback.print_exc()
         sys.exit(1)
