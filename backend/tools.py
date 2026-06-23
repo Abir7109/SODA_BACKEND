@@ -87,7 +87,6 @@ open_file_tool = {
         "required": ["path"]
     }
 },
-}
 
 execute_command_tool = {
     "name": "execute_command",
