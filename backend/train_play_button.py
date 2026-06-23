@@ -25,6 +25,7 @@ import subprocess
 
 _CALIBRATION_FILE = os.path.join(os.path.dirname(__file__), "play_button_calibration.json")
 VK_CONTROL = 0x11
+VK_LBUTTON = 0x01
 
 try:
     import win32gui
@@ -94,6 +95,11 @@ def _is_ctrl_held():
     return bool(ctypes.windll.user32.GetAsyncKeyState(VK_CONTROL) & 0x8000)
 
 
+def _is_mouse_down():
+    """Check if left mouse button is currently pressed."""
+    return bool(ctypes.windll.user32.GetAsyncKeyState(VK_LBUTTON) & 0x8000)
+
+
 def _get_cursor_pos():
     class POINT(ctypes.Structure):
         _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
@@ -139,50 +145,63 @@ def main():
 
     print("\nListening for Ctrl+Click... Hold Ctrl and click the play button.\n")
 
-    while True:
+    prev_mouse = False
+    saved = False
+
+    while not saved:
         rect = _get_spotify_rect()
         if not rect:
             print("\nSpotify window lost. Exiting.")
             sys.exit(1)
 
-        if _is_ctrl_held():
-            x, y = _get_cursor_pos()
-            left, top, right, bottom = rect
-            w = right - left
-            h = bottom - top
+        ctrl_down = _is_ctrl_held()
+        mouse_down = _is_mouse_down()
 
-            if w <= 0 or h <= 0:
-                time.sleep(0.05)
-                continue
+        # Detect rising edge of mouse click: was up, now down
+        clicked = ctrl_down and mouse_down and not prev_mouse
+        prev_mouse = mouse_down
 
-            x_pct = (x - left) / w
-            y_pct = (y - top) / h
+        if not clicked:
+            time.sleep(0.02)
+            continue
 
-            margin = 0.02
-            if x_pct < -margin or x_pct > 1 + margin or y_pct < -margin or y_pct > 1 + margin:
-                print(f"  Click at ({x}, {y}) is outside Spotify window — ignoring.")
-                time.sleep(0.3)
-                continue
+        x, y = _get_cursor_pos()
+        left, top, right, bottom = rect
+        w = right - left
+        h = bottom - top
 
-            x_pct = max(0.0, min(1.0, x_pct))
-            y_pct = max(0.0, min(1.0, y_pct))
+        if w <= 0 or h <= 0:
+            time.sleep(0.05)
+            continue
 
-            calibration = {
-                "x_pct": round(x_pct, 4),
-                "y_pct": round(y_pct, 4),
-            }
-            with open(_CALIBRATION_FILE, "w") as f:
-                json.dump(calibration, f)
+        x_pct = (x - left) / w
+        y_pct = (y - top) / h
 
-            print(f"\n  Calibration saved!")
-            print(f"    Spotify window: {w}x{h} at ({left},{top})")
-            print(f"    Click: absolute ({x}, {y})")
-            print(f"    Percentage: x={x_pct*100:.1f}%, y={y_pct*100:.1f}%")
-            print(f"    File: {_CALIBRATION_FILE}")
-            print("\n  \aDone! SODA will now use this position to click the play button.")
-            sys.exit(0)
+        margin = 0.02
+        if x_pct < -margin or x_pct > 1 + margin or y_pct < -margin or y_pct > 1 + margin:
+            print(f"  Click at ({x}, {y}) is outside Spotify window — ignoring.")
+            time.sleep(0.3)
+            continue
 
-        time.sleep(0.05)
+        x_pct = max(0.0, min(1.0, x_pct))
+        y_pct = max(0.0, min(1.0, y_pct))
+
+        calibration = {
+            "x_pct": round(x_pct, 4),
+            "y_pct": round(y_pct, 4),
+        }
+        with open(_CALIBRATION_FILE, "w") as f:
+            json.dump(calibration, f)
+
+        saved = True
+        print(f"\n  Calibration saved!")
+        print(f"    Spotify window: {w}x{h} at ({left},{top})")
+        print(f"    Click: absolute ({x}, {y})")
+        print(f"    Percentage: x={x_pct*100:.1f}%, y={y_pct*100:.1f}%")
+        print(f"    File: {_CALIBRATION_FILE}")
+        print("\n  \aDone! SODA will now use this position to click the play button.")
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":
