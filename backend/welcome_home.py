@@ -8,7 +8,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 import numpy as np
-import sounddevice as sd
+try:
+    import sounddevice as sd
+    HAS_SOUNDDEVICE = True
+except ImportError:
+    sd = None
+    HAS_SOUNDDEVICE = False
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 

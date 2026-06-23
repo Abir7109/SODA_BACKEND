@@ -6,7 +6,12 @@ Tier 1.5 vision: <100ms, offline, free — before falling back to Gemini Vision.
 import os
 import cv2
 import numpy as np
-import mss
+try:
+    import mss
+    HAS_MSS = True
+except ImportError:
+    mss = None
+    HAS_MSS = False
 from logger import log
 
 

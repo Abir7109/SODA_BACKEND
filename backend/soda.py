@@ -150,9 +150,16 @@ import github_tools
 import vercel_tools
 import netlify_tools
 from gesture_detector import GestureDetector
-from welcome_home import run_welcome_sequence
+try:
+    from welcome_home import run_welcome_sequence
+except ImportError:
+    def run_welcome_sequence(*a, **kw):
+        return {"success": False, "error": "welcome_home not available"}
 import whatsapp_bridge
-import spotify_bridge
+try:
+    import spotify_bridge
+except ImportError:
+    spotify_bridge = None
 import scheduler_service as scheduler
 import workflow_intent
 import workflow_data
@@ -1340,7 +1347,10 @@ class AudioLoop:
     async def _background_play_music(self, query):
         """Run play_music in background so the receive_audio loop doesn't block for 15+ seconds."""
         try:
-            r = await asyncio.to_thread(spotify_bridge.play_music, query)
+            if spotify_bridge is None:
+                r = {"success": False, "error": "spotify_bridge not available on this platform"}
+            else:
+                r = await asyncio.to_thread(spotify_bridge.play_music, query)
             if r.get("success"):
                 await asyncio.to_thread(system_control.volume_set, 80)
                 self._background_mode = True
@@ -2197,6 +2207,8 @@ class AudioLoop:
 
         elif name == "control_music":
             action = args.get("action", "")
+            if spotify_bridge is None:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Spotify control not available on this platform"})
             if action == "play_pause":
                 spotify_bridge.play_pause()
             elif action == "next":
