@@ -398,7 +398,7 @@ def _dispatch(tool, args):
             "vscode": ["code.exe"],
             "visual studio code": ["code.exe"],
             "whatsapp": ["WhatsApp.exe", os.path.expandvars(r"%LOCALAPPDATA%\WhatsApp\WhatsApp.exe")],
-            "spotify": ["Spotify.exe", os.path.expandvars(r"%APPDATA%\Spotify\Spotify.exe"), os.path.expandvars(r"%LOCALAPPDATA%\Spotify\Spotify.exe")],
+            "spotify": ["Spotify.exe", os.path.expandvars(r"%APPDATA%\Spotify\Spotify.exe"), os.path.expandvars(r"%LOCALAPPDATA%\Spotify\Spotify.exe"), os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WindowsApps\Spotify.exe")],
             "discord": ["Discord.exe"],
             "slack": ["slack.exe"],
             "zoom": ["Zoom.exe"],
@@ -878,14 +878,20 @@ def _dispatch(tool, args):
     # ── Music ──────────────────────────────────────────────────────
     elif tool == "play_music":
         try:
-            from spotify_bridge import play_music
-            return play_music(args.get("query", ""))
-        except ImportError:
-            return {"success": False, "error": "spotify_bridge not available locally"}
+            from spotify_bridge import play_music as _pm
+            log(f"[Music] Calling spotify_bridge.play_music(query='{args.get('query', '')}')")
+            result = _pm(args.get("query", ""))
+            log(f"[Music] play_music result: {result}")
+            return result
+        except Exception as e:
+            log(f"[Music] play_music failed: {e}")
+            log(traceback.format_exc())
+            return {"success": False, "error": f"play_music failed: {e}"}
     elif tool == "control_music":
         action = args.get("action", "")
         try:
             from spotify_bridge import play_pause, next_track, previous_track
+            log(f"[Music] control_music(action='{action}')")
             if action == "play_pause":
                 play_pause()
             elif action == "next":
@@ -895,8 +901,10 @@ def _dispatch(tool, args):
             else:
                 return {"success": False, "error": f"Unknown action: {action}"}
             return {"success": True, "result": f"Music {action}."}
-        except ImportError:
-            return {"success": False, "error": "spotify_bridge not available locally"}
+        except Exception as e:
+            log(f"[Music] control_music failed: {e}")
+            log(traceback.format_exc())
+            return {"success": False, "error": f"control_music failed: {e}"}
 
     # ── Messaging ──────────────────────────────────────────────────
     elif tool in ("send_whatsapp", "whatsapp_find_and_call", "whatsapp_find_and_message"):

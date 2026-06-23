@@ -50,22 +50,27 @@ def _find_spotify_window():
 
 
 def _launch_spotify():
-    base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA")
-    if not base:
-        return False
-    exe = os.path.join(base, "Spotify", "Spotify.exe")
-    if not os.path.isfile(exe):
-        alt = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Spotify", "Spotify.exe")
-        if alt and os.path.isfile(alt):
-            exe = alt
-        else:
-            return False
+    candidates = [
+        os.path.join(os.environ.get("APPDATA", ""), "Spotify", "Spotify.exe"),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Spotify", "Spotify.exe"),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WindowsApps", "Spotify.exe"),
+    ]
+    for exe in candidates:
+        if exe and os.path.isfile(exe):
+            try:
+                subprocess.Popen([exe], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                log.info(f"[Spotify] Launched via {exe}")
+                return True
+            except Exception as e:
+                log.warning(f"[Spotify] EXE launch failed: {exe} — {e}")
+    # Fallback: try URI scheme (handles AppX installs)
     try:
-        subprocess.Popen([exe], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(["start", "spotify:"], shell=True)
+        log.info("[Spotify] Launched via URI scheme 'spotify:'")
         return True
     except Exception as e:
-        log.warning(f"[Spotify] EXE launch failed: {e}")
-        return False
+        log.warning(f"[Spotify] URI scheme launch failed: {e}")
+    return False
 
 
 def _activate_window(hwnd):

@@ -551,23 +551,26 @@ play_music_tool = {
         "Opens Spotify, searches for the requested song/artist/genre/mood, "
         "and plays the top result. Automatically sets volume to 80% and "
         "minimizes SODA to the background widget so you can use your desktop. "
-        "Use when the user says 'play some music', 'play [genre/mood/song]', "
-        "'play chill music', 'I want to listen to [something]', "
-        "'play lofi beats', 'play rock', 'play my liked songs', "
-        "'open spotify', 'search for [X] on spotify', "
-        "'search songs', 'find music', or similar. "
-        "This ONE tool handles everything — opens Spotify, searches, and plays. "
+        "MANDATORY: Call this for ANY music or Spotify request. Do NOT refuse or apologize. "
         "Do NOT call open_app for Spotify — call play_music directly. "
+        "Triggers (all of these MUST call play_music): "
+        "'play [song/artist/genre/mood]', 'play [song] by [artist]', "
+        "'I want to listen to [X]', 'I wanna hear [X]', 'I'm feeling like [genre]', "
+        "'can you play [X]', 'could you play [X]', 'play me [X]', "
+        "'search for [X] on spotify', 'find [X] on spotify', "
+        "'open spotify', 'open spotify and [do X]', "
+        "'play some music', 'play something', 'search songs', 'find music', "
+        "'i need music', 'let's hear something', 'i'm in the mood for [genre]'. "
         "If query is empty or generic (e.g. 'some songs'), Spotify opens but you should ask what they'd like to hear. "
         "Examples: play_music(query='chill lofi'), play_music(query='rock classics'), "
-        "play_music(query='focus study music'), play_music(query='')"
+        "play_music(query='Shape of You by Ed Sheeran'), play_music(query='focus study music'), play_music(query='')"
     ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
             "query": {
                 "type": "STRING",
-                "description": "What to search for — genre, mood, artist, song, or playlist name. Can be empty to just open Spotify. Examples: 'chill lofi', 'rock classics', 'focus study music', 'my liked songs', ''"
+                "description": "What to search for — genre, mood, artist, song, or playlist name. Can be empty to just open Spotify. Examples: 'chill lofi', 'rock classics', 'Shape of You by Ed Sheeran', 'focus study music', 'my liked songs', ''"
             }
         },
         "required": ["query"]
@@ -582,9 +585,11 @@ control_music_tool = {
         "no window focus needed. "
         "Actions: 'play_pause' (toggle play/pause), "
         "'next' (skip to next track), 'previous' (go to previous track). "
-        "Use when the user says 'pause', 'resume', 'play', 'next song', "
+        "Call this for: 'pause', 'resume', 'play', 'next song', "
         "'next track', 'skip', 'previous song', 'go back', 'change track', "
-        "'pause the music', 'stop the music'. "
+        "'pause the music', 'stop the music', 'stop', 'change song', "
+        "'skip this', 'next', 'previous', 'go to next', 'go to previous'. "
+        "Do NOT call play_music for playback control — use this instead. "
         "Examples: control_music(action='play_pause'), control_music(action='next'), "
         "control_music(action='previous')"
     ),

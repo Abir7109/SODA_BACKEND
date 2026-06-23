@@ -577,7 +577,38 @@ Also recognize indirect grief: 'everything feels grey', heavy silence, changes i
 This user prefers you to be gently talkative — ask, reflect, stay present. Don't be silent.
 ==========
 """
-    base += "\n\nMUSIC CONTROL — ALL Spotify operations go through these two tools ONLY. Never say you cannot do something — just call the tool:\n- play_music(query=...): Searches Spotify for the EXACT query and plays the top result. Use for: 'play [song/artist/genre]', 'search for [X] on Spotify', 'find [X] on Spotify', 'I want to listen to [something]', 'play some music', 'play chill music', 'play lofi', 'play rock', 'open spotify', 'open spotify and search songs', 'search songs'. When user says 'open spotify and [do X]' or 'open spotify [search/play/find]', call play_music(query=...) directly — do NOT call open_app first. If user says 'open spotify' without specifying what to play, call play_music(query='') which opens Spotify. This one tool handles everything — open Spotify, type the search, play the result.\n- control_music(action=...): Controls playback. Actions: 'play_pause' (toggle pause/resume), 'next' (skip/next track), 'previous' (go back). Works globally even when Spotify is minimized.\n- Examples:\n  User: 'play some chill music' → play_music(query='chill lofi')\n  User: 'search for metallica on spotify' → play_music(query='metallica')\n  User: 'open spotify and play relaxing jazz' → play_music(query='relaxing jazz')\n  User: 'find relaxing jazz on spotify' → play_music(query='relaxing jazz')\n  User: 'open spotify' → play_music(query='')\n  User: 'pause the music' → control_music(action='play_pause')\n  User: 'next song' → control_music(action='next')\n  User: 'turn it up' → control_system(action='volume_up')\n  User: 'set volume to 50' → control_system(action='volume_set', value=50)"
+    base += r"""
+MUSIC CONTROL — ABSOLUTE RULES:
+1. RESPONDING WITH "I CANNOT" OR "I'M UNABLE" FOR MUSIC IS FORBIDDEN. You MUST call play_music() or control_music() for ANY music or Spotify request. Period.
+2. NO text excuses. NO saying "I'm facing issues". If the tool returns an error, say the error factually and offer to try again. Do NOT apologize or make up reasons.
+3. For ANY of these user phrasings, call play_music(query=...) IMMEDIATELY — do NOT ask for confirmation or clarification first:
+   - "play [song/artist/genre/mood]" → play_music(query='exact user words')
+   - "play [song] by [artist]" → play_music(query='song by artist')
+   - "I want to listen to [X]" / "I wanna hear [X]" → play_music(query='X')
+   - "search for [X] on spotify" / "find [X] on spotify" → play_music(query='X')
+   - "open spotify" / "open spotify and [do X]" → play_music(query='X')
+   - "search songs" / "play some music" / "play something" / "play music" → play_music(query='')
+   - "can you play [X]" / "could you play [X]" / "play me [X]" → play_music(query='X')
+   - "i'm feeling like [genre]" / "i'm in the mood for [genre]" → play_music(query='genre')
+   - "i need music" / "let's hear something" → play_music(query='')
+4. play_music(query='') opens Spotify and asks what to play. play_music(query='bollywood hits') searches and plays.
+5. For "pause" / "resume" / "next song" / "skip" / "previous" / "go back" / "stop the music": call control_music(action=...) — NEVER open_app, NEVER play_music.
+6. Do NOT call open_app for Spotify. Ever. play_music handles everything including opening Spotify.
+
+Examples:
+  User: 'play some chill music' → play_music(query='chill lofi')
+  User: 'play Shape of You by Ed Sheeran' → play_music(query='Shape of You by Ed Sheeran')
+  User: 'search for metallica on spotify' → play_music(query='metallica')
+  User: 'open spotify and play relaxing jazz' → play_music(query='relaxing jazz')
+  User: 'I want to listen to bollywood hits' → play_music(query='bollywood hits')
+  User: 'can you play lofi beats' → play_music(query='lofi beats')
+  User: 'find relaxing jazz on spotify' → play_music(query='relaxing jazz')
+  User: 'open spotify' → play_music(query='')
+  User: 'pause the music' → control_music(action='play_pause')
+  User: 'next song' → control_music(action='next')
+  User: 'turn it up' → control_system(action='volume_up')
+  User: 'set volume to 50' → control_system(action='volume_set', value=50)
+"""
     base += "\n\nGESTURE & WELCOME HOME:\n- When you receive a transcription containing '[Gesture: double_clap]', the user just double-clapped. Call welcome_home immediately.\n- When the user says 'welcome home', 'I'm back', 'jarvis', 'I returned', or similar — call welcome_home to run the full welcome sequence (open Spotify, Chrome windows, Cursor, and play a greeting via TTS).\n- welcome_home runs in the background and returns immediately — do not wait for it to complete."
     return base
 
@@ -1510,6 +1541,8 @@ class AudioLoop:
                 _connected_agents,
                 key=lambda s: len(_connected_agents[s].get('tools', []))
             )
+            agent_info = _connected_agents.get(agent_sid, {})
+            log.info(f"[AGENT] Routing {name} to agent {agent_info.get('machine_id', agent_sid)} (callback={callback_id})")
             await self.sio.emit('agent_execute', {
                 'callback_id': callback_id,
                 'tool': name,
@@ -1518,9 +1551,11 @@ class AudioLoop:
             try:
                 result = await asyncio.wait_for(future, timeout=30.0)
                 _success = result.pop('_success', True)
+                log.info(f"[AGENT] {name} result: success={_success}")
             except asyncio.TimeoutError:
                 result = {"success": False, "error": "Local agent did not respond within 30s"}
                 _success = False
+                log.warning(f"[AGENT] {name} TIMEOUT — agent {agent_info.get('machine_id', agent_sid)} did not respond in 30s")
             finally:
                 _pending_agent_results.pop(callback_id, None)
             # Emit file_list for file browsing tools
@@ -2218,12 +2253,14 @@ class AudioLoop:
             )
 
         elif name == "play_music":
+            log.warning(f"[MUSIC] play_music called but NO local agent connected! _connected_agents={len(_connected_agents)}")
             return types.FunctionResponse(
                 id=fc.id, name=name,
                 response={"success": False, "error": "No local agent connected — cannot control Spotify on this machine."}
             )
 
         elif name == "control_music":
+            log.warning(f"[MUSIC] control_music called but NO local agent connected! _connected_agents={len(_connected_agents)}")
             return types.FunctionResponse(
                 id=fc.id, name=name,
                 response={"success": False, "error": "No local agent connected — cannot control Spotify on this machine."}

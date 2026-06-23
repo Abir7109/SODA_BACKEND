@@ -73,6 +73,11 @@ def _asyncio_exception_handler(loop, context):
 
 
 sys.excepthook = _global_excepthook
-asyncio.get_event_loop().set_exception_handler(_asyncio_exception_handler)
+try:
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        loop.set_exception_handler(_asyncio_exception_handler)
+except RuntimeError:
+    pass
 
 log.info("Logger initialized")
