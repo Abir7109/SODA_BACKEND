@@ -171,13 +171,24 @@ async def _click_big_play_ai_vision():
             y = int(top + img_y * h / max(rh, 1))
             log.info(f"[Spotify] AI Vision big play -> click ({x}, {y}) (orig img {img_x},{img_y} scaled from {rw}x{rh} to {w}x{h})")
             pyautogui.click(x, y)
-            time.sleep(0.3)
+            time.sleep(1.5)
             _save_big_play_template(x, y)
             log.info("[Spotify] Click made, waiting for playback...")
             if _wait_for_playback(timeout=6.0):
                 log.info("[Spotify] Playback confirmed via window title")
                 return True
-            log.info("[Spotify] Click didn't start playback, trying keyboard fallback...")
+            log.info("[Spotify] Click didn't start playback, retrying click...")
+            pyautogui.click(x, y)
+            time.sleep(1.5)
+            if _wait_for_playback(timeout=5.0):
+                log.info("[Spotify] Playback confirmed on retry")
+                return True
+            log.info("[Spotify] Retry click failed, trying template match...")
+            if _click_big_play_template():
+                if _wait_for_playback(timeout=6.0):
+                    log.info("[Spotify] Playback confirmed via template match")
+                    return True
+            log.info("[Spotify] All click methods failed, trying keyboard fallback...")
             return _keyboard_play()
         log.warning(f"[Spotify] AI Vision unparseable: {text[:80]}")
         return False
@@ -355,15 +366,15 @@ def _maximize_soda():
 def _do_search(search_text):
     """Ctrl+K, type text, Down enters results list (selects first), Enter opens it."""
     pyautogui.hotkey("ctrl", "k")
-    time.sleep(0.8)
+    time.sleep(1.0)
     pyautogui.write(search_text, interval=0.05)
-    time.sleep(2.0)
-    pyautogui.press("down")
-    time.sleep(0.5)
-    pyautogui.press("enter")
     time.sleep(2.5)
+    pyautogui.press("down")
+    time.sleep(0.8)
+    pyautogui.press("enter")
+    time.sleep(3.0)
     pyautogui.press("home")
-    time.sleep(0.3)
+    time.sleep(0.5)
 
 
 def play_music(query):
@@ -376,6 +387,11 @@ def play_music(query):
     try:
         history_match = find_similar(query)
         search_text = history_match["title"] if history_match else query
+
+        if not search_text or search_text.strip() == '':
+            _focus_or_open_spotify()
+            _maximize_soda()
+            return {"success": True, "query": query, "note": "Spotify opened. What would you like to listen to?"}
 
         if not _focus_or_open_spotify():
             return {"success": False, "error": "Could not open Spotify. Is it installed?"}
@@ -408,9 +424,37 @@ def play_music(query):
 
 def _send_media_key(vk_code):
     try:
-        ctypes.windll.user32.keybd_event(vk_code, 0, 0, 0)
+        from ctypes import wintypes
+        INPUT_KEYBOARD = 1
+        KEYEVENTF_KEYUP = 0x0002
+
+        class KEYBDINPUT(ctypes.Structure):
+            _fields_ = [("wVk", wintypes.WORD),
+                        ("wScan", wintypes.WORD),
+                        ("dwFlags", wintypes.DWORD),
+                        ("time", wintypes.DWORD),
+                        ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong))]
+
+        class INPUT_UNION(ctypes.Union):
+            _fields_ = [("ki", KEYBDINPUT)]
+
+        class INPUT(ctypes.Structure):
+            _fields_ = [("type", wintypes.DWORD),
+                        ("union", INPUT_UNION)]
+
+        input_down = INPUT()
+        input_down.type = INPUT_KEYBOARD
+        input_down.union.ki.wVk = vk_code
+        input_down.union.ki.dwFlags = 0
+
+        input_up = INPUT()
+        input_up.type = INPUT_KEYBOARD
+        input_up.union.ki.wVk = vk_code
+        input_up.union.ki.dwFlags = KEYEVENTF_KEYUP
+
+        ctypes.windll.user32.SendInput(1, ctypes.byref(input_down), ctypes.sizeof(input_down))
         time.sleep(0.02)
-        ctypes.windll.user32.keybd_event(vk_code, 0, 2, 0)
+        ctypes.windll.user32.SendInput(1, ctypes.byref(input_up), ctypes.sizeof(input_up))
     except Exception as e:
         log.warning(f"[Spotify] media key 0x{vk_code:02X} failed: {e}")
 

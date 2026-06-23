@@ -38,7 +38,7 @@ import WorkflowOverlay from './components/workflows/WorkflowOverlay'
 import Notepad from './components/Notepad'
 import BackgroundWidget from './components/BackgroundWidget'
 import PasteBox from './components/pastebox/PasteBox'
-import useBrowserMic from './services/useBrowserMic'
+import useBrowserMic, { resumeMicAudio } from './services/useBrowserMic'
 // --- Frontend Error Logging ---
 if (typeof socket !== 'undefined') {
   window.onerror = (msg, url, line, col, err) => {
@@ -1491,7 +1491,7 @@ export default function App() {
         pointerEvents: backgroundMode ? 'none' : 'auto',
         transition: 'opacity 0.25s ease',
       }}
-      onClick={() => initAudioCtx()}
+      onClick={() => { initAudioCtx(); resumeMicAudio() }}
     >
       {/* ── Remote Connection Indicator (top-right) ── */}
       {remoteCount > 0 && (

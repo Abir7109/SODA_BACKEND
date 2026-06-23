@@ -398,7 +398,7 @@ def _dispatch(tool, args):
             "vscode": ["code.exe"],
             "visual studio code": ["code.exe"],
             "whatsapp": ["WhatsApp.exe", os.path.expandvars(r"%LOCALAPPDATA%\WhatsApp\WhatsApp.exe")],
-            "spotify": ["Spotify.exe"],
+            "spotify": ["Spotify.exe", os.path.expandvars(r"%APPDATA%\Spotify\Spotify.exe"), os.path.expandvars(r"%LOCALAPPDATA%\Spotify\Spotify.exe")],
             "discord": ["Discord.exe"],
             "slack": ["slack.exe"],
             "zoom": ["Zoom.exe"],

@@ -553,16 +553,21 @@ play_music_tool = {
         "minimizes SODA to the background widget so you can use your desktop. "
         "Use when the user says 'play some music', 'play [genre/mood/song]', "
         "'play chill music', 'I want to listen to [something]', "
-        "'play lofi beats', 'play rock', 'play my liked songs', or similar. "
+        "'play lofi beats', 'play rock', 'play my liked songs', "
+        "'open spotify', 'search for [X] on spotify', "
+        "'search songs', 'find music', or similar. "
+        "This ONE tool handles everything — opens Spotify, searches, and plays. "
+        "Do NOT call open_app for Spotify — call play_music directly. "
+        "If query is empty or generic (e.g. 'some songs'), Spotify opens but you should ask what they'd like to hear. "
         "Examples: play_music(query='chill lofi'), play_music(query='rock classics'), "
-        "play_music(query='focus study music')"
+        "play_music(query='focus study music'), play_music(query='')"
     ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
             "query": {
                 "type": "STRING",
-                "description": "What to search for — genre, mood, artist, song, or playlist name. Examples: 'chill lofi', 'rock classics', 'focus study music', 'my liked songs'"
+                "description": "What to search for — genre, mood, artist, song, or playlist name. Can be empty to just open Spotify. Examples: 'chill lofi', 'rock classics', 'focus study music', 'my liked songs', ''"
             }
         },
         "required": ["query"]
@@ -572,13 +577,14 @@ play_music_tool = {
 control_music_tool = {
     "name": "control_music",
     "description": (
-        "Control Spotify music playback globally. "
+        "Control Spotify music playback globally using system media keys. "
         "Works even when Spotify is minimized or in the background — "
         "no window focus needed. "
         "Actions: 'play_pause' (toggle play/pause), "
         "'next' (skip to next track), 'previous' (go to previous track). "
         "Use when the user says 'pause', 'resume', 'play', 'next song', "
-        "'next track', 'skip', 'previous song', 'go back', 'change track'. "
+        "'next track', 'skip', 'previous song', 'go back', 'change track', "
+        "'pause the music', 'stop the music'. "
         "Examples: control_music(action='play_pause'), control_music(action='next'), "
         "control_music(action='previous')"
     ),

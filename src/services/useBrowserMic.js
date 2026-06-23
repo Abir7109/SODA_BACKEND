@@ -7,6 +7,12 @@ let audioCtx = null
 let scriptNode = null
 let stream = null
 
+export function resumeMicAudio() {
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {})
+  }
+}
+
 export default function useBrowserMic(socket) {
   const [micActive, setMicActive] = useState(false)
   const [micError, setMicError] = useState(null)
@@ -28,6 +34,9 @@ export default function useBrowserMic(socket) {
 
       const AC = window.AudioContext || window.webkitAudioContext
       audioCtx = new AC({ sampleRate: SAMPLE_RATE })
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume()
+      }
       const source = audioCtx.createMediaStreamSource(stream)
 
       scriptNode = audioCtx.createScriptProcessor(CHUNK_SIZE, 1, 1)
