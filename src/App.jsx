@@ -1001,6 +1001,8 @@ export default function App() {
           setTerminal(prev => ({ ...prev, visible: false }))
           if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
           setSearch(prev => ({ ...prev, visible: false }))
+          if (spotifySearchTimerRef.current) clearTimeout(spotifySearchTimerRef.current)
+          setSpotifySearch(prev => ({ ...prev, visible: false }))
           if (fileTimerRef.current) clearTimeout(fileTimerRef.current)
           setFileOutput(prev => ({ ...prev, visible: false }))
           if (infoTimerRef.current) clearTimeout(infoTimerRef.current)
