@@ -53,7 +53,7 @@ edit_file_tool = {
         },
         "required": ["path", "old_string", "new_string"]
     }
-},
+}
 
 list_files_tool = {
     "name": "list_files",
@@ -71,7 +71,7 @@ list_files_tool = {
             }
         }
     }
-},
+}
 
 open_file_tool = {
     "name": "open_file",
@@ -86,7 +86,7 @@ open_file_tool = {
         },
         "required": ["path"]
     }
-},
+}
 
 execute_command_tool = {
     "name": "execute_command",
