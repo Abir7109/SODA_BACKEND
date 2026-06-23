@@ -167,6 +167,36 @@ from external_apis import (
     get_pagespeed_insights,
 )
 
+# ── Local Agent Routing ──
+# These tools MUST run on the local Windows desktop agent.
+# server.py sets _connected_agents and _pending_agent_results at import time.
+_connected_agents: dict[str, dict] = {}
+_pending_agent_results: dict[str, 'asyncio.Future'] = {}
+
+LOCAL_AGENT_TOOLS = {
+    # Window / app management (Windows-only)
+    "close_window", "close_app", "open_app", "window_manage",
+    "window_focus", "window_get_info", "get_active_window",
+    # System control (volume, brightness, power, screenshot)
+    "control_system",
+    # File operations (local filesystem)
+    "list_files", "open_file", "write_file", "read_file", "edit_file",
+    "create_folder", "delete_items", "rename_item", "copy_item", "move_item",
+    "list_drives",
+    # Process management
+    "list_processes", "process_kill",
+    # Clipboard
+    "clipboard_read", "clipboard_write",
+    # Mouse / keyboard / UI automation
+    "mouse_click", "mouse_move", "mouse_scroll",
+    "keyboard_type", "keyboard_press", "keyboard_hotkey",
+    "click_image", "click_text",
+    # Screenshot
+    "screenshot", "take_screenshot",
+    # System info
+    "get_system_status",
+}
+
 SODA_WAKE_PATTERN = re.compile(
     r'(?<![a-zA-Z])soda(?![a-zA-Z])|'
     r'সোডা|'
@@ -1431,6 +1461,39 @@ class AudioLoop:
     async def _dispatch_tool(self, fc):
         name = fc.name
         args = fc.args
+
+        # ── Route to local desktop agent if applicable ──
+        if name in LOCAL_AGENT_TOOLS and _connected_agents:
+            import uuid as _uuid
+            callback_id = str(_uuid.uuid4())
+            future = asyncio.Future()
+            _pending_agent_results[callback_id] = future
+            agent_sid = next(iter(_connected_agents))
+            await self.sio.emit('agent_execute', {
+                'callback_id': callback_id,
+                'tool': name,
+                'args': args,
+            }, room=agent_sid)
+            try:
+                result = await asyncio.wait_for(future, timeout=30.0)
+                _success = result.pop('_success', True)
+            except asyncio.TimeoutError:
+                result = {"success": False, "error": "Local agent did not respond within 30s"}
+                _success = False
+            finally:
+                _pending_agent_results.pop(callback_id, None)
+            # Emit file_list for file browsing tools
+            if name == "list_files" and result.get('success'):
+                await self.sio.emit('file_list', {
+                    'path': result.get('path', args.get('path', '')),
+                    'items': result.get('items', []),
+                    'success': True,
+                    'searchQuery': args.get('search', ''),
+                })
+            return types.FunctionResponse(id=fc.id, name=name, response=result)
+        elif name in LOCAL_AGENT_TOOLS and not _connected_agents:
+            # Some tools work on the cloud server too; let existing handlers try
+            pass  # fall through
 
         if name == "get_weather":
             r = await get_weather(args.get("location", ""), args.get("units", "celsius"))

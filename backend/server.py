@@ -13,6 +13,7 @@ from fastapi import FastAPI
 import threading
 import os
 import json
+import uuid
 
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +33,14 @@ from logger import log
 # Module-level reference to the audio loop, set during start_audio
 _audio_loop = None
 _scheduler_task = None
+
+# ── Local Agent Routing ──
+_connected_agents: dict[str, dict] = {}
+_pending_agent_results: dict[str, asyncio.Future] = {}
+
+# Share with soda module for _dispatch_tool routing
+soda._connected_agents = _connected_agents
+soda._pending_agent_results = _pending_agent_results
 
 # Create a Socket.IO server
 sio = socketio.AsyncServer(
@@ -202,6 +211,55 @@ async def disconnect(sid):
             loop_task.cancel()
         loop_task = None
         audio_loop = None
+
+    # Clean up local agent if it disconnected
+    agent = _connected_agents.pop(sid, None)
+    if agent:
+        print(f"[AGENT] Agent disconnected: {agent.get('machine_id', sid)}")
+
+# ── Local Agent Events ──
+@sio.event
+async def agent_register(sid, data):
+    """Register a local desktop agent for Windows-local tool execution."""
+    machine_id = data.get('machine_id', sid)
+    platform = data.get('platform', 'unknown')
+    tools = data.get('tools', [])
+    _connected_agents[sid] = {
+        'machine_id': machine_id,
+        'platform': platform,
+        'tools': tools,
+        'connected_at': datetime.now().isoformat(),
+        'sid': sid,
+    }
+    print(f"[AGENT] Registered: {machine_id} ({platform}) — {len(tools)} tools")
+
+@sio.event
+async def agent_disconnect(sid, data=None):
+    """Explicit agent disconnect notification."""
+    agent = _connected_agents.pop(sid, None)
+    if agent:
+        print(f"[AGENT] Agent disconnected (explicit): {agent.get('machine_id', sid)}")
+
+@sio.event
+async def agent_tool_result(sid, data):
+    """Receive tool result from a local agent. Resolves the pending future."""
+    callback_id = data.get('callback_id', '')
+    result = data.get('result', {})
+    success = data.get('success', False)
+    future = _pending_agent_results.get(callback_id)
+    if future and not future.done():
+        result['_success'] = success
+        future.set_result(result)
+        _pending_agent_results.pop(callback_id, None)
+    else:
+        print(f"[AGENT] Orphaned tool result: {callback_id} (agent: {_connected_agents.get(sid, {}).get('machine_id', sid)})")
+
+@sio.event
+async def agent_pong(sid, data):
+    """Heartbeat from local agent — keep-alive tracking."""
+    agent = _connected_agents.get(sid)
+    if agent:
+        agent['last_pong'] = datetime.now().isoformat()
 
 @sio.event
 async def start_audio(sid, data=None):

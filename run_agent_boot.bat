@@ -1,29 +1,21 @@
 @echo off
-REM SODA Local Agent - Boot-time launcher for Task Scheduler
-REM Uses pythonw.exe (no console window) and logs all output.
+REM SODA Local Agent - Boot launcher for Task Scheduler
+REM Uses launch_agent.py to capture all output to agent_launcher.log
 
-set "AGENT_DIR=%~dp0backend"
-set "LOG_FILE=%~dp0agent_boot.log"
+set "SCRIPT_DIR=%~dp0"
+set "LOG_FILE=%SCRIPT_DIR%agent_boot.log"
 
-echo [%date% %time%] Starting SODA Agent... >> "%LOG_FILE%"
+echo [%date% %time%] Starting SODA Agent Launcher... >> "%LOG_FILE%"
 
+:: Find Python
 set "PYTHON="
-if exist "C:\Users\Abir\AppData\Local\Programs\Python\Python311\pythonw.exe" set "PYTHON=C:\Users\Abir\AppData\Local\Programs\Python\Python311\pythonw.exe"
-if not defined PYTHON if exist "C:\Program Files\Python311\pythonw.exe" set "PYTHON=C:\Program Files\Python311\pythonw.exe"
-if not defined PYTHON for /f "tokens=*" %%a in ('where pythonw 2^>nul') do set "PYTHON=%%a" & goto :found
-:found
+if exist "C:\Users\Abir\AppData\Local\Programs\Python\Python311\python.exe" set "PYTHON=C:\Users\Abir\AppData\Local\Programs\Python\Python311\python.exe"
+if not defined PYTHON if exist "C:\Program Files\Python311\python.exe" set "PYTHON=C:\Program Files\Python311\python.exe"
+if not defined PYTHON set "PYTHON=python"
 
-if not defined PYTHON (
-    echo [%date% %time%] ERROR: pythonw.exe not found! >> "%LOG_FILE%"
-    exit /b 1
-)
+echo [%date% %time%] Python: %PYTHON% >> "%LOG_FILE%"
 
-echo [%date% %time%] Using: %PYTHON% >> "%LOG_FILE%"
-echo [%date% %time%] Script: %AGENT_DIR%\local_agent.py >> "%LOG_FILE%"
+:: Launch agent via launcher script (captures stdout/stderr to agent_launcher.log)
+start "" "%PYTHON%" -u "%SCRIPT_DIR%launch_agent.py"
 
-start "" "%PYTHON%" -u "%AGENT_DIR%\local_agent.py"
-
-:: Get the actual PID of the agent
-for /f "tokens=2" %%a in ('tasklist /fi "IMAGENAME eq pythonw.exe" /nh 2^>nul') do set "AGENT_PID=%%a"
-echo [%date% %time%] Agent launched successfully. PID: %AGENT_PID% >> "%LOG_FILE%"
-echo Agent PID: %AGENT_PID%
+echo [%date% %time%] Launcher started >> "%LOG_FILE%"

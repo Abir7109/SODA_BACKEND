@@ -53,6 +53,40 @@ edit_file_tool = {
         },
         "required": ["path", "old_string", "new_string"]
     }
+},
+
+list_files_tool = {
+    "name": "list_files",
+    "description": "List files and folders in a directory on the local machine. Returns file names, sizes, and modification dates. Use this to browse the user's file system.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "path": {
+                "type": "STRING",
+                "description": "Directory path to list. Defaults to user's desktop if not specified."
+            },
+            "search": {
+                "type": "STRING",
+                "description": "Optional search query to filter files by name."
+            }
+        }
+    }
+},
+
+open_file_tool = {
+    "name": "open_file",
+    "description": "Open a file on the local machine using the default application. Use when the user asks you to open a specific file or document.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "path": {
+                "type": "STRING",
+                "description": "The full path to the file to open."
+            }
+        },
+        "required": ["path"]
+    }
+},
 }
 
 execute_command_tool = {

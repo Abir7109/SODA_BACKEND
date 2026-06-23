@@ -457,12 +457,114 @@ def _dispatch(tool, args):
         return _close_app_by_name(name)
 
     elif tool == "control_system":
+        action = (args.get("action", "") or "").lower()
+        value = args.get("value", "") or args.get("val", "")
+
+        # Close app by name
+        if action in ("close_app", "close", "exit", "quit"):
+            return _close_app_by_name(value or args.get("name", "") or args.get("app", ""))
+
+        # Minimize window
+        elif action == "minimize":
+            return _dispatch("window_manage", {"title": value, "action": "minimize"})
+
+        # Maximize window
+        elif action == "maximize":
+            return _dispatch("window_manage", {"title": value, "action": "maximize"})
+
+        # Focus window
+        elif action in ("focus", "switch_window"):
+            return _dispatch("window_focus", {"title": value})
+
+        # Show desktop
+        elif action == "show_desktop":
+            if HAS_PYAUTOGUI:
+                import pyautogui
+                pyautogui.hotkey("win", "d")
+                return {"success": True, "action": "show_desktop"}
+            return {"success": False, "error": "pyautogui required"}
+
+        # Open app
+        elif action == "open_app":
+            return _dispatch("open_app", {"name": value})
+
+        # Volume control
+        elif action in ("volume_up", "volume_down", "volume_set", "mute", "unmute", "toggle_mute"):
+            vol_action = action.replace("volume_", "").replace("volume", "")
+            return _dispatch("system_volume", {"action": vol_action or action, "value": value})
+
+        # Brightness
+        elif action in ("brightness_up", "brightness_down", "brightness_set"):
+            b_action = action.replace("brightness_", "")
+            return _dispatch("system_brightness", {"action": b_action, "value": value})
+
+        # Screenshot
+        elif action == "screenshot":
+            return _dispatch("screenshot", {})
+
+        # Lock screen
+        elif action == "lock_screen":
+            os.system("rundll32.exe user32.dll,LockWorkStation")
+            return {"success": True}
+
+        # Power
+        elif action in ("restart", "shutdown", "sleep", "hibernate", "logoff"):
+            return _dispatch("power_control", {"action": action})
+
+        # File explorer
+        elif action == "file_explorer":
+            subprocess.Popen(["explorer.exe"])
+            return {"success": True}
+
+        # Type text
+        elif action == "type_text":
+            if HAS_PYAUTOGUI:
+                import pyautogui
+                pyautogui.write(value, interval=0.02)
+                return {"success": True}
+            return {"success": False, "error": "pyautogui required"}
+
+        # Press key
+        elif action == "press_key":
+            if HAS_PYAUTOGUI:
+                import pyautogui
+                pyautogui.press(value)
+                return {"success": True}
+            return {"success": False, "error": "pyautogui required"}
+
+        # Scroll
+        elif action in ("scroll_up", "scroll_down"):
+            if HAS_PYAUTOGUI:
+                import pyautogui
+                amount = int(value) if value and value.isdigit() else 3
+                pyautogui.scroll(amount if action == "scroll_up" else -amount)
+                return {"success": True}
+            return {"success": False, "error": "pyautogui required"}
+
+        # Open settings
+        elif action == "open_settings":
+            subprocess.Popen(["start", "ms-settings:"], shell=True)
+            return {"success": True}
+
+        # Task manager
+        elif action == "task_manager":
+            subprocess.Popen(["taskmgr.exe"])
+            return {"success": True}
+
+        # Fallback — catch all errors gracefully
         try:
             from system_control import computer_settings_action
-            r = _await_it(computer_settings_action(args.get("action", ""), args.get("value")))
-            return r
-        except ImportError:
-            return {"success": False, "error": "control_system not available"}
+            r = computer_settings_action(action, value)
+            if hasattr(r, '__await__'):
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                    r = loop.run_until_complete(r)
+                except:
+                    r = asyncio.run(r)
+            return {"success": True, "result": str(r) if r else "done"}
+        except:
+            return {"success": False, "error": f"control_system action '{action}' not available locally. Try: say 'open (app)', 'close (app)', or 'minimize (window)'"}
 
     elif tool in ("go_to_sleep", "wake_up", "go_background", "come_back"):
         return {"success": True, "note": f"Action '{tool}' acknowledged, but full support requires the system_control module."}
