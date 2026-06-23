@@ -10,9 +10,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ backend/
+COPY start.sh .
 
 ENV PORT=8000
 
 EXPOSE 8000
 
-CMD uvicorn backend.server:app_socketio --host 0.0.0.0 --port $PORT --ws-ping-interval 10 --ws-ping-timeout 5
+RUN chmod +x start.sh
+CMD ./start.sh
