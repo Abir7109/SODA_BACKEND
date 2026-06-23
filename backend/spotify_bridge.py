@@ -32,6 +32,18 @@ _SPOTIFY_BIG_PLAY_TEMPLATE = os.path.join(
     os.path.dirname(__file__), "vision_templates", "spotify_big_play.png"
 )
 
+# Cooldown: after play_music succeeds, ignore control_music for this many seconds.
+# Prevents Gemini from double-calling pause/play after starting playback.
+_last_play_success_at = 0.0
+_PLAY_COOLDOWN = 10.0
+
+def _mark_play_started():
+    global _last_play_success_at
+    _last_play_success_at = time.time()
+
+def _play_cooldown_active():
+    return time.time() - _last_play_success_at < _PLAY_COOLDOWN
+
 
 # ── Window Management ──
 
@@ -485,6 +497,7 @@ def play_music(query, emit_callback=None):
 
         # Method 1: Simple area click (fast, no dependencies)
         if _click_play_area():
+            _mark_play_started()
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             log.info(f"[Spotify] Playback via area click")
@@ -495,6 +508,7 @@ def play_music(query, emit_callback=None):
 
         # Method 2: Keyboard Tab→Enter / Space / Ctrl+Shift+Down
         if _keyboard_play():
+            _mark_play_started()
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             log.info(f"[Spotify] Playback via keyboard")
@@ -510,6 +524,7 @@ def play_music(query, emit_callback=None):
         except Exception:
             clicked = False
         if clicked:
+            _mark_play_started()
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             log.info(f"[Spotify] Playback via AI Vision")
@@ -564,12 +579,21 @@ def _send_media_key(vk_code):
 
 
 def play_pause():
+    if _play_cooldown_active():
+        log.info("[Spotify] play_pause ignored (playback cooldown active)")
+        return
     _send_media_key(0xB3)
 
 
 def next_track():
+    if _play_cooldown_active():
+        log.info("[Spotify] next_track ignored (playback cooldown active)")
+        return
     _send_media_key(0xB0)
 
 
 def previous_track():
+    if _play_cooldown_active():
+        log.info("[Spotify] previous_track ignored (playback cooldown active)")
+        return
     _send_media_key(0xB1)
