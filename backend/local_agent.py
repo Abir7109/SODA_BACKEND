@@ -350,6 +350,7 @@ def _dispatch(tool, args):
             "outlook": ["outlook.exe"],
             "vscode": ["code.exe"],
             "visual studio code": ["code.exe"],
+            "whatsapp": ["WhatsApp.exe", os.path.expandvars(r"%LOCALAPPDATA%\WhatsApp\WhatsApp.exe")],
             "spotify": ["Spotify.exe"],
             "discord": ["Discord.exe"],
             "slack": ["slack.exe"],
@@ -411,7 +412,29 @@ def _dispatch(tool, args):
         except:
             pass
 
-        # ── FINAL FALLBACK: Start Menu search ────────────────────
+        # ── Search Start Menu shortcuts on disk ────────────────
+        # Every installed app has a .lnk in the Start Menu folders
+        try:
+            _start_menu_dirs = [
+                os.path.expandvars(r"%APPDATA%\Microsoft\Windows\Start Menu\Programs"),
+                os.path.expandvars(r"%PROGRAMDATA%\Microsoft\Windows\Start Menu\Programs"),
+            ]
+            for _sm_dir in _start_menu_dirs:
+                if not os.path.isdir(_sm_dir):
+                    continue
+                for _root, _dirs, _files in os.walk(_sm_dir):
+                    for _f in _files:
+                        if _f.lower().endswith(".lnk") and app_lower in _f.lower().replace(".lnk", ""):
+                            _shortcut_path = os.path.join(_root, _f)
+                            try:
+                                os.startfile(_shortcut_path)
+                                return {"success": True, "app": app, "method": "start_menu_shortcut", "path": _shortcut_path}
+                            except:
+                                continue
+        except:
+            pass
+
+        # ── FINAL FALLBACK: PyAutoGUI Start Menu search ────────
         # Win key → type app name → Enter (same as clicking Start and searching)
         if HAS_PYAUTOGUI:
             import pyautogui

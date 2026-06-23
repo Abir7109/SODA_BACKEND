@@ -2471,8 +2471,8 @@ class AudioLoop:
 
         elif name == "open_app":
             app_name = args.get("app_name", "")
-            system_app.open_app(app_name)
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": "Opened app."})
+            result = system_app.open_app(app_name)
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": result})
 
         elif name == "webview_action":
             loop = asyncio.get_event_loop()
