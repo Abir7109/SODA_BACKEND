@@ -448,6 +448,144 @@ def _do_search(search_text):
     time.sleep(0.5)
 
 
+def _get_spotify_search_region():
+    """Return region covering the search dropdown (below nav bar, ~top 8-55% of window)."""
+    rect = _get_spotify_rect()
+    if not rect:
+        return None
+    left, top, right, bottom = rect
+    w = right - left
+    h = bottom - top
+    return {
+        "left": left,
+        "top": top + int(h * 0.08),
+        "width": w,
+        "height": int(h * 0.47),
+    }
+
+
+def search_music(query):
+    """Search Spotify, extract visible results via AI Vision, return structured list.
+    Does NOT auto-play — returns results for user selection.
+    """
+    if not _PYAUTOGUI or not _WIN32:
+        return {"success": False, "error": "PyAutoGUI or win32 not available"}
+
+    try:
+        if not _focus_or_open_spotify():
+            return {"success": False, "error": "Could not open Spotify"}
+
+        pyautogui.hotkey("ctrl", "k")
+        time.sleep(1.0)
+        pyautogui.write(query, interval=0.05)
+        time.sleep(2.5)
+
+        region = _get_spotify_search_region()
+        if not region:
+            return {"success": False, "error": "Could not get Spotify window region"}
+
+        import mss
+        with mss.mss() as sct:
+            shot = sct.grab(region)
+            png_bytes = mss.tools.to_png(shot.rgb, shot.size)
+
+        import asyncio
+        from screen_vision import analyze_screen
+
+        async def _get_results():
+            prompt = (
+                "This is a screenshot of Spotify search results for the query: " + query + ". "
+                "List ALL visible search results in order from top to bottom. "
+                "For each result, identify the TITLE and TYPE (song/artist/album/playlist/podcast). "
+                "Format your response as a JSON array with NO extra text:\n"
+                '[{"index": 1, "title": "...", "type": "song"}, ...]'
+            )
+            return await analyze_screen(prompt=prompt, screenshot=png_bytes)
+
+        try:
+            vision = asyncio.run(_get_results())
+        except Exception:
+            vision = {"success": False, "error": "AI Vision call failed"}
+
+        if not vision.get("success"):
+            return {"success": False, "error": vision.get("error", "AI Vision failed")}
+
+        text = vision.get("analysis", "").strip()
+        import json
+        try:
+            results = json.loads(text)
+        except json.JSONDecodeError:
+            match = re.search(r'\[.*?\]', text, re.DOTALL)
+            if match:
+                try:
+                    results = json.loads(match.group())
+                except (json.JSONDecodeError, Exception):
+                    return {"success": True, "_raw": text, "results": []}
+            else:
+                return {"success": True, "_raw": text, "results": []}
+
+        if not isinstance(results, list):
+            return {"success": True, "_raw": text, "results": []}
+
+        _maximize_soda()
+        return {
+            "success": True,
+            "query": query,
+            "results": results,
+        }
+    except Exception as e:
+        log.error(f"[Spotify] search_music failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def play_music_result(query, index):
+    """Open search results page and play the result at the given position (1-based index)."""
+    if not _PYAUTOGUI or not _WIN32:
+        return {"success": False, "error": "PyAutoGUI or win32 not available"}
+
+    try:
+        if not _focus_or_open_spotify():
+            return {"success": False, "error": "Could not open Spotify"}
+
+        pyautogui.hotkey("ctrl", "k")
+        time.sleep(1.0)
+        pyautogui.write(query, interval=0.05)
+        time.sleep(2.5)
+
+        for _ in range(index):
+            pyautogui.press("down")
+            time.sleep(0.3)
+        pyautogui.press("enter")
+        time.sleep(3.0)
+        pyautogui.press("home")
+        time.sleep(0.5)
+
+        if _is_playing():
+            now_playing = _get_now_playing()
+            record_play(query, _get_window_title())
+            _maximize_soda()
+            return {"success": True, "query": query, "now_playing": now_playing}
+
+        if _click_play_area():
+            _mark_play_started()
+            now_playing = _get_now_playing()
+            record_play(query, _get_window_title())
+            _maximize_soda()
+            return {"success": True, "query": query, "now_playing": now_playing}
+
+        if _keyboard_play():
+            _mark_play_started()
+            now_playing = _get_now_playing()
+            record_play(query, _get_window_title())
+            _maximize_soda()
+            return {"success": True, "query": query, "now_playing": now_playing}
+
+        return {"success": False, "error": "Could not start playback"}
+    except Exception as e:
+        log.error(f"[Spotify] play_music_result failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
 def _get_now_playing():
     """Parse 'Song - Artist' from Spotify window title. Returns dict or None."""
     title = _get_window_title()

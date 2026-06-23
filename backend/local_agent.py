@@ -920,6 +920,43 @@ def _dispatch(tool, args):
             log(f"[Music] control_music failed: {e}")
             log(traceback.format_exc())
             return {"success": False, "error": f"control_music failed: {e}"}
+    elif tool == "search_music":
+        try:
+            from spotify_bridge import search_music as _sm
+            log(f"[Music] Calling spotify_bridge.search_music(query='{args.get('query', '')}')")
+            result = _sm(args.get("query", ""))
+            log(f"[Music] search_music result: {len(result.get('results', []))} results")
+            if result.get("success") and result.get("results"):
+                try:
+                    sio.emit("spotify_search_results", {
+                        "query": args.get("query", ""),
+                        "results": result["results"],
+                    })
+                except Exception:
+                    pass
+            return result
+        except Exception as e:
+            log(f"[Music] search_music failed: {e}")
+            log(traceback.format_exc())
+            return {"success": False, "error": f"search_music failed: {e}"}
+    elif tool == "play_music_result":
+        try:
+            from spotify_bridge import play_music_result as _pmr
+            q = args.get("query", "")
+            i = args.get("index", 1)
+            log(f"[Music] Calling spotify_bridge.play_music_result(query='{q}', index={i})")
+            result = _pmr(q, i)
+            log(f"[Music] play_music_result result: {result}")
+            if result.get("success") and result.get("now_playing"):
+                try:
+                    sio.emit("now_playing", result["now_playing"])
+                except Exception:
+                    pass
+            return result
+        except Exception as e:
+            log(f"[Music] play_music_result failed: {e}")
+            log(traceback.format_exc())
+            return {"success": False, "error": f"play_music_result failed: {e}"}
 
     # ── Messaging ──────────────────────────────────────────────────
     elif tool in ("send_whatsapp", "whatsapp_find_and_call", "whatsapp_find_and_message"):

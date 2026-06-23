@@ -194,7 +194,7 @@ LOCAL_AGENT_TOOLS = {
     # Process management
     "list_processes", "process_kill",
     # Music (runs on local agent where Spotify Desktop is installed)
-    "play_music", "control_music",
+    "play_music", "control_music", "search_music", "play_music_result",
     # Clipboard
     "clipboard_read", "clipboard_write",
     # Mouse / keyboard / UI automation
@@ -1566,6 +1566,11 @@ class AudioLoop:
                     'items': result.get('items', []),
                     'success': True,
                     'searchQuery': args.get('search', ''),
+                })
+            if name == "search_music" and result.get('success'):
+                await self.sio.emit('spotify_search_results', {
+                    'query': args.get('query', ''),
+                    'results': result.get('results', []),
                 })
             return types.FunctionResponse(id=fc.id, name=name, response=result)
         elif name in LOCAL_AGENT_TOOLS and not _connected_agents:

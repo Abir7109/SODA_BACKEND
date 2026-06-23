@@ -29,6 +29,7 @@ import IELTSSpeakingPanel from './components/panels/IELTSSpeakingPanel'
 import IELTSReadingPanel from './components/panels/IELTSReadingPanel'
 import IELTSVocabPanel from './components/panels/IELTSVocabPanel'
 import IELTSProgressPanel from './components/panels/IELTSProgressPanel'
+import SpotifySearchPanel from './components/panels/SpotifySearchPanel'
 import { PanelSpaceProvider } from './contexts/PanelSpaceContext'
 import WebviewActionService from './services/WebviewActionService'
 import SlidePanel from './components/SlidePanel'
@@ -492,6 +493,10 @@ export default function App() {
   // Search results panel state (right)
   const [search, setSearch] = useState({ visible: false, query: '', results: [] })
   const searchTimerRef = useRef(null)
+
+  // Spotify search results panel state (right)
+  const [spotifySearch, setSpotifySearch] = useState({ visible: false, query: '', results: [] })
+  const spotifySearchTimerRef = useRef(null)
 
   // File/clipboard/code output panel state (bottom)
   const [fileOutput, setFileOutput] = useState({ visible: false, type: 'file', title: '', content: '', success: null })
@@ -969,6 +974,10 @@ export default function App() {
           if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
           setSearch(prev => ({ ...prev, visible: false }))
           break
+        case 'spotify_search':
+          if (spotifySearchTimerRef.current) clearTimeout(spotifySearchTimerRef.current)
+          setSpotifySearch(prev => ({ ...prev, visible: false }))
+          break
         case 'task_terminal':
           setTaskTerminalVisible(false)
           break
@@ -1055,6 +1064,11 @@ export default function App() {
     socket.on('mic_level', onMicLevel)
     socket.on('tool_showcase', onToolShowcase)
     socket.on('search_results', onSearchResults)
+    socket.on('spotify_search_results', (data) => {
+      if (!data || !data.results) return
+      if (spotifySearchTimerRef.current) clearTimeout(spotifySearchTimerRef.current)
+      setSpotifySearch({ visible: true, query: data.query || '', results: data.results || [] })
+    })
     socket.on('webpage_content', onWebpageContent)
     socket.on('file_list', onFileList)
     socket.on('tool_result', onToolResult)
@@ -1283,6 +1297,7 @@ export default function App() {
       socket.off('mic_level', onMicLevel)
       socket.off('tool_showcase', onToolShowcase)
       socket.off('search_results', onSearchResults)
+      socket.off('spotify_search_results')
       socket.off('webpage_content', onWebpageContent)
       socket.off('file_list', onFileList)
       socket.off('scraped_data', onScrapedData)
@@ -1327,6 +1342,11 @@ export default function App() {
   const closeSearch = () => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
     setSearch((prev) => ({ ...prev, visible: false }))
+  }
+
+  const closeSpotifySearch = () => {
+    if (spotifySearchTimerRef.current) clearTimeout(spotifySearchTimerRef.current)
+    setSpotifySearch((prev) => ({ ...prev, visible: false }))
   }
 
   const closeFileOutput = () => {
@@ -1524,6 +1544,14 @@ export default function App() {
         results={search.results}
         onClose={closeSearch}
         onOpenUrl={openUrlInFloatingWindow}
+      />
+
+      {/* Spotify Search Results Panel — slides from RIGHT */}
+      <SpotifySearchPanel
+        visible={spotifySearch.visible}
+        query={spotifySearch.query}
+        results={spotifySearch.results}
+        onClose={closeSpotifySearch}
       />
 
       {/* File/Clipboard/Code Output Panel — slides from BOTTOM */}

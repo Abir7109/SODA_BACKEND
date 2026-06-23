@@ -632,6 +632,55 @@ control_system_tool = {
     }
 }
 
+search_music_tool = {
+    "name": "search_music",
+    "description": (
+        "Search for music on Spotify and return a list of visible results. "
+        "Opens Spotify, types the query into search, waits for results to appear, "
+        "takes a screenshot, and uses AI Vision to extract the visible result list. "
+        "Returns the search results with title and type (song/artist/album/playlist). "
+        "Does NOT auto-play — presents results for the user to choose from. "
+        "Call this when the user wants to browse/search for music before picking. "
+        "Examples: search_music(query='lofi'), search_music(query='bollywood hits'), "
+        "search_music(query='Ed Sheeran'), search_music(query='rock classics')"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "query": {
+                "type": "STRING",
+                "description": "The search query — genre, mood, artist, song, or playlist name. Examples: 'chill lofi', 'bollywood hits', 'Ed Sheeran'"
+            }
+        },
+        "required": ["query"]
+    }
+}
+
+play_music_result_tool = {
+    "name": "play_music_result",
+    "description": (
+        "Play a specific search result from a previous search_music call. "
+        "Navigates to the result at the given position, opens it, and clicks play. "
+        "Use this when the user picks a result from the search list (1-based index). "
+        "Examples: play_music_result(query='lofi', index=2) — plays the second lofi result. "
+        "play_music_result(query='bollywood hits', index=1) — plays the top bollywood result."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "query": {
+                "type": "STRING",
+                "description": "The search query used in the original search_music call"
+            },
+            "index": {
+                "type": "INTEGER",
+                "description": "1-based index of the result to play (1 = first result)"
+            }
+        },
+        "required": ["query", "index"]
+    }
+}
+
 window_move_tool = {
     "name": "window_move",
     "description": "Move or resize a window by title. Use to arrange windows on the desktop. If width and height are omitted, only moves the window.",
@@ -1569,6 +1618,8 @@ tools_list = [{"function_declarations": [
     play_music_tool,
     control_music_tool,
     control_system_tool,
+    search_music_tool,
+    play_music_result_tool,
     *FEELINGS_TOOLS_SCHEMA,
     *IELTS_TOOLS,
     pentest_target_tool,
