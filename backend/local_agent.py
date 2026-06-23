@@ -377,7 +377,7 @@ def _dispatch(tool, args):
             "outlook": ["outlook.exe"],
             "vscode": ["code.exe"],
             "visual studio code": ["code.exe"],
-            "whatsapp": ["WhatsApp.exe"],
+            "whatsapp": ["WhatsApp.exe", os.path.expandvars(r"%LOCALAPPDATA%\WhatsApp\WhatsApp.exe")],
             "spotify": ["Spotify.exe"],
             "discord": ["Discord.exe"],
             "slack": ["slack.exe"],
@@ -387,12 +387,14 @@ def _dispatch(tool, args):
         }
 
         if app_lower in KNOWN_APPS:
+            # First: try full paths that exist (direct launch, no dialog)
             for c in KNOWN_APPS[app_lower]:
-                if _launch(c):
+                if os.path.isfile(c) and _launch(c):
                     return {"success": True, "app": app, "path": c, "method": "known"}
-            # Try via `start` command as last KNOWN_APPS resort
+            # Second: use `start` command (searches App Paths registry, no error dialog)
+            _first_exe = KNOWN_APPS[app_lower][0]
             try:
-                subprocess.Popen(["start", "", KNOWN_APPS[app_lower][0]], shell=True)
+                subprocess.Popen(["start", "", _first_exe], shell=True)
                 if _verify_started():
                     return {"success": True, "app": app, "method": "known_start"}
             except:
