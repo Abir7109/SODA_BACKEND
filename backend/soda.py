@@ -193,6 +193,13 @@ LOCAL_AGENT_TOOLS = {
     "click_image", "click_text",
     # Screenshot
     "screenshot", "take_screenshot",
+    # Screen analysis (needs local display / cv2 / mss)
+    "analyze_screen", "read_screen_text", "recognize_face",
+    # Terminal / scripting (local machine)
+    "terminal_execute", "execute_command",
+    # UI automation
+    "ui_find_image", "ui_click_image", "ui_click_text",
+    "ui_wait_for_image", "ui_drag_drop",
     # System info
     "get_system_status",
 }
