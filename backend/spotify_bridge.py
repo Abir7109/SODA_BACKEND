@@ -161,10 +161,14 @@ async def _click_big_play_ai_vision():
             "Return ONLY the X,Y pixel coordinates of the BIG play button's center "
             "within this screenshot image. Format: 'X,Y'. No other text."
         )
+        log.info(f"[Spotify] AI Vision: screenshot={w}x{h}, calling analyze_screen...")
         result = await analyze_screen(prompt=prompt, screenshot=png_bytes)
+        log.info(f"[Spotify] AI Vision analyze_screen result success={result.get('success')}")
         if not result.get("success"):
+            log.warning(f"[Spotify] AI Vision API error: {result.get('error')}")
             return False
         text = result.get("analysis", "").strip()
+        log.info(f"[Spotify] AI Vision raw response: {text[:120]}")
         # analyze_screen resizes to max 1024px — Gemini coords are in THAT space
         rw = result.get("width", w) or w
         rh = result.get("height", h) or h
@@ -277,18 +281,42 @@ def _wait_for_playback(timeout=8.0):
 
 
 def _keyboard_play():
-    """Single-shot: press Home, Enter, Space to start playback."""
+    """Navigate to the big play button via Tab, then Enter. Falls back to area click and Space."""
     log.info("[Spotify] Keyboard play attempt")
-    pyautogui.press("home")
-    time.sleep(0.3)
+    # Method 1: Tab through UI to reach play button
+    for i in range(6):
+        pyautogui.press("tab")
+        time.sleep(0.15)
     pyautogui.press("enter")
-    time.sleep(0.5)
-    pyautogui.press("space")
-    time.sleep(0.5)
-    if _wait_for_playback(timeout=6.0):
-        log.info("[Spotify] Playback confirmed via keyboard")
+    time.sleep(0.8)
+    if _wait_for_playback(timeout=5.0):
+        log.info("[Spotify] Playback confirmed via Tab→Enter")
         return True
-    log.warning("[Spotify] Keyboard play did not start playback")
+    # Method 2: Try clicking approximate big play button area (top-left of content region)
+    rect = _get_spotify_rect()
+    if rect:
+        left, top, right, bottom = rect
+        cx = left + int((right - left) * 0.20)
+        cy = top + int((bottom - top) * 0.20)
+        log.info(f"[Spotify] Clicking play area ({cx},{cy})")
+        pyautogui.click(cx, cy)
+        time.sleep(1.0)
+        if _wait_for_playback(timeout=5.0):
+            log.info(f"[Spotify] Playback confirmed via area click ({cx},{cy})")
+            return True
+    # Method 3: Space key (play/pause toggle on focused track)
+    pyautogui.press("space")
+    time.sleep(0.8)
+    if _wait_for_playback(timeout=5.0):
+        log.info("[Spotify] Playback confirmed via Space")
+        return True
+    # Method 4: Ctrl+Shift+Down (Spotify native play shortcut)
+    pyautogui.hotkey("ctrl", "shift", "down")
+    time.sleep(1.0)
+    if _wait_for_playback(timeout=5.0):
+        log.info("[Spotify] Playback confirmed via Ctrl+Shift+Down")
+        return True
+    log.warning("[Spotify] All keyboard play methods failed")
     return False
 
 

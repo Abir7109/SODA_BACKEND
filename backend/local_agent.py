@@ -891,15 +891,18 @@ def _dispatch(tool, args):
         action = args.get("action", "")
         try:
             from spotify_bridge import play_pause, next_track, previous_track
-            log(f"[Music] control_music(action='{action}')")
             if action == "play_pause":
+                log(f"[Music] control_music(action='play_pause') -> calling _send_media_key(0xB3)")
                 play_pause()
             elif action == "next":
+                log(f"[Music] control_music(action='next') -> calling _send_media_key(0xB0)")
                 next_track()
             elif action == "previous":
+                log(f"[Music] control_music(action='previous') -> calling _send_media_key(0xB1)")
                 previous_track()
             else:
                 return {"success": False, "error": f"Unknown action: {action}"}
+            log(f"[Music] control_music({action}) completed successfully")
             return {"success": True, "result": f"Music {action}."}
         except Exception as e:
             log(f"[Music] control_music failed: {e}")

@@ -593,7 +593,8 @@ MUSIC CONTROL — ABSOLUTE RULES:
    - "i need music" / "let's hear something" → play_music(query='')
 4. play_music(query='') opens Spotify and asks what to play. play_music(query='bollywood hits') searches and plays.
 5. For "pause" / "resume" / "next song" / "skip" / "previous" / "go back" / "stop the music": call control_music(action=...) — NEVER open_app, NEVER play_music.
-6. Do NOT call open_app for Spotify. Ever. play_music handles everything including opening Spotify.
+6. For volume: "turn it up" → control_system(action='volume_up'), "turn it down" → control_system(action='volume_down'), "set volume to 50" → control_system(action='volume_set', value=50), "mute" → control_system(action='mute'), "unmute" → control_system(action='unmute').
+7. Do NOT call open_app for Spotify. Ever. play_music handles everything including opening Spotify.
 
 Examples:
   User: 'play some chill music' → play_music(query='chill lofi')
@@ -607,7 +608,10 @@ Examples:
   User: 'pause the music' → control_music(action='play_pause')
   User: 'next song' → control_music(action='next')
   User: 'turn it up' → control_system(action='volume_up')
+  User: 'turn it down' → control_system(action='volume_down')
   User: 'set volume to 50' → control_system(action='volume_set', value=50)
+  User: 'mute' / 'unmute' → control_system(action='mute') / control_system(action='unmute')
+  User: 'volume 30' / 'volume 70 percent' → control_system(action='volume_set', value=30)
 """
     base += "\n\nGESTURE & WELCOME HOME:\n- When you receive a transcription containing '[Gesture: double_clap]', the user just double-clapped. Call welcome_home immediately.\n- When the user says 'welcome home', 'I'm back', 'jarvis', 'I returned', or similar — call welcome_home to run the full welcome sequence (open Spotify, Chrome windows, Cursor, and play a greeting via TTS).\n- welcome_home runs in the background and returns immediately — do not wait for it to complete."
     return base
