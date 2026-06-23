@@ -876,12 +876,25 @@ def _dispatch(tool, args):
         return {"success": False, "error": "pygetwindow or pywin32 required"}
 
     # ── Music ──────────────────────────────────────────────────────
-    elif tool in ("play_music", "control_music"):
+    elif tool == "play_music":
         try:
-            from spotify_bridge import play_music_handler, control_music_handler
-            if tool == "play_music":
-                return play_music_handler(args.get("query", ""))
-            return control_music_handler(args.get("action", ""))
+            from spotify_bridge import play_music
+            return play_music(args.get("query", ""))
+        except ImportError:
+            return {"success": False, "error": "spotify_bridge not available locally"}
+    elif tool == "control_music":
+        action = args.get("action", "")
+        try:
+            from spotify_bridge import play_pause, next_track, previous_track
+            if action == "play_pause":
+                play_pause()
+            elif action == "next":
+                next_track()
+            elif action == "previous":
+                previous_track()
+            else:
+                return {"success": False, "error": f"Unknown action: {action}"}
+            return {"success": True, "result": f"Music {action}."}
         except ImportError:
             return {"success": False, "error": "spotify_bridge not available locally"}
 

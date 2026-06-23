@@ -192,6 +192,8 @@ LOCAL_AGENT_TOOLS = {
     "list_drives",
     # Process management
     "list_processes", "process_kill",
+    # Music (runs on local agent where Spotify Desktop is installed)
+    "play_music", "control_music",
     # Clipboard
     "clipboard_read", "clipboard_write",
     # Mouse / keyboard / UI automation
