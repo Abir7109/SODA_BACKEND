@@ -44,7 +44,7 @@ LOCAL_TOOLS = [
     "list_files", "open_file", "write_file", "read_file", "create_folder",
     "delete_items", "rename_item", "copy_item", "move_item", "list_drives",
     "scroll_file_list", "view_file",
-    "terminal_execute", "execute_command", "open_app", "close_window",
+    "terminal_execute", "execute_command", "open_app", "close_window", "close_app",
     "control_system", "screenshot", "screenshot_region",
     "clipboard_read", "clipboard_write",
     "mouse_click", "mouse_move", "mouse_scroll", "mouse_drag",
@@ -303,24 +303,102 @@ def _dispatch(tool, args):
 
     # ── App / System Control ──────────────────────────────────────
     elif tool == "open_app":
-        try:
-            from system_app import open_app
-            return open_app(args.get("name", "") or args.get("app_name", ""))
-        except ImportError:
-            app = args.get("name", "") or args.get("app_name", "")
+        app = args.get("name", "") or args.get("app_name", "") or args.get("app", "")
+        if not app:
+            return {"success": False, "error": "No app name provided"}
+        app_lower = app.lower().strip()
+
+        # Hardcoded lookup for common apps
+        KNOWN_APPS = {
+            "chrome": ["chrome.exe", r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                       r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"],
+            "firefox": ["firefox.exe", r"C:\Program Files\Mozilla Firefox\firefox.exe"],
+            "edge": ["msedge.exe", r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"],
+            "notepad": ["notepad.exe"],
+            "cmd": ["cmd.exe"],
+            "command prompt": ["cmd.exe"],
+            "terminal": ["wt.exe", "cmd.exe"],
+            "powershell": ["powershell.exe"],
+            "explorer": ["explorer.exe"],
+            "file explorer": ["explorer.exe"],
+            "this pc": ["explorer.exe"],
+            "calculator": ["calc.exe"],
+            "paint": ["mspaint.exe"],
+            "word": ["winword.exe", r"C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE"],
+            "excel": ["excel.exe", r"C:\Program Files\Microsoft Office\root\Office16\EXCEL.EXE"],
+            "outlook": ["outlook.exe"],
+            "vscode": ["code.exe"],
+            "visual studio code": ["code.exe"],
+            "spotify": ["Spotify.exe"],
+            "discord": ["Discord.exe"],
+            "slack": ["slack.exe"],
+            "zoom": ["Zoom.exe"],
+            "vlc": ["vlc.exe"],
+            "soda": ["chrome.exe", "--app=https://soda-hud.netlify.app"],
+        }
+
+        if app_lower in KNOWN_APPS:
+            candidates = KNOWN_APPS[app_lower]
+            # First try exe name via start command
+            exe_name = candidates[0]
+            # Try full path first
+            for path in candidates:
+                if os.path.isfile(path):
+                    try:
+                        subprocess.Popen([path], shell=False)
+                        return {"success": True, "app": app, "path": path}
+                    except:
+                        pass
+            # Try just the executable name
             try:
-                os.startfile(app)
-                return {"success": True}
-            except Exception:
-                subprocess.Popen(["start", app], shell=True)
-                return {"success": True}
+                subprocess.Popen(["start", "", exe_name], shell=True)
+                return {"success": True, "app": app, "method": "start"}
+            except:
+                pass
+
+        # Try os.startfile (works for registered apps)
+        try:
+            os.startfile(app)
+            return {"success": True, "app": app, "method": "startfile"}
+        except:
+            pass
+
+        # Try `start` command
+        try:
+            subprocess.Popen(["start", "", app], shell=True)
+            return {"success": True, "app": app, "method": "start"}
+        except:
+            pass
+
+        # Search PATH for the executable
+        try:
+            result = subprocess.run(["where", app], shell=True, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                exe_path = result.stdout.strip().split("\n")[0].strip()
+                subprocess.Popen([exe_path], shell=False)
+                return {"success": True, "app": app, "path": exe_path}
+        except:
+            pass
+
+        # Try with .exe extension
+        try:
+            result = subprocess.run(["where", f"{app}.exe"], shell=True, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                exe_path = result.stdout.strip().split("\n")[0].strip()
+                subprocess.Popen([exe_path], shell=False)
+                return {"success": True, "app": app, "path": exe_path}
+        except:
+            pass
+
+        return {"success": False, "error": f"Could not find or open '{app}'. Try a different name."}
 
     elif tool == "close_window":
-        try:
-            from system_control import close_window
-            return close_window(args.get("window_name", ""))
-        except ImportError:
-            return {"success": False, "error": "close_window not available"}
+        name = args.get("name", "") or args.get("window_name", "") or args.get("title", "")
+        return _close_app_by_name(name)
+
+    elif tool == "close_app":
+        name = args.get("name", "") or args.get("app", "") or args.get("app_name", "")
+        return _close_app_by_name(name)
 
     elif tool == "control_system":
         try:
@@ -1057,6 +1135,58 @@ def _fallback_list_files(path="."):
         return {"success": True, "path": str(p), "items": items, "parent": str(p.parent)}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+def _close_app_by_name(name):
+    """Close an app by name — searches windows first, then kills process."""
+    if not name:
+        return {"success": False, "error": "No app/window name provided. Say 'close Chrome' or 'close Notepad'."}
+
+    # Method 1: Close via window title (pygetwindow)
+    if HAS_PYGETWINDOW:
+        import pygetwindow as gw
+        try:
+            all_wins = gw.getAllWindows()
+            matching = [w for w in all_wins if w.title and name.lower() in w.title.lower()]
+            if matching:
+                closed = []
+                for w in matching:
+                    try:
+                        w.close()
+                        closed.append(w.title)
+                    except:
+                        pass
+                if closed:
+                    return {"success": True, "closed": closed, "method": "window_title", "count": len(closed)}
+        except:
+            pass
+
+    # Method 2: Kill process by name
+    for proc_name in [name if name.endswith(".exe") else f"{name}.exe",
+                      name, f"{name}.EXE"]:
+        try:
+            r = subprocess.run(["taskkill", "/f", "/im", proc_name],
+                               shell=True, capture_output=True, text=True, timeout=5)
+            if r.returncode == 0:
+                return {"success": True, "method": "taskkill", "process": proc_name}
+        except:
+            pass
+
+    # Method 3: psutil-based process kill
+    if HAS_PSUTIL:
+        import psutil
+        killed = []
+        for p in psutil.process_iter(["pid", "name"]):
+            try:
+                if name.lower() in p.info["name"].lower():
+                    p.kill()
+                    killed.append(p.info["name"])
+            except:
+                pass
+        if killed:
+            return {"success": True, "killed": killed, "method": "psutil"}
+
+    return {"success": False, "error": f"Could not find or close '{name}'. No matching window or process found."}
 
 
 def _fallback_open_file(path=""):
