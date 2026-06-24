@@ -1,7 +1,7 @@
 """
-Spotify bridge — hybrid approach.
-- Search: Playwright-based Web API (not rate-limited per-user token)
-- Playback: Spicetify extension via WebSocket (play, pause, skip, volume, status)
+Spotify bridge — Spicetify extension via WebSocket.
+- Search: Pathfinder GraphQL via extension's native fetch
+- Playback: Spicetify.Player API (play, pause, skip, volume, status)
 """
 
 import asyncio, json, threading, time, uuid, os, requests
@@ -54,6 +54,12 @@ def _ensure_server():
 async def _ws_main():
     global _extension_ws
     import websockets
+    import asyncio
+    import logging
+
+    # Suppress noisy non-WebSocket connection errors (HEAD probes, etc.)
+    logging.getLogger("websockets.server").setLevel(logging.CRITICAL)
+
     async def handler(ws):
         global _extension_ws
         _extension_ws = ws
@@ -70,7 +76,8 @@ async def _ws_main():
         finally:
             _extension_ws = None
             log.info("[Spotify] Extension disconnected")
-    async with websockets.serve(handler, "127.0.0.1", WS_PORT):
+
+    async with websockets.serve(handler, "0.0.0.0", WS_PORT):
         log.info("[Spotify] Bridge ready on port %d", WS_PORT)
         await asyncio.Future()
 

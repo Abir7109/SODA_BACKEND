@@ -149,7 +149,7 @@ Colors, typography, and spacing are defined as CSS custom properties in
 ### Spotify Bridge (Final Architecture)
 
 **Spicetify extension** at `%LOCALAPPDATA%\spicetify\Extensions\soda_spotify_bridge.js`:
-- Connects to Python WebSocket server at `ws://127.0.0.1:18920`
+- Connects to Python WebSocket server at `ws://127.0.0.1:18920` (server binds `0.0.0.0` for all-interface access)
 - Loads inside Spotify's CEF browser via Spicetify injection
 - **Playback control**: Uses `Spicetify.Player` API — `playUri()`, `togglePlay()`, `next()`, `back()`, `setVolume()`
 - **Search**: Uses Pathfinder GraphQL API via **direct `fetch()`** (CosmosAsync skips auth for `api-partner.spotify.com`)
@@ -159,7 +159,8 @@ Colors, typography, and spacing are defined as CSS custom properties in
   - Normalizes Pathfinder response → Web API format (`tracks.items[].{name,artists,album,uri,id}`)
 
 **Python bridge** at `backend/spotify_bridge.py`:
-- Starts `websockets.serve` on port 18920 in background thread
+- Starts `websockets.serve` on port 18920 (`0.0.0.0` / all interfaces) in background thread
+- Suppresses websockets.server logs to CRITICAL to ignore non-WebSocket HEAD probes on the port
 - `_send_command()` sends JSON over WebSocket, blocks on `threading.Event` for response
 - Public API: `search()`, `play_track()`, `play_uri()`, `play_music()`, `play_pause()`, `resume()`, `next_track()`, `previous_track()`, `set_volume()`, `get_status()`
 
