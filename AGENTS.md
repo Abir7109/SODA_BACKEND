@@ -138,21 +138,33 @@ Colors, typography, and spacing are defined as CSS custom properties in
 - `AudioTranscriptionConfig.languageCode` is NOT sent through pydantic serialization (LiveConnectParameters caches original schema — extra fields stripped)
 - `context_window_compression` should be omitted entirely — low `trigger_tokens` adds latency on every turn
 
-### Spotify Playback (Retry + Verify)
-- `_is_playing()`: Checks window title for `" - "` pattern (`Song - Artist`). Returns False if title is just `"Spotify"` or `"Advertisement"`.
-- `play_music()` flow: **Check play_history** for repeat → **Ctrl+K search → Enter** (opens top result, not row-click) → **Big play button** at top of page → verify.
-- **Two-step flow**: Search + Enter opens the top playlist/album page (NOT clicking a row-level play icon). Then find the BIG green circular play button at the top of the page (48-60px, very distinctive). This avoids the "clicked song name instead of play" problem.
-- `_click_big_play_template()`: Searches top 35% of Spotify window for `spotify_big_play.png` template.
-- `_click_big_play_ai_vision()`: Gemini prompt asks for "big green circular play button at top-left area of playlist page".
-- `_try_play_with_method(method_fn, name, max_attempts)`: Calls click function, waits 1.5s, checks `_is_playing()`. If not playing, presses **Home** (scrolls to top, where play button lives) and retries.
-- `play_music()` only returns `{"success": True}` when `_is_playing()` confirms audio is playing.
-- `_save_big_play_template` uses `size=24` (tight 24x24 crop around big green play icon).
-- `record_play(query, title)` in `play_history.py`: Saves successful plays to `backend/play_history.json` with play_count, first/last played timestamps.
-- `find_similar(query)` in `play_history.py`: Word-overlap matching against history. Next time you say "play lofi", it matches previous "lofi hip hop radio" entry and searches that exact title.
-- `_scroll_to_top()`: Presses Home key to ensure the big play button is visible at the top of the page.
+### Spotify Playback (Spicetify Bridge — see final architecture below)
 
 ### Key Notes
 - `npm run dev` uses `py -3.11` — default `python` (3.12+) crashes `server.py`
 - Electron `<webview>` requires `webviewTag: true` in `electron/main.js`
 - News RSS fails often; DDG HTML scraping is fallback via `_parse_ddg_html()`
 - `get_news` handler has 5s cooldown (`_last_news_briefing`)
+
+### Spotify Bridge (Final Architecture)
+
+**Spicetify extension** at `%LOCALAPPDATA%\spicetify\Extensions\soda_spotify_bridge.js`:
+- Connects to Python WebSocket server at `ws://127.0.0.1:18920`
+- Loads inside Spotify's CEF browser via Spicetify injection
+- **Playback control**: Uses `Spicetify.Player` API — `playUri()`, `togglePlay()`, `next()`, `back()`, `setVolume()`
+- **Search**: Uses Pathfinder GraphQL API via **direct `fetch()`** (CosmosAsync skips auth for `api-partner.spotify.com`)
+  - Auth token from `Spicetify.Platform.AuthorizationAPI.getState().token.accessToken`
+  - Query operation `searchDesktop` with SHA-256 hash `4801118d4a100f756e833d33984436a3899cff359c532f8fd3aaf174b60b3b49`
+  - URL: `https://api-partner.spotify.com/pathfinder/v1/query?operationName=searchDesktop&variables=...&extensions=...`
+  - Normalizes Pathfinder response → Web API format (`tracks.items[].{name,artists,album,uri,id}`)
+
+**Python bridge** at `backend/spotify_bridge.py`:
+- Starts `websockets.serve` on port 18920 in background thread
+- `_send_command()` sends JSON over WebSocket, blocks on `threading.Event` for response
+- Public API: `search()`, `play_track()`, `play_uri()`, `play_music()`, `play_pause()`, `resume()`, `next_track()`, `previous_track()`, `set_volume()`, `get_status()`
+
+**No UI automation** — no pyautogui, no OCR, no screen coordinates.
+**No Playwright** — all token acquisition goes through Spicetify's in-app session.
+**No rate limits** — Pathfinder uses desktop session auth, separate pool from `api.spotify.com`.
+**Spicetify CLI**: `spicetify apply --bypass-admin` then `spicetify restart` to load patched app.
+**Refresh after extension changes**: `spicetify refresh -e` then `spicetify restart`.
