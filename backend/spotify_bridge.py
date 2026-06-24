@@ -74,12 +74,41 @@ async def _ws_main():
         log.info("[Spotify] Bridge ready on port %d", WS_PORT)
         await asyncio.Future()
 
+SPICETIFY_EXE = os.path.join(
+    os.environ.get("LOCALAPPDATA", ""), "spicetify", "spicetify.exe"
+)
+
+def _launch_spotify():
+    """Try to launch Spotify via spicetify restart."""
+    if not os.path.isfile(SPICETIFY_EXE):
+        log.warning("[Spotify] spicetify.exe not found at %s", SPICETIFY_EXE)
+        return False
+    try:
+        import subprocess
+        subprocess.Popen([SPICETIFY_EXE, "restart"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log.info("[Spotify] Launched via spicetify restart")
+        return True
+    except Exception as e:
+        log.warning("[Spotify] spicetify launch failed: %s", e)
+        return False
+
 def _send_command(cmd, params=None, timeout=10):
     _ensure_server()
+    # First wait: check if extension is already connected
     for _ in range(timeout * 2):
         if _extension_ws is not None:
             break
         time.sleep(0.5)
+    if _extension_ws is None:
+        # Extension not connected — try launching Spotify
+        log.info("[Spotify] Extension not connected, launching Spotify...")
+        _launch_spotify()
+        # Second wait: give Spotify time to start and extension to connect
+        for _ in range(40):
+            if _extension_ws is not None:
+                break
+            time.sleep(0.5)
     if _extension_ws is None:
         raise ConnectionError("Spicetify extension not connected — is Spotify running via 'spicetify auto'?")
 
