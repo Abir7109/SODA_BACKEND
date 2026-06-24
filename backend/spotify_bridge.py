@@ -127,23 +127,25 @@ def _within_spotify_bounds(x, y):
 
 def _click_play_area():
     """Click the big green play button on Spotify after navigating to a result page.
-    The button is in the top-left content area: ~8-10% from left, ~18-22% from top.
-    Only clicks if coordinates are within Spotify window bounds. Returns True if playback detected."""
+    Tries 3 Y positions (20%, 25%, 15%) to handle varying playlist/album header heights.
+    The big green play button is always at ~10% from left in the top-left content area."""
     rect = _get_spotify_rect()
     if not rect:
         return False
     left, top, right, bottom = rect
-    cx = left + int((right - left) * 0.10)
-    cy = top + int((bottom - top) * 0.20)
-    if not _within_spotify_bounds(cx, cy):
-        log.warning(f"[Spotify] Play area click ({cx},{cy}) outside bounds — skipping")
-        return False
-    log.info(f"[Spotify] Clicking play area ({cx},{cy})")
-    pyautogui.click(cx, cy)
-    safe_sleep(1.0)
-    if _wait_for_playback(timeout=5.0):
-        log.info(f"[Spotify] Playback confirmed via area click ({cx},{cy})")
-        return True
+    w, h = right - left, bottom - top
+    cx = left + int(w * 0.10)
+
+    for y_pct in [0.20, 0.25, 0.15]:
+        cy = top + int(h * y_pct)
+        if not _within_spotify_bounds(cx, cy):
+            continue
+        log.info(f"[Spotify] Clicking play area ({cx},{cy}) at {y_pct*100:.0f}% Y")
+        pyautogui.click(cx, cy)
+        if _wait_for_playback(timeout=3.0):
+            log.info(f"[Spotify] Playback confirmed at Y {y_pct*100:.0f}%")
+            return True
+    log.warning("[Spotify] Area click failed at all Y positions")
     return False
 
 
@@ -339,6 +341,8 @@ def _save_big_play_template(x, y, size=24):
 
 def _click_big_play_template():
     """Try OpenCV template matching to find the big green play button at the top of a page."""
+    if not os.path.exists(_SPOTIFY_BIG_PLAY_TEMPLATE):
+        return False
     region = _get_spotify_top_region()
     if not region:
         return False

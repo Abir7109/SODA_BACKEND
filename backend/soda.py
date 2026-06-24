@@ -1368,8 +1368,10 @@ class AudioLoop:
                                 self._model_is_speaking = False
                                 self._tools_running = False
                                 break
-                            # Reset speaking flag immediately — don't wait for play_audio silence timeout
-                            self._model_is_speaking = False
+                            # Let play_audio()'s silence timeout handle the speaking flag naturally.
+                            # Do NOT reset _model_is_speaking here — the model may still be
+                            # generating a spoken response to the tool results, and unmuting
+                            # the mic prematurely lets user audio interrupt the model's reply.
                             self._tools_running = False
                         else:
                             # All tool calls failed — reset flags so mic unmutes for normal chat
