@@ -80,13 +80,24 @@ def _launch_spotify():
 def _activate_window(hwnd):
     if win32gui.IsIconic(hwnd):
         win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        safe_sleep(0.3)
         if win32gui.IsZoomed(hwnd):
             win32gui.ShowWindow(hwnd, win32con.SW_SHOWNORMAL)
-    rect = win32gui.GetWindowRect(hwnd)
-    cx = (rect[0] + rect[2]) // 2
-    cy = rect[1] + 10
-    pyautogui.click(cx, cy)
+    # Use Alt-key UIPI bypass + SetForegroundWindow (no mouse click = no accidental close)
+    ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)
+    try:
+        safe_sleep(0.1)
+        win32gui.SetForegroundWindow(hwnd)
+        safe_sleep(0.15)
+    finally:
+        ctypes.windll.user32.keybd_event(0x12, 0, 2, 0)
     safe_sleep(0.3)
+    if win32gui.GetForegroundWindow() != hwnd:
+        try:
+            ctypes.windll.user32.SwitchToThisWindow(hwnd, True)
+            safe_sleep(0.3)
+        except Exception:
+            pass
 
 
 def _within_spotify_bounds(x, y):
@@ -102,15 +113,15 @@ def _within_spotify_bounds(x, y):
 
 
 def _click_play_area():
-    """Click the approximate position of the big green play button on Spotify.
-    The button is typically in the top-left content area: ~20% from left, ~22% from top.
+    """Click the big green play button on Spotify after navigating to a result page.
+    The button is in the top-left content area: ~8-10% from left, ~18-22% from top.
     Only clicks if coordinates are within Spotify window bounds. Returns True if playback detected."""
     rect = _get_spotify_rect()
     if not rect:
         return False
     left, top, right, bottom = rect
-    cx = left + int((right - left) * 0.20)
-    cy = top + int((bottom - top) * 0.22)
+    cx = left + int((right - left) * 0.10)
+    cy = top + int((bottom - top) * 0.20)
     if not _within_spotify_bounds(cx, cy):
         log.warning(f"[Spotify] Play area click ({cx},{cy}) outside bounds — skipping")
         return False
@@ -664,7 +675,10 @@ def _ocr_click_search_result(index):
 
 
 def play_music_result(query, index):
-    """Open search results page and play the result at the given position (1-based index)."""
+    """Play a specific search result from the already-visible Spotify dropdown.
+    Does NOT re-search — the dropdown is still there from search_music().
+    Only re-searches as fallback if OCR fails to find results.
+    """
     if not _PYAUTOGUI or not _WIN32:
         return {"success": False, "error": "PyAutoGUI or win32 not available"}
 
@@ -672,20 +686,25 @@ def play_music_result(query, index):
         if not _focus_or_open_spotify():
             return {"success": False, "error": "Could not open Spotify"}
 
-        pyautogui.hotkey("ctrl", "k")
-        safe_sleep(1.0)
-        pyautogui.write(query, interval=0.05)
-        safe_sleep(2.5)
+        # Try to OCR-click from existing search dropdown (no re-search needed)
+        clicked = _ocr_click_search_result(index)
 
-        if not _ocr_click_search_result(index):
-            log.warning("[Spotify] OCR click navigation failed, falling back to keyboard navigation")
-            for _ in range(index):
-                pyautogui.press("down")
-                safe_sleep(0.3)
-            pyautogui.press("enter")
-            safe_sleep(3.0)
-        pyautogui.press("home")
-        safe_sleep(0.5)
+        if not clicked:
+            log.info("[Spotify] Existing dropdown not found — re-searching")
+            pyautogui.hotkey("ctrl", "k")
+            safe_sleep(1.0)
+            pyautogui.write(query, interval=0.05)
+            safe_sleep(2.5)
+            if not _ocr_click_search_result(index):
+                log.warning("[Spotify] OCR click navigation failed, falling back to keyboard navigation")
+                for _ in range(index):
+                    pyautogui.press("down")
+                    safe_sleep(0.3)
+                pyautogui.press("enter")
+                safe_sleep(3.0)
+
+        # Let the page fully render before attempting play
+        safe_sleep(1.5)
 
         if _is_playing():
             now_playing = _get_now_playing()
@@ -693,28 +712,53 @@ def play_music_result(query, index):
             _maximize_soda()
             return {"success": True, "query": query, "now_playing": now_playing}
 
-        # Method 0: User-trained play button click (set via train_play_button.py)
+        # Method 0: User-trained play button calibration (highest priority)
         if _click_trained_play_button():
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             _maximize_soda()
             return {"success": True, "query": query, "now_playing": now_playing}
 
+        # Method 1: Area click (10% left, 20% top — matches big green play button)
         if _click_play_area():
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             _maximize_soda()
             return {"success": True, "query": query, "now_playing": now_playing}
 
+        # Method 2: OpenCV template matching (big green play button)
+        if _click_big_play_template():
+            safe_sleep(1.0)
+            if _is_playing():
+                now_playing = _get_now_playing()
+                record_play(query, _get_window_title())
+                _maximize_soda()
+                return {"success": True, "query": query, "now_playing": now_playing}
+
+        # Method 3: Keyboard Tab→Enter / Space / Ctrl+Shift+Down
         if _keyboard_play():
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             _maximize_soda()
             return {"success": True, "query": query, "now_playing": now_playing}
 
+        # Method 4: AI Vision (last resort — slow, expensive)
+        import asyncio
+        try:
+            clicked = asyncio.run(_click_big_play_ai_vision())
+        except Exception:
+            clicked = False
+        if clicked:
+            now_playing = _get_now_playing()
+            record_play(query, _get_window_title())
+            _maximize_soda()
+            return {"success": True, "query": query, "now_playing": now_playing}
+
+        _maximize_soda()
         return {"success": False, "error": "Could not start playback"}
     except Exception as e:
         log.error(f"[Spotify] play_music_result failed: {e}")
+        _maximize_soda()
         return {"success": False, "error": str(e)}
 
 

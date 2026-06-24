@@ -1576,11 +1576,6 @@ class AudioLoop:
                     'success': True,
                     'searchQuery': args.get('search', ''),
                 })
-            if name == "search_music" and result.get('success'):
-                await self.sio.emit('spotify_search_results', {
-                    'query': args.get('query', ''),
-                    'results': result.get('results', []),
-                })
             return types.FunctionResponse(id=fc.id, name=name, response=result)
         elif name in LOCAL_AGENT_TOOLS and not _connected_agents:
             # Some tools work on the cloud server too; let existing handlers try
