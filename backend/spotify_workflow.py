@@ -119,16 +119,67 @@ def _step_clear_menu():
 def _step_do_search(query):
     """Ctrl+K to open search bar, then type the query."""
     pyautogui.hotkey("ctrl", "k")
-    safe_sleep(1.0)
+    safe_sleep(0.5)
     pyautogui.write(query, interval=0.05)
-    safe_sleep(2.5)
+    safe_sleep(1.5)
 
 
 # ── Step 4: Extract search results via OCR ──
 
+def _ocr_group(img):
+    """Run tesseract OCR on image and group results into structured rows.
+    Raises on failure; caller handles timeout."""
+    import pytesseract
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+
+    rows = {}
+    for i in range(len(data["text"])):
+        txt = data["text"][i].strip()
+        if not txt or int(data["conf"][i]) < 30:
+            continue
+        y = data["top"][i]
+        row_key = round(y / 20) * 20
+        rows.setdefault(row_key, []).append({
+            "text": txt,
+            "x": data["left"][i],
+            "y": y,
+        })
+
+    skip_keywords = {"top result", "songs", "artists", "albums", "playlists",
+                     "podcasts", "genres", "profiles"}
+    results = []
+    for row_key in sorted(rows):
+        words = rows[row_key]
+        words.sort(key=lambda w: w["x"])
+        line = " ".join(w["text"] for w in words).strip()
+        if not line or len(line) < 2:
+            continue
+        if line.lower() in skip_keywords:
+            continue
+
+        title = line
+        result_type = "result"
+        lower = line.lower()
+        if any(k in lower for k in ("song", "single")):
+            result_type = "song"
+        elif any(k in lower for k in ("artist", "artists")):
+            result_type = "artist"
+        elif any(k in lower for k in ("album", "ep")):
+            result_type = "album"
+        elif any(k in lower for k in ("playlist", "radio")):
+            result_type = "playlist"
+        elif any(k in lower for k in ("podcast", "episode", "show")):
+            result_type = "podcast"
+
+        results.append({"index": len(results) + 1, "title": title, "type": result_type})
+    return results
+
+
 def _step_extract_results():
     """Screenshot the search dropdown region, run pytesseract OCR,
-    group by Y-position, skip headers, return structured result list."""
+    group by Y-position, skip headers, return structured result list.
+    OCR runs with a timeout guard so slow tesseract doesn't hang the agent."""
     region = _get_spotify_search_region()
     if not region:
         return []
@@ -139,57 +190,23 @@ def _step_extract_results():
         shot = sct.grab(region)
         img = Image.frombytes("RGB", shot.size, shot.rgb)
 
-    results = []
     try:
         import pytesseract
-        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-        data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
-
-        rows = {}
-        for i in range(len(data["text"])):
-            txt = data["text"][i].strip()
-            if not txt or int(data["conf"][i]) < 30:
-                continue
-            y = data["top"][i]
-            row_key = round(y / 20) * 20
-            rows.setdefault(row_key, []).append({
-                "text": txt,
-                "x": data["left"][i],
-                "y": y,
-            })
-
-        skip_keywords = {"top result", "songs", "artists", "albums", "playlists",
-                         "podcasts", "genres", "profiles"}
-        for row_key in sorted(rows):
-            words = rows[row_key]
-            words.sort(key=lambda w: w["x"])
-            line = " ".join(w["text"] for w in words).strip()
-            if not line or len(line) < 2:
-                continue
-            if line.lower() in skip_keywords:
-                continue
-
-            title = line
-            result_type = "result"
-            lower = line.lower()
-            if any(k in lower for k in ("song", "single")):
-                result_type = "song"
-            elif any(k in lower for k in ("artist", "artists")):
-                result_type = "artist"
-            elif any(k in lower for k in ("album", "ep")):
-                result_type = "album"
-            elif any(k in lower for k in ("playlist", "radio")):
-                result_type = "playlist"
-            elif any(k in lower for k in ("podcast", "episode", "show")):
-                result_type = "podcast"
-
-            results.append({"index": len(results) + 1, "title": title, "type": result_type})
     except ImportError:
         log.info("[Workflow] pytesseract not available")
+        return []
+
+    try:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(_ocr_group, img)
+            return future.result(timeout=8.0)
+    except concurrent.futures.TimeoutError:
+        log.warning("[Workflow] OCR timed out after 8s")
+        return []
     except Exception as e:
         log.warning(f"[Workflow] OCR failed: {e}")
-
-    return results
+        return []
 
 
 # ── Step 5: Click a specific search result by index ──

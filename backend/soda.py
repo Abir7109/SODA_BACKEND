@@ -1563,14 +1563,15 @@ class AudioLoop:
                 'tool': name,
                 'args': args,
             }, room=agent_sid)
+            timeout = 30.0 if name in ("search_music", "play_music_result") else 10.0
             try:
-                result = await asyncio.wait_for(future, timeout=10.0)
+                result = await asyncio.wait_for(future, timeout=timeout)
                 _success = result.pop('_success', True)
                 log.info(f"[AGENT] {name} result: success={_success}")
             except asyncio.TimeoutError:
-                result = {"success": False, "error": "Local agent did not respond within 10s"}
+                result = {"success": False, "error": f"Local agent did not respond within {timeout}s"}
                 _success = False
-                log.warning(f"[AGENT] {name} TIMEOUT — agent {agent_info.get('machine_id', agent_sid)} did not respond in 30s")
+                log.warning(f"[AGENT] {name} TIMEOUT — agent {agent_info.get('machine_id', agent_sid)} did not respond in {timeout}s")
             finally:
                 _pending_agent_results.pop(callback_id, None)
             # Emit file_list for file browsing tools

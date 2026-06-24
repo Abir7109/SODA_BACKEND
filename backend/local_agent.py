@@ -170,35 +170,39 @@ def on_agent_execute(data):
     clear()
     log(f"[LocalAgent] Executing: {tool}({json.dumps(args)[:200]})")
 
-    try:
-        result = _dispatch(tool, args)
-        sio.emit("agent_tool_result", {
-            "callback_id": callback_id,
-            "tool": tool,
-            "result": result,
-            "success": True,
-        })
-    except AbortError:
-        log(f"[LocalAgent] Tool {tool} aborted (frontend disconnected)")
+    def _run():
         try:
+            result = _dispatch(tool, args)
             sio.emit("agent_tool_result", {
                 "callback_id": callback_id,
                 "tool": tool,
-                "result": {"success": False, "error": "Tool aborted — frontend disconnected"},
+                "result": result,
+                "success": True,
+            })
+        except AbortError:
+            log(f"[LocalAgent] Tool {tool} aborted (frontend disconnected)")
+            try:
+                sio.emit("agent_tool_result", {
+                    "callback_id": callback_id,
+                    "tool": tool,
+                    "result": {"success": False, "error": "Tool aborted — frontend disconnected"},
+                    "success": False,
+                })
+            except Exception:
+                pass
+        except Exception as e:
+            tb = traceback.format_exc()
+            log(f"[LocalAgent] Error executing {tool}: {e}")
+            log(tb)
+            sio.emit("agent_tool_result", {
+                "callback_id": callback_id,
+                "tool": tool,
+                "result": {"error": str(e)},
                 "success": False,
             })
-        except Exception:
-            pass
-    except Exception as e:
-        tb = traceback.format_exc()
-        log(f"[LocalAgent] Error executing {tool}: {e}")
-        log(tb)
-        sio.emit("agent_tool_result", {
-            "callback_id": callback_id,
-            "tool": tool,
-            "result": {"error": str(e)},
-            "success": False,
-        })
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
 
 
 @sio.on("agent_status")
