@@ -22,6 +22,7 @@ import subprocess
 import asyncio
 import threading
 import urllib.parse
+from tool_abort import abort, clear, AbortError
 from pathlib import Path
 
 # Ensure backend/ directory is on the path
@@ -157,6 +158,7 @@ def connect_error(data):
 @sio.event
 def disconnect():
     log(f"[LocalAgent] Disconnected")
+    abort()
 
 
 @sio.on("agent_execute")
@@ -165,6 +167,7 @@ def on_agent_execute(data):
     args = data.get("args", {})
     callback_id = data.get("callback_id", "")
 
+    clear()
     log(f"[LocalAgent] Executing: {tool}({json.dumps(args)[:200]})")
 
     try:
@@ -175,6 +178,17 @@ def on_agent_execute(data):
             "result": result,
             "success": True,
         })
+    except AbortError:
+        log(f"[LocalAgent] Tool {tool} aborted (frontend disconnected)")
+        try:
+            sio.emit("agent_tool_result", {
+                "callback_id": callback_id,
+                "tool": tool,
+                "result": {"success": False, "error": "Tool aborted — frontend disconnected"},
+                "success": False,
+            })
+        except Exception:
+            pass
     except Exception as e:
         tb = traceback.format_exc()
         log(f"[LocalAgent] Error executing {tool}: {e}")
@@ -1571,6 +1585,20 @@ def _await_it(coro):
     return loop.run_until_complete(coro)
 
 
+def _start_abort_monitor():
+    """Daemon thread that monitors socket connection and signals abort on disconnect.
+    Runs continuously (never breaks) so reconnects are also monitored.
+    Runs independently of the socketio callback thread so it can detect disconnection
+    even while a tool is executing synchronously."""
+    def monitor():
+        while True:
+            if not sio.connected:
+                abort()
+            time.sleep(0.2)
+    t = threading.Thread(target=monitor, daemon=True)
+    t.start()
+
+
 def _heartbeat_loop():
     """Print a heartbeat every 30 seconds so user knows agent is alive."""
     while True:
@@ -1600,7 +1628,8 @@ if __name__ == "__main__":
 
     try:
         sio.connect(BACKEND_URL, transports=["websocket", "polling"], wait_timeout=10)
-        # Start heartbeat in background
+        # Start background threads
+        _start_abort_monitor()
         threading.Thread(target=_heartbeat_loop, daemon=True).start()
         log(f"[LocalAgent] ✅ ALIVE — waiting for commands from backend...")
         log(f"[LocalAgent] 💡 Say something to SODA in the browser, like 'open notepad' or 'list my desktop files'")

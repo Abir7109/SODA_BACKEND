@@ -7,7 +7,6 @@ Two-step flow: Enter opens top result, then click big play button at top of page
 import os
 import re
 import json
-import time
 import subprocess
 import ctypes
 
@@ -28,6 +27,7 @@ except ImportError:
 from logger import log
 from template_matcher import find_on_screen, capture_template
 from play_history import find_similar, record_play
+from tool_abort import safe_sleep, check, AbortError
 
 _SPOTIFY_BIG_PLAY_TEMPLATE = os.path.join(
     os.path.dirname(__file__), "vision_templates", "spotify_big_play.png"
@@ -36,19 +36,6 @@ _SPOTIFY_BIG_PLAY_TEMPLATE = os.path.join(
 _PLAY_BUTTON_CALIBRATION = os.path.join(
     os.path.dirname(__file__), "play_button_calibration.json"
 )
-
-# Cooldown: after play_music succeeds, ignore control_music for this many seconds.
-# Prevents Gemini from double-calling pause/play after starting playback.
-_last_play_success_at = 0.0
-_PLAY_COOLDOWN = 10.0
-
-def _mark_play_started():
-    global _last_play_success_at
-    _last_play_success_at = time.time()
-
-def _play_cooldown_active():
-    return time.time() - _last_play_success_at < _PLAY_COOLDOWN
-
 
 # ── Window Management ──
 
@@ -99,7 +86,7 @@ def _activate_window(hwnd):
     cx = (rect[0] + rect[2]) // 2
     cy = rect[1] + 10
     pyautogui.click(cx, cy)
-    time.sleep(0.3)
+    safe_sleep(0.3)
 
 
 def _within_spotify_bounds(x, y):
@@ -129,7 +116,7 @@ def _click_play_area():
         return False
     log.info(f"[Spotify] Clicking play area ({cx},{cy})")
     pyautogui.click(cx, cy)
-    time.sleep(1.0)
+    safe_sleep(1.0)
     if _wait_for_playback(timeout=5.0):
         log.info(f"[Spotify] Playback confirmed via area click ({cx},{cy})")
         return True
@@ -139,7 +126,8 @@ def _click_play_area():
 def _click_trained_play_button():
     """Click the play button using user-trained calibration from train_play_button.py.
     Method 0 (highest priority) — uses percentage offsets saved by the training script.
-    Falls through silently if calibration file doesn't exist."""
+    Verifies playback started before returning True. Falls through if calibration
+    file doesn't exist or playback isn't confirmed."""
     if not os.path.exists(_PLAY_BUTTON_CALIBRATION):
         return False
     try:
@@ -163,17 +151,12 @@ def _click_trained_play_button():
         return False
     log.info(f"[Spotify] Clicking trained play button ({cx},{cy}) at {x_pct*100:.1f}%,{y_pct*100:.1f}%")
     pyautogui.click(cx, cy)
-    time.sleep(1.5)
-    if _wait_for_playback(timeout=6.0):
+    safe_sleep(2.0)
+    check()
+    if _wait_for_playback(timeout=8.0):
         log.info(f"[Spotify] Playback confirmed via trained click")
         return True
-    log.info(f"[Spotify] Trained click didn't start playback — retrying")
-    if _within_spotify_bounds(cx, cy):
-        pyautogui.click(cx, cy)
-        time.sleep(1.0)
-        if _wait_for_playback(timeout=5.0):
-            log.info(f"[Spotify] Playback confirmed via trained click retry")
-            return True
+    log.warning(f"[Spotify] Trained click did not start playback")
     return False
 
 
@@ -189,7 +172,7 @@ def _focus_or_open_spotify():
             open_app("spotify")
         except Exception:
             return False
-    time.sleep(6.0)
+    safe_sleep(6.0)
     found = _find_spotify_window()
     if not found:
         log.warning("[Spotify] Window not found after launch")
@@ -275,7 +258,7 @@ async def _click_big_play_ai_vision():
                 return False
             log.info(f"[Spotify] AI Vision big play -> click ({x}, {y}) (orig img {img_x},{img_y} scaled from {rw}x{rh} to {w}x{h})")
             pyautogui.click(x, y)
-            time.sleep(1.5)
+            safe_sleep(1.5)
             _save_big_play_template(x, y)
             log.info("[Spotify] Click made, waiting for playback...")
             if _wait_for_playback(timeout=6.0):
@@ -284,7 +267,7 @@ async def _click_big_play_ai_vision():
             log.info("[Spotify] Click didn't start playback, retrying click...")
             if _within_spotify_bounds(x, y):
                 pyautogui.click(x, y)
-                time.sleep(1.5)
+                safe_sleep(1.5)
                 if _wait_for_playback(timeout=5.0):
                     log.info("[Spotify] Playback confirmed on retry")
                     return True
@@ -328,7 +311,7 @@ def _click_big_play_template():
     if point:
         log.info(f"[Spotify] Big play template match -> click ({point[0]}, {point[1]})")
         pyautogui.click(point[0], point[1])
-        time.sleep(0.5)
+        safe_sleep(0.5)
         return True
     return False
 
@@ -370,8 +353,22 @@ def _get_window_title():
 def _wait_for_playback(timeout=8.0):
     """Poll _is_playing() until playback starts or timeout. Returns True if confirmed."""
     for _ in range(int(timeout / 0.5)):
-        time.sleep(0.5)
+        safe_sleep(0.5)
+        check()
         if _is_playing():
+            return True
+    return False
+
+
+def _wait_for_navigation(timeout=8.0):
+    """Wait for Spotify to navigate to a new page by monitoring window title changes.
+    Returns True if title changed (page loaded), False on timeout."""
+    prev_title = _get_window_title()
+    for _ in range(int(timeout / 0.3)):
+        safe_sleep(0.3)
+        check()
+        title = _get_window_title()
+        if title and title != prev_title and title not in ("", "Spotify", "Advertisement"):
             return True
     return False
 
@@ -382,21 +379,21 @@ def _keyboard_play():
     log.info("[Spotify] Keyboard play attempt (Tab→Enter)")
     for i in range(6):
         pyautogui.press("tab")
-        time.sleep(0.15)
+        safe_sleep(0.15)
     pyautogui.press("enter")
-    time.sleep(0.8)
+    safe_sleep(0.8)
     if _wait_for_playback(timeout=5.0):
         log.info("[Spotify] Playback confirmed via Tab→Enter")
         return True
     # Space key (play/pause toggle on focused track)
     pyautogui.press("space")
-    time.sleep(0.8)
+    safe_sleep(0.8)
     if _wait_for_playback(timeout=5.0):
         log.info("[Spotify] Playback confirmed via Space")
         return True
     # Ctrl+Shift+Down (Spotify native play shortcut)
     pyautogui.hotkey("ctrl", "shift", "down")
-    time.sleep(1.0)
+    safe_sleep(1.0)
     if _wait_for_playback(timeout=5.0):
         log.info("[Spotify] Playback confirmed via Ctrl+Shift+Down")
         return True
@@ -421,27 +418,26 @@ def _maximize_soda():
                 return False
             if win32gui.IsIconic(hwnd):
                 win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-                time.sleep(0.2)
+                safe_sleep(0.2)
         except Exception:
             return False
 
         # Method 1: Alt-key UIPI bypass + SetForegroundWindow
+        ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)
         try:
-            ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)
-            time.sleep(0.1)
+            safe_sleep(0.1)
             win32gui.SetForegroundWindow(hwnd)
-            time.sleep(0.15)
+            safe_sleep(0.15)
+        finally:
             ctypes.windll.user32.keybd_event(0x12, 0, 2, 0)
-            time.sleep(0.1)
-            if win32gui.GetForegroundWindow() == hwnd:
-                return True
-        except Exception:
-            ctypes.windll.user32.keybd_event(0x12, 0, 2, 0)
+        safe_sleep(0.1)
+        if win32gui.GetForegroundWindow() == hwnd:
+            return True
 
         # Method 2: SwitchToThisWindow (bypasses UIPI on most Windows versions)
         try:
             ctypes.windll.user32.SwitchToThisWindow(hwnd, True)
-            time.sleep(0.15)
+            safe_sleep(0.15)
             if win32gui.GetForegroundWindow() == hwnd:
                 return True
         except Exception:
@@ -451,7 +447,7 @@ def _maximize_soda():
         try:
             win32gui.BringWindowToTop(hwnd)
             win32gui.SetForegroundWindow(hwnd)
-            time.sleep(0.15)
+            safe_sleep(0.15)
             if win32gui.GetForegroundWindow() == hwnd:
                 return True
         except Exception:
@@ -483,15 +479,15 @@ def _maximize_soda():
 def _do_search(search_text):
     """Ctrl+K, type text, Down enters results list (selects first), Enter opens it."""
     pyautogui.hotkey("ctrl", "k")
-    time.sleep(1.0)
+    safe_sleep(1.0)
     pyautogui.write(search_text, interval=0.05)
-    time.sleep(2.5)
+    safe_sleep(2.5)
     pyautogui.press("down")
-    time.sleep(0.8)
+    safe_sleep(0.8)
     pyautogui.press("enter")
-    time.sleep(3.0)
+    safe_sleep(3.0)
     pyautogui.press("home")
-    time.sleep(0.5)
+    safe_sleep(0.5)
 
 
 def _get_spotify_search_region():
@@ -522,9 +518,9 @@ def search_music(query):
             return {"success": False, "error": "Could not open Spotify"}
 
         pyautogui.hotkey("ctrl", "k")
-        time.sleep(1.0)
+        safe_sleep(1.0)
         pyautogui.write(query, interval=0.05)
-        time.sleep(2.5)
+        safe_sleep(2.5)
 
         region = _get_spotify_search_region()
         if not region:
@@ -595,6 +591,78 @@ def search_music(query):
         return {"success": False, "error": str(e)}
 
 
+def _ocr_click_search_result(index):
+    """Use pytesseract OCR to find the Nth search result by Y position and click it.
+    Skips header rows (Top result, Songs, Artists, etc.) to match search_music() indexing.
+    Returns True if click was made."""
+    region = _get_spotify_search_region()
+    if not region:
+        return False
+
+    import mss
+    from PIL import Image
+    with mss.mss() as sct:
+        shot = sct.grab(region)
+        img = Image.frombytes("RGB", shot.size, shot.rgb)
+
+    try:
+        import pytesseract
+        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+
+        rows = {}
+        for i in range(len(data["text"])):
+            txt = data["text"][i].strip()
+            if not txt or int(data["conf"][i]) < 30:
+                continue
+            y = data["top"][i]
+            row_key = round(y / 20) * 20
+            rows.setdefault(row_key, []).append({
+                "text": txt,
+                "x": data["left"][i],
+                "y": y,
+            })
+
+        skip_keywords = {"top result", "songs", "artists", "albums", "playlists", "podcasts", "genres", "profiles"}
+        sorted_rows = []
+        for row_key in sorted(rows):
+            words = rows[row_key]
+            words.sort(key=lambda w: w["x"])
+            line = " ".join(w["text"] for w in words).strip()
+            if not line or len(line) < 2:
+                continue
+            if line.lower() in skip_keywords:
+                continue
+            avg_y = sum(w["y"] for w in words) // len(words)
+            sorted_rows.append((avg_y, line))
+
+        if index < 1 or index > len(sorted_rows):
+            log.warning(f"[Spotify] OCR click: index {index} out of range (1-{len(sorted_rows)})")
+            return False
+
+        target_y = sorted_rows[index - 1][0]
+        rect = _get_spotify_rect()
+        if not rect:
+            return False
+        left, top, right, bottom = rect
+        cx = left + int((right - left) * 0.25)
+        cy = region["top"] + target_y + 8
+
+        log.info(f"[Spotify] OCR click result {index}: '{sorted_rows[index-1][1]}' -> ({cx}, {cy})")
+        pyautogui.click(cx, cy)
+        if _wait_for_navigation(timeout=8.0):
+            log.info(f"[Spotify] Navigation confirmed after OCR click")
+        else:
+            log.warning(f"[Spotify] Navigation timeout after OCR click — continuing anyway")
+        return True
+    except ImportError:
+        log.info("[Spotify] pytesseract not available for OCR click navigation")
+        return False
+    except Exception as e:
+        log.warning(f"[Spotify] OCR click navigation failed: {e}")
+        return False
+
+
 def play_music_result(query, index):
     """Open search results page and play the result at the given position (1-based index)."""
     if not _PYAUTOGUI or not _WIN32:
@@ -605,17 +673,19 @@ def play_music_result(query, index):
             return {"success": False, "error": "Could not open Spotify"}
 
         pyautogui.hotkey("ctrl", "k")
-        time.sleep(1.0)
+        safe_sleep(1.0)
         pyautogui.write(query, interval=0.05)
-        time.sleep(2.5)
+        safe_sleep(2.5)
 
-        for _ in range(index):
-            pyautogui.press("down")
-            time.sleep(0.3)
-        pyautogui.press("enter")
-        time.sleep(3.0)
+        if not _ocr_click_search_result(index):
+            log.warning("[Spotify] OCR click navigation failed, falling back to keyboard navigation")
+            for _ in range(index):
+                pyautogui.press("down")
+                safe_sleep(0.3)
+            pyautogui.press("enter")
+            safe_sleep(3.0)
         pyautogui.press("home")
-        time.sleep(0.5)
+        safe_sleep(0.5)
 
         if _is_playing():
             now_playing = _get_now_playing()
@@ -625,21 +695,18 @@ def play_music_result(query, index):
 
         # Method 0: User-trained play button click (set via train_play_button.py)
         if _click_trained_play_button():
-            _mark_play_started()
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             _maximize_soda()
             return {"success": True, "query": query, "now_playing": now_playing}
 
         if _click_play_area():
-            _mark_play_started()
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             _maximize_soda()
             return {"success": True, "query": query, "now_playing": now_playing}
 
         if _keyboard_play():
-            _mark_play_started()
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             _maximize_soda()
@@ -700,7 +767,6 @@ def play_music(query, emit_callback=None):
 
         # Method 0: User-trained play button click (set via train_play_button.py)
         if _click_trained_play_button():
-            _mark_play_started()
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             log.info(f"[Spotify] Playback via trained click")
@@ -711,7 +777,6 @@ def play_music(query, emit_callback=None):
 
         # Method 1: Simple area click (fast, no dependencies)
         if _click_play_area():
-            _mark_play_started()
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             log.info(f"[Spotify] Playback via area click")
@@ -722,7 +787,6 @@ def play_music(query, emit_callback=None):
 
         # Method 2: Keyboard Tab→Enter / Space / Ctrl+Shift+Down
         if _keyboard_play():
-            _mark_play_started()
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             log.info(f"[Spotify] Playback via keyboard")
@@ -738,7 +802,6 @@ def play_music(query, emit_callback=None):
         except Exception:
             clicked = False
         if clicked:
-            _mark_play_started()
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             log.info(f"[Spotify] Playback via AI Vision")
@@ -786,28 +849,19 @@ def _send_media_key(vk_code):
         input_up.union.ki.dwFlags = KEYEVENTF_KEYUP
 
         ctypes.windll.user32.SendInput(1, ctypes.byref(input_down), ctypes.sizeof(input_down))
-        time.sleep(0.02)
+        safe_sleep(0.02)
         ctypes.windll.user32.SendInput(1, ctypes.byref(input_up), ctypes.sizeof(input_up))
     except Exception as e:
         log.warning(f"[Spotify] media key 0x{vk_code:02X} failed: {e}")
 
 
 def play_pause():
-    if _play_cooldown_active():
-        log.info("[Spotify] play_pause ignored (playback cooldown active)")
-        return
     _send_media_key(0xB3)
 
 
 def next_track():
-    if _play_cooldown_active():
-        log.info("[Spotify] next_track ignored (playback cooldown active)")
-        return
     _send_media_key(0xB0)
 
 
 def previous_track():
-    if _play_cooldown_active():
-        log.info("[Spotify] previous_track ignored (playback cooldown active)")
-        return
     _send_media_key(0xB1)
