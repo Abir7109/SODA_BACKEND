@@ -1,14 +1,10 @@
 """
-Spotify workflow — sequential music playback.
-Step-by-step: open → search (OCR once) → cache rows → click cached row → play.
-NO re-OCR, NO re-search in play_music_result. Uses cached Y positions from search_music.
-NO title-bar click in play_music_result (preserves search dropdown).
-NO Alt-key anywhere (triggers Spotify menu bar).
+Spotify workflow — sequential music playback with AI Vision.
+Step-by-step: open → search (OCR for text) → AI Vision finds+clicks result → AI Vision finds+clicks play.
+No coordinate math, no hardcoded Y positions, no destructive retry cascade.
 """
 
 import os
-import re
-import json
 import ctypes
 
 try:
@@ -27,7 +23,7 @@ except ImportError:
 
 from logger import log
 from play_history import record_play
-from tool_abort import safe_sleep, check
+from tool_abort import safe_sleep
 
 from spotify_bridge import (
     _find_spotify_window,
@@ -37,24 +33,16 @@ from spotify_bridge import (
     _get_now_playing,
     _wait_for_playback,
     _wait_for_navigation,
-    _click_play_area,
-    _keyboard_play,
+    _click_big_play_ai_vision,
+    _vision_find_and_click,
     _get_spotify_search_region,
-    _get_spotify_rect,
-    _within_spotify_bounds,
 )
-
-# ── Module-level cache: OCR rows from the last search_music() call ──
-# Each entry: {"y": int, "line": str, "region_top": int}
-_cached_rows = []
-_cached_query = ""
 
 
 # ── Step 1: Open / activate Spotify ──
 
 def _step_open_spotify():
-    """Bring Spotify to foreground. Uses SwitchToThisWindow + title-bar click.
-    No Alt-key — that triggers Spotify's menu bar and breaks subsequent Ctrl+K."""
+    """Bring Spotify to foreground. Uses SwitchToThisWindow + title-bar click."""
     found = _find_spotify_window()
     if found:
         hwnd, _ = found
@@ -104,8 +92,7 @@ def _activate_spotify_window(hwnd):
 
 def _focus_spotify_quiet():
     """Bring Spotify to foreground WITHOUT clicking title bar.
-    Preserves any existing UI state (search dropdown, focus).
-    Only called from play_music_result where activation is not needed."""
+    Preserves existing UI state (search dropdown, focus)."""
     found = _find_spotify_window()
     if not found:
         return _step_open_spotify()
@@ -141,7 +128,7 @@ def _step_do_search(query):
     safe_sleep(1.5)
 
 
-# ── Step 4: OCR once, cache rows ──
+# ── Step 4: OCR once, extract text for display ──
 
 def _ocr_screenshot():
     """Take a screenshot of the search dropdown region and return PIL Image."""
@@ -224,72 +211,49 @@ def _format_results(sorted_rows):
     return results
 
 
-# ── Step 5: Click a cached search result by index (NO RE-OCR) ──
+# ── Step 5: AI Vision — find and click Nth search result ──
 
-def _click_cached_row(index, region_top):
-    """Click the Nth search result using cached OCR row data.
-    Uses the stored Y position directly — no screenshot, no OCR.
-    """
-    global _cached_rows
-    if index < 1 or index > len(_cached_rows):
-        log.warning(f"[Workflow] Cached click: index {index} out of range (1-{len(_cached_rows)})")
+def _step_vision_click_result(index, query):
+    """Use AI Vision to find and click the Nth search result in the Spotify search dropdown."""
+    import asyncio
+    loop = _get_or_create_eventloop()
+    try:
+        return loop.run_until_complete(_vision_find_and_click(index, query))
+    except Exception as e:
+        log.error(f"[Workflow] Vision click result failed: {e}")
         return False
 
-    target_y = _cached_rows[index - 1][0]
-    rect = _get_spotify_rect()
-    if not rect:
-        return False
-    left, top, right, bottom = rect
-    cx = left + int((right - left) * 0.50)
-    cy = region_top + target_y + 8
 
-    log.info(f"[Workflow] Cached click result {index}: '{_cached_rows[index-1][1]}' -> ({cx}, {cy})")
-    pyautogui.click(cx, cy)
-    if _wait_for_navigation(timeout=8.0):
-        log.info("[Workflow] Navigation confirmed after cached click")
-    else:
-        log.warning("[Workflow] Navigation timeout — continuing anyway")
-    return True
+# ── Step 6: AI Vision — find and click play button ──
 
-
-def _keyboard_select_result(index):
-    """Keyboard fallback: press Down N times + Enter to select Nth result.
-    Adds +2 offset for Top result + first category header."""
-    kb_offset = index + 2
-    for _ in range(kb_offset):
-        pyautogui.press("down")
-        safe_sleep(0.3)
-    pyautogui.press("enter")
-    safe_sleep(3.0)
-
-
-# ── Step 6: Play ──
-
-def _step_play():
-    """Try to start playback. Area click first (with 2 Y-position tries),
-    then keyboard shortcuts. Max 2 methods, no random cascading."""
+def _step_vision_play():
+    """Use AI Vision to find the big green play button."""
     if _is_playing():
         return True
-
-    log.info("[Workflow] Play: area click at 10%/20%")
-    if _click_play_area():
-        log.info("[Workflow] Playback confirmed via area click")
-        return True
-
-    log.info("[Workflow] Play: keyboard shortcuts")
-    if _keyboard_play():
-        log.info("[Workflow] Playback confirmed via keyboard")
-        return True
-
-    log.warning("[Workflow] Play methods exhausted — returning")
-    return False
+    import asyncio
+    loop = _get_or_create_eventloop()
+    try:
+        return loop.run_until_complete(_click_big_play_ai_vision())
+    except Exception as e:
+        log.error(f"[Workflow] Vision play failed: {e}")
+        return False
 
 
-# ── Clean SODA foreground (no Alt-key) ──
+def _get_or_create_eventloop():
+    """Get current event loop or create a new one for async Vision calls."""
+    import asyncio
+    try:
+        return asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop
+
+
+# ── Clean SODA foreground ──
 
 def _step_return_to_soda():
-    """Bring SODA window to foreground WITHOUT using Alt-key.
-    Uses SwitchToThisWindow — avoids triggering Spotify's menu bar."""
+    """Bring SODA window to foreground WITHOUT using Alt-key."""
     if not _WIN32:
         return
     patterns = ["soda core intelligence", "core intelligence", "soda"]
@@ -315,10 +279,8 @@ def _step_return_to_soda():
 # ── Main workflow: search_music ──
 
 def search_music(query):
-    """Open Spotify → search → OCR once → cache rows → return results.
-    Does NOT auto-play. Caches OCR row data for play_music_result to use directly."""
-    global _cached_rows, _cached_query
-
+    """Open Spotify → search → OCR → return results as text.
+    No Y-coordinate caching — AI Vision handles clicking in play_music_result."""
     if not _PYAUTOGUI or not _WIN32:
         return {"success": False, "error": "PyAutoGUI or win32 not available"}
 
@@ -331,16 +293,9 @@ def search_music(query):
 
         region, img = _ocr_screenshot()
         if not region:
-            _cached_rows = []
             return {"success": True, "query": query, "results": []}
 
         sorted_rows = _ocr_with_timeout(img)
-
-        # Cache the full OCR data (Y positions + region) for play_music_result
-        _cached_rows = sorted_rows
-        _cached_query = query
-        _cached_region_top = region["top"]
-
         results = _format_results(sorted_rows)
         return {"success": True, "query": query, "results": results}
     except Exception as e:
@@ -348,98 +303,56 @@ def search_music(query):
         return {"success": False, "error": str(e)}
 
 
-# Module-level cache for region top (set by search_music, read by play_music_result)
-_cached_region_top = 0
-
-
 # ── Main workflow: play_music_result ──
 
 def play_music_result(query, index):
-    """Click Nth search result from cache → navigate → play.
-    Uses cached OCR rows from the search_music() call.
-    No re-OCR, no re-search, no title-bar click on Spotify activation.
-    """
-    global _cached_rows, _cached_query, _cached_region_top
-
+    """Use AI Vision to find and click Nth search result → navigate → find and click play button.
+    No cached coordinates, no OCR-based clicking, no destructive retry cascade."""
     if not _PYAUTOGUI or not _WIN32:
         return {"success": False, "error": "PyAutoGUI or win32 not available"}
 
     try:
-        # Quiet focus — no title-bar click (preserves search dropdown)
+        # Quiet focus — no title-bar click (preserves search dropdown state)
         if not _focus_spotify_quiet():
             return {"success": False, "error": "Could not focus Spotify"}
 
         result = {"success": True, "query": query, "clicked": True}
 
-        # Use cached rows from search_music() to click directly
-        if _cached_rows and _cached_query == query:
-            if _click_cached_row(index, _cached_region_top):
-                safe_sleep(1.5)
-                # Playback may start automatically after navigation
-                if _is_playing():
-                    now_playing = _get_now_playing()
-                    record_play(query, _get_window_title())
-                    result["now_playing"] = now_playing
-                    _step_return_to_soda()
-                    return result
-                if _step_play():
-                    now_playing = _get_now_playing()
-                    record_play(query, _get_window_title())
-                    result["now_playing"] = now_playing
-                    _step_return_to_soda()
-                    return result
+        # Step 1: AI Vision finds and clicks the Nth search result
+        if not _step_vision_click_result(index, query):
+            log.warning("[Workflow] AI Vision could not find result — trying full search fallback")
+            # Fallback: re-search and try again
+            if not _focus_spotify_quiet():
+                return {"success": False, "error": "Could not focus Spotify"}
+            _step_do_search(query)
+            safe_sleep(1.0)
+            if not _step_vision_click_result(index, query):
                 result["playback"] = "pending"
-                _step_return_to_soda()
-                return result
-            else:
-                log.warning("[Workflow] Cached click failed — index mismatch")
-        else:
-            log.info(f"[Workflow] No cache for query '{query}' — doing full search+click")
-
-        # Fallback: full search + OCR click (cache miss or mismatch)
-        if not _focus_spotify_quiet():
-            return {"success": False, "error": "Could not focus Spotify"}
-
-        _step_do_search(query)
-        region, img = _ocr_screenshot()
-        if region:
-            sorted_rows = _ocr_with_timeout(img)
-            # Temporarily overwrite cache for this attempt
-            _cached_rows = sorted_rows
-            _cached_query = query
-            _cached_region_top = region["top"]
-            if _click_cached_row(index, _cached_region_top):
-                safe_sleep(1.5)
-                if _is_playing():
-                    now_playing = _get_now_playing()
-                    record_play(query, _get_window_title())
-                    result["now_playing"] = now_playing
-                    _step_return_to_soda()
-                    return result
-                if _step_play():
-                    now_playing = _get_now_playing()
-                    record_play(query, _get_window_title())
-                    result["now_playing"] = now_playing
-                    _step_return_to_soda()
-                    return result
-                result["playback"] = "pending"
+                result["success"] = False
+                result["error"] = "AI Vision could not find the search result"
                 _step_return_to_soda()
                 return result
 
-        # Last-resort: keyboard select
-        log.warning("[Workflow] All click methods failed — keyboard fallback")
-        _keyboard_select_result(index)
+        # Step 2: Wait for navigation
         safe_sleep(1.5)
+
+        # Step 3: Check if playback started automatically
         if _is_playing():
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             result["now_playing"] = now_playing
-        elif _step_play():
+            _step_return_to_soda()
+            return result
+
+        # Step 4: AI Vision finds and clicks the big green play button
+        if _step_vision_play():
             now_playing = _get_now_playing()
             record_play(query, _get_window_title())
             result["now_playing"] = now_playing
-        else:
-            result["playback"] = "pending"
+            _step_return_to_soda()
+            return result
+
+        result["playback"] = "pending"
         _step_return_to_soda()
         return result
 

@@ -1565,7 +1565,7 @@ class AudioLoop:
                 'tool': name,
                 'args': args,
             }, room=agent_sid)
-            timeout = 30.0 if name in ("search_music", "play_music_result") else 10.0
+            timeout = 60.0 if name in ("search_music", "play_music_result") else 10.0
             try:
                 result = await asyncio.wait_for(future, timeout=timeout)
                 _success = result.pop('_success', True)

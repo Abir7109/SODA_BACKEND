@@ -305,24 +305,71 @@ async def _click_big_play_ai_vision():
             if _wait_for_playback(timeout=6.0):
                 log.info("[Spotify] Playback confirmed via window title")
                 return True
-            log.info("[Spotify] Click didn't start playback, retrying click...")
-            if _within_spotify_bounds(x, y):
-                pyautogui.click(x, y)
-                safe_sleep(1.5)
-                if _wait_for_playback(timeout=5.0):
-                    log.info("[Spotify] Playback confirmed on retry")
-                    return True
-            log.info("[Spotify] Retry click failed, trying template match...")
-            if _click_big_play_template():
-                if _wait_for_playback(timeout=6.0):
-                    log.info("[Spotify] Playback confirmed via template match")
-                    return True
-            log.info("[Spotify] All click methods failed, trying keyboard fallback...")
-            return _keyboard_play()
+            log.info("[Spotify] AI Vision click didn't start playback — returning")
+            return False
         log.warning(f"[Spotify] AI Vision unparseable: {text[:80]}")
         return False
     except Exception as e:
         log.warning(f"[Spotify] AI Vision failed: {e}")
+        return False
+
+
+# ── AI Vision: Find and click Nth search result ──
+
+async def _vision_find_and_click(index, query):
+    """Use Gemini Vision to find the Nth search result in the Spotify search dropdown
+    and click it. Returns True if navigation happened."""
+    rect = _get_spotify_rect()
+    if not rect:
+        return False
+    left, top, right, bottom = rect
+    w, h = right - left, bottom - top
+    if w < 200 or h < 100:
+        return False
+    try:
+        import mss
+        from screen_vision import analyze_screen
+        capture = {"left": left, "top": top, "width": w, "height": h}
+        with mss.mss() as sct:
+            shot = sct.grab(capture)
+            png_bytes = mss.tools.to_png(shot.rgb, shot.size)
+        prompt = (
+            f"This is a screenshot of the Spotify Desktop window showing search results for '{query}'. "
+            f"Find search result number {index} (1-indexed — the {index}th result after skipping ALL headers "
+            f"like 'Top result', 'Songs', 'Artists', 'Albums', 'Playlists', 'Podcasts', 'Genres', 'Profiles'). "
+            "Each result is a row with a title/name, possibly an artist name below it, and a thumbnail on the left. "
+            f"Return ONLY the X,Y pixel coordinates of the CENTER of the clickable row for result #{index} "
+            "within this screenshot image. Format: 'X,Y'. No other text."
+        )
+        log.info(f"[Spotify] AI Vision find result {index} for '{query}': screenshot={w}x{h}")
+        result = await analyze_screen(prompt=prompt, screenshot=png_bytes)
+        if not result.get("success"):
+            log.warning(f"[Spotify] AI Vision API error: {result.get('error')}")
+            return False
+        text = result.get("analysis", "").strip()
+        log.info(f"[Spotify] AI Vision raw response: {text[:120]}")
+        rw = result.get("width", w) or w
+        rh = result.get("height", h) or h
+        match = re.search(r'(\d{1,5})\s*,\s*(\d{1,5})', text)
+        if match:
+            img_x, img_y = int(match.group(1)), int(match.group(2))
+            x = int(left + img_x * w / max(rw, 1))
+            y = int(top + img_y * h / max(rh, 1))
+            if not _within_spotify_bounds(x, y):
+                log.warning(f"[Spotify] AI Vision click ({x},{y}) outside Spotify bounds — skipping")
+                return False
+            log.info(f"[Spotify] AI Vision result #{index} -> click ({x}, {y})")
+            pyautogui.click(x, y)
+            log.info("[Spotify] Click made, waiting for navigation...")
+            if _wait_for_navigation(timeout=5.0):
+                log.info("[Spotify] Navigation confirmed")
+            else:
+                log.warning("[Spotify] Navigation timeout — continuing anyway")
+            return True
+        log.warning(f"[Spotify] AI Vision unparseable coords: {text[:80]}")
+        return False
+    except Exception as e:
+        log.warning(f"[Spotify] AI Vision find result failed: {e}")
         return False
 
 
