@@ -595,6 +595,8 @@ CRITICAL — STOP AFTER PLAYBACK SUCCEEDS:
 When play_music or play_music_result returns {'success': True}, the music IS PLAYING.
 STOP all further tool calls. A single request = one tool call, nothing more.
 
+NEVER call search_music() more than once per user request. If the user already asked for music and you called search_music(), wait for their response. Do NOT call search_music() again on the same request — it creates a loop.
+
 Examples:
   User: 'play lofi' → search_music(query='lofi')
   User: 'play Ed Sheeran songs' → search_music(query='Ed Sheeran')
@@ -659,6 +661,7 @@ class AudioLoop:
         self._latest_image_payload = None
         self._last_search_query = ""
         self._last_search_results = []
+        self._last_music_search = 0.0
         self._last_scraped_data = None
         self._last_scraped_url = ""
         self.session = None
@@ -1095,7 +1098,7 @@ class AudioLoop:
                     self.on_audio_data(data)
             except Exception:
                 silent_ticks += 1
-                if self._model_is_speaking and not self._tools_running and silent_ticks >= 3:
+                if self._model_is_speaking and not self._tools_running and silent_ticks >= 8:
                     self._model_is_speaking = False
                     if self.sio:
                         loop = asyncio.get_event_loop()
@@ -2290,6 +2293,14 @@ class AudioLoop:
             )
 
         elif name == "search_music":
+            now = time.time()
+            if now - self._last_music_search < 8:
+                log.warning(f"[MUSIC] search_music cooldown ({now - self._last_music_search:.1f}s), blocking recursive call")
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"success": True, "results": [], "message": "Already searching — wait for results."}
+                )
+            self._last_music_search = now
             log.info(f"[MUSIC] search_music fallback (no agent) query='{args.get('query', '')}'")
             try:
                 from spotify_workflow import search_music as _sm
@@ -2308,6 +2319,14 @@ class AudioLoop:
                 )
 
         elif name == "play_music_result":
+            now = time.time()
+            if now - self._last_music_search < 4:
+                log.warning(f"[MUSIC] play_music_result cooldown ({now - self._last_music_search:.1f}s), blocking")
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"success": True, "message": "Music is already playing."}
+                )
+            self._last_music_search = now
             log.info(f"[MUSIC] play_music_result fallback (no agent) query='{args.get('query', '')}' index={args.get('index')}")
             try:
                 from spotify_workflow import play_music_result as _pmr

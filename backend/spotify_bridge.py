@@ -102,22 +102,24 @@ def _launch_spotify():
 
 def _send_command(cmd, params=None, timeout=10):
     _ensure_server()
-    # First wait: check if extension is already connected
-    for _ in range(timeout * 2):
+    # Fast check: avoid blocking the server for too long
+    for _ in range(min(timeout, 5)):
         if _extension_ws is not None:
             break
         time.sleep(0.5)
     if _extension_ws is None:
-        # Extension not connected — try launching Spotify
-        log.info("[Spotify] Extension not connected, launching Spotify...")
+        log.info("[Spotify] Extension not connected, trying launch...")
         _launch_spotify()
-        # Second wait: give Spotify time to start and extension to connect
-        for _ in range(40):
+        for _ in range(20):
             if _extension_ws is not None:
                 break
             time.sleep(0.5)
     if _extension_ws is None:
-        raise ConnectionError("Spicetify extension not connected — is Spotify running via 'spicetify auto'?")
+        raise ConnectionError(
+            "Spicetify extension not connected. "
+            "Make sure Spotify is running with Spicetify loaded. "
+            "Run: spicetify apply --bypass-admin && spicetify restart"
+        )
 
     cmd_id = str(uuid.uuid4())
     evt = threading.Event()

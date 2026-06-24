@@ -46,8 +46,8 @@ soda._pending_agent_results = _pending_agent_results
 sio = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins='*',
-    ping_interval=10,
-    ping_timeout=5,
+    ping_interval=15,
+    ping_timeout=10,
 )
 
 @asynccontextmanager
