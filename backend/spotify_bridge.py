@@ -539,6 +539,7 @@ def search_music(query):
         results = []
         try:
             import pytesseract
+            pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
             data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
             rows = {}
             for i in range(len(data["text"])):
