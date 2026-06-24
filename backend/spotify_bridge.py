@@ -78,26 +78,21 @@ def _launch_spotify():
 
 
 def _activate_window(hwnd):
+    """Bring Spotify window to foreground by clicking its title bar.
+    No Alt-key bypass — that triggers Spotify's menu bar and breaks Ctrl+K."""
+    if win32gui.GetForegroundWindow() == hwnd:
+        return True
     if win32gui.IsIconic(hwnd):
         win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
         safe_sleep(0.3)
-        if win32gui.IsZoomed(hwnd):
-            win32gui.ShowWindow(hwnd, win32con.SW_SHOWNORMAL)
-    # Use Alt-key UIPI bypass + SetForegroundWindow (no mouse click = no accidental close)
-    ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)
-    try:
-        safe_sleep(0.1)
-        win32gui.SetForegroundWindow(hwnd)
-        safe_sleep(0.15)
-    finally:
-        ctypes.windll.user32.keybd_event(0x12, 0, 2, 0)
-    safe_sleep(0.3)
-    if win32gui.GetForegroundWindow() != hwnd:
-        try:
-            ctypes.windll.user32.SwitchToThisWindow(hwnd, True)
-            safe_sleep(0.3)
-        except Exception:
-            pass
+    rect = win32gui.GetWindowRect(hwnd)
+    if not rect:
+        return False
+    cx = (rect[0] + rect[2]) // 2
+    cy = rect[1] + 10
+    pyautogui.click(cx, cy)
+    safe_sleep(0.5)
+    return win32gui.GetForegroundWindow() == hwnd
 
 
 def _within_spotify_bounds(x, y):
@@ -442,6 +437,9 @@ def _maximize_soda():
         finally:
             ctypes.windll.user32.keybd_event(0x12, 0, 2, 0)
         safe_sleep(0.1)
+        # Escape dismisses any menu triggered by the Alt keypress
+        pyautogui.press("escape")
+        safe_sleep(0.1)
         if win32gui.GetForegroundWindow() == hwnd:
             return True
 
@@ -528,6 +526,9 @@ def search_music(query):
         if not _focus_or_open_spotify():
             return {"success": False, "error": "Could not open Spotify"}
 
+        # Escape clears any stray menu/focus before triggering search
+        pyautogui.press("escape")
+        safe_sleep(0.3)
         pyautogui.hotkey("ctrl", "k")
         safe_sleep(1.0)
         pyautogui.write(query, interval=0.05)
@@ -685,6 +686,10 @@ def play_music_result(query, index):
     try:
         if not _focus_or_open_spotify():
             return {"success": False, "error": "Could not open Spotify"}
+
+        # Escape clears any stray menu triggered by _maximize_soda() during search_music
+        pyautogui.press("escape")
+        safe_sleep(0.3)
 
         # Try to OCR-click from existing search dropdown (no re-search needed)
         clicked = _ocr_click_search_result(index)
