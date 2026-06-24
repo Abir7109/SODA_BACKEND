@@ -2289,6 +2289,37 @@ class AudioLoop:
                 response={"success": False, "error": "No local agent connected — cannot control Spotify on this machine."}
             )
 
+        elif name == "search_music":
+            log.info(f"[MUSIC] search_music fallback (no agent) query='{args.get('query', '')}'")
+            try:
+                from spotify_workflow import search_music as _sm
+                result = await asyncio.to_thread(_sm, args.get("query", ""))
+                if result.get('success'):
+                    await self.sio.emit('spotify_search_results', {
+                        'query': args.get('query', ''),
+                        'results': result.get('results', []),
+                    })
+                return types.FunctionResponse(id=fc.id, name=name, response=result)
+            except Exception as e:
+                log.error(f"[MUSIC] search_music fallback error: {e}")
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"success": False, "error": str(e)}
+                )
+
+        elif name == "play_music_result":
+            log.info(f"[MUSIC] play_music_result fallback (no agent) query='{args.get('query', '')}' index={args.get('index')}")
+            try:
+                from spotify_workflow import play_music_result as _pmr
+                result = await asyncio.to_thread(_pmr, args.get("query", ""), args.get("index", 1))
+                return types.FunctionResponse(id=fc.id, name=name, response=result)
+            except Exception as e:
+                log.error(f"[MUSIC] play_music_result fallback error: {e}")
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"success": False, "error": str(e)}
+                )
+
         elif name == "mouse_click":
             screen_control.mouse_click(
                 args.get("x", 0), args.get("y", 0),
