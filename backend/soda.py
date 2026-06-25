@@ -661,7 +661,8 @@ class AudioLoop:
         self._latest_image_payload = None
         self._last_search_query = ""
         self._last_search_results = []
-        self._last_music_search = 0.0
+        self._last_search_call = 0.0
+        self._last_play_call = 0.0
         self._last_scraped_data = None
         self._last_scraped_url = ""
         self.session = None
@@ -2279,28 +2280,57 @@ class AudioLoop:
             )
 
         elif name == "play_music":
-            log.warning(f"[MUSIC] play_music called but NO local agent connected! _connected_agents={len(_connected_agents)}")
-            return types.FunctionResponse(
-                id=fc.id, name=name,
-                response={"success": False, "error": "No local agent connected — cannot control Spotify on this machine."}
-            )
+            log.warning(f"[MUSIC] play_music called but NO local agent — falling back to search+play index=1")
+            try:
+                from spotify_workflow import play_music_result as _pmr
+                result = await asyncio.to_thread(_pmr, args.get("query", ""), 1)
+                return types.FunctionResponse(id=fc.id, name=name, response=result)
+            except Exception as e:
+                log.error(f"[MUSIC] play_music fallback error: {e}")
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"success": False, "error": str(e)}
+                )
 
         elif name == "control_music":
-            log.warning(f"[MUSIC] control_music called but NO local agent connected! _connected_agents={len(_connected_agents)}")
-            return types.FunctionResponse(
-                id=fc.id, name=name,
-                response={"success": False, "error": "No local agent connected — cannot control Spotify on this machine."}
-            )
+            action = args.get("action", "")
+            log.warning(f"[MUSIC] control_music({action}) called but NO local agent — calling bridge directly")
+            try:
+                from spotify_bridge import play_pause, next_track, previous_track, resume
+                actions = {
+                    "play_pause": play_pause,
+                    "pause": lambda: play_pause(),
+                    "resume": resume,
+                    "play": resume,
+                    "next": next_track,
+                    "skip": next_track,
+                    "previous": previous_track,
+                }
+                fn = actions.get(action)
+                if fn:
+                    result = await asyncio.to_thread(fn)
+                    return types.FunctionResponse(id=fc.id, name=name, response=result)
+                else:
+                    return types.FunctionResponse(
+                        id=fc.id, name=name,
+                        response={"success": False, "error": f"Unknown action: {action}"}
+                    )
+            except Exception as e:
+                log.error(f"[MUSIC] control_music fallback error: {e}")
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"success": False, "error": str(e)}
+                )
 
         elif name == "search_music":
             now = time.time()
-            if now - self._last_music_search < 8:
-                log.warning(f"[MUSIC] search_music cooldown ({now - self._last_music_search:.1f}s), blocking recursive call")
+            if now - self._last_search_call < 8:
+                log.warning(f"[MUSIC] search_music cooldown ({now - self._last_search_call:.1f}s), blocking recursive call")
                 return types.FunctionResponse(
                     id=fc.id, name=name,
                     response={"success": True, "results": [], "message": "Already searching — wait for results."}
                 )
-            self._last_music_search = now
+            self._last_search_call = now
             log.info(f"[MUSIC] search_music fallback (no agent) query='{args.get('query', '')}'")
             try:
                 from spotify_workflow import search_music as _sm
@@ -2320,13 +2350,13 @@ class AudioLoop:
 
         elif name == "play_music_result":
             now = time.time()
-            if now - self._last_music_search < 4:
-                log.warning(f"[MUSIC] play_music_result cooldown ({now - self._last_music_search:.1f}s), blocking")
+            if now - self._last_play_call < 4:
+                log.warning(f"[MUSIC] play_music_result cooldown ({now - self._last_play_call:.1f}s), blocking")
                 return types.FunctionResponse(
                     id=fc.id, name=name,
                     response={"success": True, "message": "Music is already playing."}
                 )
-            self._last_music_search = now
+            self._last_play_call = now
             log.info(f"[MUSIC] play_music_result fallback (no agent) query='{args.get('query', '')}' index={args.get('index')}")
             try:
                 from spotify_workflow import play_music_result as _pmr
