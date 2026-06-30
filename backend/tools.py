@@ -1083,17 +1083,17 @@ whatsapp_find_and_call_tool = {
     "name": "whatsapp_find_and_call",
     "description": (
         "Find a contact in WhatsApp Desktop and initiate a voice call. "
-        "Use ONLY when the user asks to call someone via WhatsApp. "
-        "Before calling, use recall_person or recall_by_relationship to find the person "
-        "in memory. If multiple matches, ask the user which one. "
-        "Then pass the exact contact name to this tool. "
-        "Only works with WhatsApp Desktop — no browser fallback. "
+        "Use when the user says 'call [name]', 'WhatsApp call [name]', or 'call [name] on WhatsApp'. "
+        "If the user gives a relationship (e.g. 'call my sister'), first call recall_by_relationship "
+        "to find the person's name, then call this tool with that name. "
+        "If the user gives a name directly (e.g. 'call Rubab'), call this tool immediately. "
+        "Opens WhatsApp Desktop automatically if not running. "
         "Example: whatsapp_find_and_call(contact_name='Rubab')"
     ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "contact_name": {"type": "STRING", "description": "Exact name to search in WhatsApp contacts"}
+            "contact_name": {"type": "STRING", "description": "Exact contact name to search and call in WhatsApp"}
         },
         "required": ["contact_name"]
     }
@@ -1103,17 +1103,20 @@ whatsapp_find_and_message_tool = {
     "name": "whatsapp_find_and_message",
     "description": (
         "Find a contact in WhatsApp Desktop and send them a text message. "
-        "Use ONLY when the user asks to message someone via WhatsApp. "
-        "Before messaging, use recall_person or recall_by_relationship to find the person "
-        "in memory. If multiple matches, ask the user which one. "
-        "Then pass the exact contact name and message to this tool. "
+        "Use when the user says 'WhatsApp [name] saying [message]', 'tell [name] [message] on WhatsApp', "
+        "'send WhatsApp to [name]', 'message [name]', 'text [name]'. "
+        "If the user gives a relationship (e.g. 'message my sister'), first call recall_by_relationship "
+        "to find the person's name, then call this tool with that name. "
+        "If the user gives a name and message directly, call this tool immediately. "
+        "Opens WhatsApp Desktop automatically, searches the contact, types and sends the message. "
+        "Requires both contact_name and message. "
         "Example: whatsapp_find_and_message(contact_name='Rubab', message='Hey, how are you?')"
     ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "contact_name": {"type": "STRING", "description": "Exact name to search in WhatsApp contacts"},
-            "message": {"type": "STRING", "description": "The message text to send"}
+            "contact_name": {"type": "STRING", "description": "Exact contact name to search in WhatsApp"},
+            "message": {"type": "STRING", "description": "The full message text to send"}
         },
         "required": ["contact_name", "message"]
     }
