@@ -268,11 +268,99 @@ def message_contact_sync(contact_name, message):
         return {"success": False, "error": str(e)}
 
 
+# ── Check WhatsApp for unread messages ──
+async def check_whatsapp():
+    """Take a screenshot of WhatsApp and use AI Vision to find unread messages."""
+    if not _PYAUTOGUI:
+        return {"success": False, "error": "PyAutoGUI not installed"}
+    if not _WIN32:
+        return {"success": False, "error": "win32api not available"}
+    if not _focus_or_open_whatsapp():
+        return {"success": False, "error": "Could not open WhatsApp"}
+    time.sleep(1.5)
+    rect = _get_window_rect()
+    if not rect:
+        return {"success": False, "error": "Could not get WhatsApp window position"}
+    left, top, right, bottom = rect
+    win_w = right - left
+    win_h = bottom - top
+    if win_w < 200 or win_h < 200:
+        return {"success": False, "error": "WhatsApp window too small"}
+    try:
+        import mss
+        from screen_vision import analyze_screen
+        with mss.mss() as sct:
+            screenshot = sct.grab({"left": left, "top": top, "width": win_w, "height": win_h})
+            png_bytes = mss.tools.to_png(screenshot.rgb, screenshot.size)
+        prompt = (
+            "This is a screenshot of WhatsApp Desktop. "
+            "Look at the CHAT LIST on the LEFT panel. "
+            "For each chat that has UNREAD messages (green dot, green number badge, or bold contact name):\n"
+            "1. List the contact name exactly as shown\n"
+            "2. Show the last message preview text\n"
+            "3. Number of unread messages if visible\n\n"
+            "If NO chats have unread messages, say 'No unread messages'.\n"
+            "Format each unread chat as: 'CONTACT: [name] | PREVIEW: [last message] | UNREAD: [count]'"
+        )
+        result = await analyze_screen(prompt=prompt, screenshot=png_bytes)
+        return result
+    except Exception as e:
+        log.error(f"[WA] check_whatsapp failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def check_whatsapp_sync():
+    """Synchronous wrapper for check_whatsapp."""
+    return asyncio.run(check_whatsapp())
+
+
+# ── Reply to an existing WhatsApp chat ──
+def reply_whatsapp_sync(contact_name, message):
+    """Open an existing WhatsApp chat by name, type reply, and send.
+    Uses the chat list search bar (not Ctrl+N) to find existing conversations."""
+    _require_pyautogui()
+    if not _focus_or_open_whatsapp():
+        return {"success": False, "error": "Could not open WhatsApp"}
+    log.info(f"[WA] Replying to '{contact_name}'")
+    rect = _get_window_rect()
+    if not rect:
+        return {"success": False, "error": "Could not get window position"}
+    left, top, right, bottom = rect
+    win_w = right - left
+
+    # Click the chat list search bar (top of left panel)
+    search_x = left + int(win_w * 0.16)
+    search_y = top + 26
+    pyautogui.click(search_x, search_y)
+    time.sleep(0.5)
+
+    # Clear any existing search text and type contact name
+    pyautogui.hotkey("ctrl", "a")
+    time.sleep(0.2)
+    pyautogui.press("backspace")
+    time.sleep(0.3)
+    pyautogui.write(contact_name, interval=0.05)
+    time.sleep(1.5)
+
+    # Click the first search result (the existing chat)
+    result_y = top + 80
+    pyautogui.click(search_x, result_y)
+    time.sleep(1.5)
+
+    # Type and send the reply
+    pyautogui.write(message, interval=0.06)
+    time.sleep(0.3)
+    pyautogui.press("enter")
+    time.sleep(0.5)
+    log.info(f"[WA] Reply sent to '{contact_name}': {message[:60]}")
+    return {"success": True, "action": "reply", "contact": contact_name}
+
+
 # ── Sync entry point for local_agent._dispatch thread ──
 def whatsapp_handler(tool, args):
     """Synchronous handler called by local_agent._dispatch() in a worker thread.
     All WhatsApp message operations are fully synchronous (keyboard/mouse automation).
-    Only voice calls need async (for AI Vision fallback).
+    Only voice calls and check need async (for AI Vision).
     """
     contact = args.get("contact", "") or args.get("contact_name", "") or args.get("name", "")
     message = args.get("message", "") or args.get("text", "") or args.get("msg", "")
@@ -285,5 +373,13 @@ def whatsapp_handler(tool, args):
         if not message:
             return {"success": False, "error": "No message provided"}
         return message_contact_sync(contact, message)
+
+    if tool == "check_whatsapp":
+        return check_whatsapp_sync()
+
+    if tool == "reply_whatsapp":
+        if not message:
+            return {"success": False, "error": "No reply message provided"}
+        return reply_whatsapp_sync(contact, message)
 
     return {"success": False, "error": f"Unknown WhatsApp tool: {tool}"}

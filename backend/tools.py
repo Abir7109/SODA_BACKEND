@@ -1122,6 +1122,46 @@ whatsapp_find_and_message_tool = {
     }
 }
 
+check_whatsapp_tool = {
+    "name": "check_whatsapp",
+    "description": (
+        "Check WhatsApp for unread messages. Takes a screenshot of WhatsApp Desktop's chat list "
+        "and uses AI Vision to identify any chats with unread messages (green dot, number badge, or bold name). "
+        "Use when the user says 'check my WhatsApp', 'any WhatsApp messages', 'read my WhatsApp', "
+        "'did I get any messages', 'check WhatsApp', 'any new messages on WhatsApp'. "
+        "Opens WhatsApp Desktop automatically if not running. "
+        "Returns a list of unread chats with contact name, last message preview, and unread count. "
+        "If no unread messages, says 'No unread messages'. "
+        "After checking, the user may ask you to reply to someone. "
+        "Example: check_whatsapp()"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
+reply_whatsapp_tool = {
+    "name": "reply_whatsapp",
+    "description": (
+        "Reply to an existing WhatsApp chat. Opens the chat by contact name in WhatsApp Desktop, "
+        "types the message, and sends it. Use after check_whatsapp when the user says 'reply to [name]', "
+        "'respond to [name]', 'tell [name] back', 'send [name] a reply'. "
+        "Requires contact_name (the exact name as shown in chat list) and message (the reply text). "
+        "Opens WhatsApp Desktop automatically. "
+        "Example: reply_whatsapp(contact_name='Rubab', message='On my way!')"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "contact_name": {"type": "STRING", "description": "Exact contact name from the chat list to reply to"},
+            "message": {"type": "STRING", "description": "The reply message text to send"}
+        },
+        "required": ["contact_name", "message"]
+    }
+}
+
 # ── Scheduled Tasks ──
 
 create_scheduled_task_tool = {
@@ -1520,6 +1560,8 @@ tools_list = [{"function_declarations": [
     workbase_compare_tool,
     whatsapp_find_and_call_tool,
     whatsapp_find_and_message_tool,
+    check_whatsapp_tool,
+    reply_whatsapp_tool,
     create_scheduled_task_tool,
     list_scheduled_tasks_tool,
     delete_scheduled_task_tool,

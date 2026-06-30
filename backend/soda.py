@@ -208,6 +208,7 @@ LOCAL_AGENT_TOOLS = {
     "ui_wait_for_image", "ui_drag_drop",
     # Messaging (runs locally — WhatsApp/Telegram Desktop required)
     "send_whatsapp", "whatsapp_find_and_call", "whatsapp_find_and_message",
+    "check_whatsapp", "reply_whatsapp",
     "send_telegram_message", "send_telegram_file",
     # System info / agent control
     "get_system_status",
@@ -517,6 +518,22 @@ def _build_system_prompt():
 "recall_by_relationship('sister') → whatsapp_find_and_message(contact_name='Rubab', message='dinner is ready')\n"
 "  User: 'call my sister' → recall_by_relationship('sister') → "
 "if 1 result: whatsapp_find_and_call('Rubab'); if multiple: ask which one\n"
+"\nWHATSAPP CHECKING & REPLYING:\n"
+"- Use check_whatsapp() when user says 'check my WhatsApp', 'any messages on WhatsApp', "
+"'read my WhatsApp', 'did I get any messages', 'check for new messages'.\n"
+"- check_whatsapp takes a screenshot of WhatsApp's chat list and uses AI Vision to find unread messages.\n"
+"- It returns a list of unread chats with contact name, last message preview, and unread count.\n"
+"- If there are unread messages, BRIEF the user: 'You have X unread messages from [names]'.\n"
+"- Then ask if they want to reply to any of them: 'Want me to reply to anyone?'\n"
+"- If user says 'reply to [name]' or 'respond to [name] saying [message]' — use "
+"reply_whatsapp(contact_name='<exact name>', message='<reply text>').\n"
+"- reply_whatsapp opens the chat, types, and sends. Tell the user 'Done, replied to [name]'.\n"
+"- Example flow:\n"
+"  User: 'check my WhatsApp'\n"
+"  → check_whatsapp()\n"
+"  → 'You have 2 unread messages: Rubab asked "are you coming?" and Mom sent "call me". Want me to reply?'\n"
+"  User: 'reply to Rubab saying on my way'\n"
+"  → reply_whatsapp(contact_name='Rubab', message='On my way!')\n"
 "\nSCHEDULED TASKS:\n"
 "- When the user says 'schedule [action] at [time]', 'every [interval] do [action]', "
 "'remind me to [action] at [time]' — use create_scheduled_task with the action_text "
@@ -1533,6 +1550,8 @@ class AudioLoop:
                 "send_whatsapp": 45.0,
                 "whatsapp_find_and_message": 45.0,
                 "whatsapp_find_and_call": 45.0,
+                "check_whatsapp": 45.0,
+                "reply_whatsapp": 45.0,
                 "open_app": 15.0,
                 "list_installed_apps": 15.0,
                 "refresh_app_registry": 30.0,
