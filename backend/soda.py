@@ -183,6 +183,8 @@ LOCAL_AGENT_TOOLS = {
     "window_list", "window_move",
     # System control (volume, brightness, power, screenshot)
     "control_system",
+    # App registry
+    "list_installed_apps", "refresh_app_registry",
     # File operations (local filesystem)
     "list_files", "open_file", "write_file", "read_file", "edit_file",
     "create_folder", "delete_items", "rename_item", "copy_item", "move_item",
@@ -213,6 +215,8 @@ LOCAL_AGENT_TOOLS = {
     "go_to_sleep", "wake_up", "go_background", "come_back",
     # Other
     "send_keys_window",
+    # Agent control
+    "reconnect",
 }
 
 SODA_WAKE_PATTERN = re.compile(
@@ -351,11 +355,12 @@ def _build_system_prompt():
         "For webview interaction (clicking buttons, typing into inputs, scrolling, running JS inside an open webpage), "
          "use webview_action. First call open_browser to open the page, then use webview_action with the returned ID.\n"
         "APP OPENING — When Abir sir says 'open [app]', 'launch [app]', 'start [app]': "
-        "Call open_app(app_name=...) IMMEDIATELY. open_app first checks known app paths, "
-        "Windows Registry, Start Menu shortcuts, PATH, and AppX packages. "
-        "If none find the app, it automatically opens the Start Menu search, "
-        "types the app name, and opens the top result. "
-        "Do NOT search the web for 'how to open' — just call open_app.\n"
+         "Call open_app(app_name=...) IMMEDIATELY. open_app has a pre-built registry of ALL installed apps "
+         "(Start Menu shortcuts, Microsoft Store packages, PATH, registry) for instant launch. "
+         "If the user asks 'what apps do I have?' or 'list my apps', call list_installed_apps first. "
+         "open_app does NOT search the web. If the exact name fails, try common alternatives "
+         "(e.g. 'chrome' → 'google chrome', 'word' → 'microsoft word'). "
+         "Do NOT search the web for 'how to open' — just call open_app.\n"
         "TASK PLANNING — When the user gives 2+ commands or a multi-step request "
         "(e.g. 'do X, then Y, then Z', 'first... then... after that...'), "
         "call plan_tasks to break it down into TODO items immediately. "
@@ -1530,6 +1535,10 @@ class AudioLoop:
                 })
             return types.FunctionResponse(id=fc.id, name=name, response=result)
         elif name in LOCAL_AGENT_TOOLS and not _connected_agents:
+            log.warning(
+                f"[AGENT] {name} requested but NO local agent connected. "
+                f"Agent must run on the user's PC. Start with: py -3.11 backend\\local_agent.py"
+            )
             # Some tools work on the cloud server too; let existing handlers try
             pass  # fall through
 
@@ -2473,6 +2482,10 @@ class AudioLoop:
                 result = system_app.open_app(app_name)
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": result})
             else:
+                log.warning(
+                    f"[AGENT] open_app('{app_name}') — no local agent connected. "
+                    f"Tell user to start: py -3.11 backend\\local_agent.py"
+                )
                 return types.FunctionResponse(
                     id=fc.id, name=name,
                     response={"result": {

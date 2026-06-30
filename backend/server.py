@@ -79,7 +79,29 @@ async def lifespan(_app):
     except Exception as e:
         log.warning(f"Telegram bot failed to start: {e}")
 
+    # ── Agent health monitor (logs every 60s) ──
+    async def _agent_health_logger():
+        while True:
+            await asyncio.sleep(60)
+            if _connected_agents:
+                for sid, agent_info in list(_connected_agents.items()):
+                    machine_id = agent_info.get('machine_id', sid)
+                    tools = len(agent_info.get('tools', []))
+                    apps = agent_info.get('app_registry_count', '?')
+                    last_pong = agent_info.get('last_pong', 'never')
+                    print(f"[AGENT] Health: {machine_id} — {tools} tools, {apps} apps, last_pong: {last_pong}")
+            else:
+                print("[AGENT] Health: NO AGENTS CONNECTED — local desktop agent not running")
+    _health_task = asyncio.create_task(_agent_health_logger())
+    print("[SERVER] Agent health logger started (60s interval)")
+
     yield
+
+    _health_task.cancel()
+    try:
+        await _health_task
+    except asyncio.CancelledError:
+        pass
 
     if reminder_task:
         reminder_task.cancel()
@@ -215,7 +237,11 @@ async def disconnect(sid):
     # Clean up local agent if it disconnected
     agent = _connected_agents.pop(sid, None)
     if agent:
-        print(f"[AGENT] Agent disconnected: {agent.get('machine_id', sid)}")
+        machine_id = agent.get('machine_id', sid)
+        connected_at = agent.get('connected_at', '?')
+        tools_count = len(agent.get('tools', []))
+        print(f"[AGENT] Agent disconnected: {machine_id} ({tools_count} tools, connected since {connected_at})")
+        print(f"[AGENT] Active agents remaining: {len(_connected_agents)}")
 
 # ── Local Agent Events ──
 @sio.event
@@ -224,6 +250,8 @@ async def agent_register(sid, data):
     machine_id = data.get('machine_id', sid)
     platform = data.get('platform', 'unknown')
     tools = data.get('tools', [])
+    app_registry = data.get('app_registry', {})
+    app_count = app_registry.get('count', 0)
     # Remove stale agent entries with the same machine_id BUT fewer tools (zombie detection)
     for old_sid in list(_connected_agents.keys()):
         if old_sid == sid:
@@ -239,10 +267,11 @@ async def agent_register(sid, data):
         'machine_id': machine_id,
         'platform': platform,
         'tools': tools,
+        'app_registry_count': app_count,
         'connected_at': datetime.now().isoformat(),
         'sid': sid,
     }
-    print(f"[AGENT] Registered: {machine_id} ({platform}) — {len(tools)} tools")
+    print(f"[AGENT] Registered: {machine_id} ({platform}) — {len(tools)} tools, {app_count} apps in registry")
 
 @sio.event
 async def agent_disconnect(sid, data=None):
@@ -1333,4 +1362,6 @@ async def browser_audio(sid, data):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
+    print(f"[SERVER] Starting on port {port}...")
+    print(f"[SERVER] Expecting local agent at desktop PC")
     uvicorn.run(app_socketio, host="0.0.0.0", port=port)
