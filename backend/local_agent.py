@@ -588,7 +588,7 @@ def _dispatch(tool, args):
 
         def _verify_started(path_or_name=None, timeout=3.0):
             """Check that the app actually launched. Returns (ok: bool, detail: str)."""
-            # Method 1: Check if process started (psutil)
+            # Method 1: Check if process started (psutil) — most reliable
             if HAS_PSUTIL and path_or_name and os.path.isfile(path_or_name):
                 import psutil as _psutil
                 exe_name = os.path.basename(path_or_name).lower()
@@ -624,8 +624,10 @@ def _dispatch(tool, args):
                             pass
                 except:
                     pass
+                # psutil matched nothing — return false instead of falling through
+                return (False, f"No new process matching '{os.path.basename(path_or_name)}' detected")
 
-            # Method 2: Check for new window (pygetwindow)
+            # Method 2: Check for new window (pygetwindow) — only used when psutil not available
             if HAS_PYGETWINDOW:
                 import pygetwindow as gw
                 try:
@@ -637,19 +639,29 @@ def _dispatch(tool, args):
                     after = set(w.title.strip() for w in gw.getAllWindows() if w.title.strip() and len(w.title.strip()) > 2)
                 except:
                     after = set()
-                if after - before:
-                    return (True, f"New window appeared: {(after - before).pop()}")
+                new_windows = after - before
+                if new_windows:
+                    new_title = new_windows.pop()
+                    # Only confirm if window title relates to app name
+                    if not path_or_name or app_lower in new_title.lower() or any(w in new_title.lower() for w in path_or_name.lower().replace('.exe','').replace('.lnk','').split('\\')):
+                        return (True, f"Window opened: '{new_title}'")
+                    # Window appeared but doesn't match — might be a false positive
+                    return (False, f"Unrelated window '{new_title}' appeared, target app not confirmed")
                 # Try once more after delay
                 time.sleep(2.0)
                 try:
                     after2 = set(w.title.strip() for w in gw.getAllWindows() if w.title.strip() and len(w.title.strip()) > 2)
                 except:
                     after2 = set()
-                if after2 - before:
-                    return (True, f"New window appeared (delayed): {(after2 - before).pop()}")
+                new_windows2 = after2 - before
+                if new_windows2:
+                    new_title = new_windows2.pop()
+                    if not path_or_name or app_lower in new_title.lower() or any(w in new_title.lower() for w in path_or_name.lower().replace('.exe','').replace('.lnk','').split('\\')):
+                        return (True, f"Window opened (delayed): '{new_title}'")
+                    return (False, f"Unrelated window '{new_title}' appeared, target app not confirmed")
 
-            # No verification available — trust the Popen call
-            return (True, "Launch attempted (no verification available)")
+            # No verification available — return false instead of guessing success
+            return (False, "Could not verify if app launched (no process or window detection available)")
 
         def _launch(path_or_name):
             """Try to launch, returns (ok, detail)."""
@@ -669,6 +681,20 @@ def _dispatch(tool, args):
             "zoom": "zoommtg://", "teams": "msteams://", "skype": "skype://",
             "signal": "signal://",
         }
+        # ── Web apps: open in default browser via https ────────────
+        _WEB_APPS = {
+            "youtube": "https://youtube.com", "yt": "https://youtube.com",
+            "spotify": "https://open.spotify.com", "twitter": "https://twitter.com",
+            "x": "https://x.com", "facebook": "https://facebook.com",
+            "instagram": "https://instagram.com", "linkedin": "https://linkedin.com",
+            "reddit": "https://reddit.com", "github": "https://github.com",
+            "gmail": "https://mail.google.com", "maps": "https://maps.google.com",
+            "drive": "https://drive.google.com", "docs": "https://docs.google.com",
+            "sheets": "https://sheets.google.com", "netflix": "https://netflix.com",
+            "twitch": "https://twitch.com", "chatgpt": "https://chat.openai.com",
+            "gpt": "https://chat.openai.com", "claude": "https://claude.ai",
+            "gemini": "https://gemini.google.com",
+        }
         if app_lower in _URI_APPS:
             try:
                 subprocess.Popen(["start", "", _URI_APPS[app_lower]], shell=True)
@@ -677,6 +703,21 @@ def _dispatch(tool, args):
                     return {"success": True, "app": app, "method": "uri", "detail": _detail}
             except:
                 pass
+
+        # ── 0b. Web apps (open in browser) ─────────────────────────
+        if app_lower in _WEB_APPS:
+            url = _WEB_APPS[app_lower]
+            log.info(f"[LocalAgent] Opening web app '{app}' → {url}")
+            try:
+                subprocess.Popen(["start", "", url], shell=True)
+                _ok, _detail = _verify_started()
+                if _ok:
+                    return {"success": True, "app": app, "url": url, "method": "web_app", "detail": _detail}
+                # Even if verify fails, web pages load in tab — trust it
+                return {"success": True, "app": app, "url": url, "method": "web_app", "detail": f"Opened {url} in default browser"}
+            except Exception as e:
+                log.warning(f"[LocalAgent] web_app '{app}' failed: {e}")
+                # fall through to other methods
 
         # ── 1. APP_REGISTRY lookup (instant, no search delay) ────
         reg_match = _find_app(app)
@@ -846,6 +887,16 @@ def _dispatch(tool, args):
                         return {"success": True, "app": app, "method": "pyautogui_start", "detail": _detail}
                 except:
                     time.sleep(1)
+
+        # ── 9. Final fallback: try as website https://{app}.com ────
+        if "." not in app_lower and " " not in app_lower:
+            web_url = f"https://{app_lower}.com"
+            log.info(f"[LocalAgent] Final fallback: trying {web_url} in browser")
+            try:
+                subprocess.Popen(["start", "", web_url], shell=True)
+                return {"success": True, "app": app, "url": web_url, "method": "website_fallback", "detail": f"Could not find '{app}' as an installed app. Opened {web_url} in browser instead."}
+            except Exception as e:
+                return {"success": False, "error": f"Could not find '{app}' installed on this system. Also failed to open website: {e}", "not_found": True}
 
         # ── All methods exhausted ─────────────────────────────────
         return {"success": False, "error": f"Could not find '{app}' installed on this system. Try searching the web for it.", "not_found": True}
