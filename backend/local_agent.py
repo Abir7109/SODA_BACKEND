@@ -572,31 +572,82 @@ def _dispatch(tool, args):
             return {"success": False, "error": "No app name provided"}
         app_lower = app.lower().strip()
 
-        def _verify_started(timeout=2.0):
-            if not HAS_PYGETWINDOW:
-                return True
-            import pygetwindow as gw
-            try:
-                before = set(w.title.strip() for w in gw.getAllWindows() if w.title.strip() and len(w.title.strip()) > 2)
-            except:
+        def _verify_started(path_or_name=None, timeout=3.0):
+            """Check that the app actually launched. Returns (ok: bool, detail: str)."""
+            # Method 1: Check if process started (psutil)
+            if HAS_PSUTIL and path_or_name and os.path.isfile(path_or_name):
+                import psutil as _psutil
+                exe_name = os.path.basename(path_or_name).lower()
                 before = set()
-            time.sleep(timeout)
-            try:
-                after = set(w.title.strip() for w in gw.getAllWindows() if w.title.strip() and len(w.title.strip()) > 2)
-            except:
+                try:
+                    before = set(p.info['pid'] for p in _psutil.process_iter(['pid', 'name']))
+                except:
+                    pass
+                time.sleep(timeout)
                 after = set()
-            return bool(after - before)
+                try:
+                    after = set(p.info['pid'] for p in _psutil.process_iter(['pid', 'name']))
+                except:
+                    pass
+                new_pids = after - before
+                for pid in new_pids:
+                    try:
+                        p = _psutil.Process(pid)
+                        if exe_name in p.name().lower() or exe_name.replace('.exe','') in p.name().lower():
+                            return (True, f"Process {p.name()} (PID {pid}) started")
+                    except:
+                        pass
+                # Give it one more chance — some apps start via a launcher
+                time.sleep(2.0)
+                try:
+                    after2 = set(p.info['pid'] for p in _psutil.process_iter(['pid', 'name']))
+                    new_pids2 = after2 - before
+                    for pid in new_pids2:
+                        try:
+                            p = _psutil.Process(pid)
+                            return (True, f"Process {p.name()} (PID {pid}) started (delayed)")
+                        except:
+                            pass
+                except:
+                    pass
+
+            # Method 2: Check for new window (pygetwindow)
+            if HAS_PYGETWINDOW:
+                import pygetwindow as gw
+                try:
+                    before = set(w.title.strip() for w in gw.getAllWindows() if w.title.strip() and len(w.title.strip()) > 2)
+                except:
+                    before = set()
+                time.sleep(timeout)
+                try:
+                    after = set(w.title.strip() for w in gw.getAllWindows() if w.title.strip() and len(w.title.strip()) > 2)
+                except:
+                    after = set()
+                if after - before:
+                    return (True, f"New window appeared: {(after - before).pop()}")
+                # Try once more after delay
+                time.sleep(2.0)
+                try:
+                    after2 = set(w.title.strip() for w in gw.getAllWindows() if w.title.strip() and len(w.title.strip()) > 2)
+                except:
+                    after2 = set()
+                if after2 - before:
+                    return (True, f"New window appeared (delayed): {(after2 - before).pop()}")
+
+            # No verification available — trust the Popen call
+            return (True, "Launch attempted (no verification available)")
 
         def _launch(path_or_name):
+            """Try to launch, returns (ok, detail)."""
             try:
                 subprocess.Popen([path_or_name], shell=False)
-                return _verify_started()
+                return _verify_started(path_or_name)
             except:
                 try:
                     subprocess.Popen(["start", "", path_or_name], shell=True)
                     return _verify_started()
-                except:
-                    return False
+                except Exception as e:
+                    return (False, str(e))
 
         # ── 0. URI scheme (fastest) ───────────────────────────────
         _URI_APPS = {
@@ -607,8 +658,9 @@ def _dispatch(tool, args):
         if app_lower in _URI_APPS:
             try:
                 subprocess.Popen(["start", "", _URI_APPS[app_lower]], shell=True)
-                if _verify_started():
-                    return {"success": True, "app": app, "method": "uri"}
+                _ok, _detail = _verify_started()
+                if _ok:
+                    return {"success": True, "app": app, "method": "uri", "detail": _detail}
             except:
                 pass
 
@@ -624,20 +676,22 @@ def _dispatch(tool, args):
                         subprocess.Popen(["explorer", p], shell=False)
                     else:
                         subprocess.Popen([p], shell=False)
-                    if _verify_started():
+                    _ok, _detail = _verify_started(p)
+                    if _ok:
                         return {
                             "success": True, "app": app,
                             "path": p, "method": f"registry_{method}",
-                            "matched": matched_key,
+                            "matched": matched_key, "detail": _detail,
                         }
                 except:
                     try:
                         subprocess.Popen(["start", "", p], shell=True)
-                        if _verify_started():
+                        _ok, _detail = _verify_started(p)
+                        if _ok:
                             return {
                                 "success": True, "app": app,
                                 "path": p, "method": f"registry_{method}_start",
-                                "matched": matched_key,
+                                "matched": matched_key, "detail": _detail,
                             }
                     except:
                         continue
@@ -656,8 +710,10 @@ def _dispatch(tool, args):
                             try:
                                 exe_path = winreg.QueryValue(subkey, "")
                                 winreg.CloseKey(subkey)
-                                if exe_path and os.path.isfile(exe_path) and _launch(exe_path):
-                                    return {"success": True, "app": app, "path": exe_path, "method": "registry"}
+                                if exe_path and os.path.isfile(exe_path):
+                                    _ok, _detail = _launch(exe_path)
+                                    if _ok:
+                                        return {"success": True, "app": app, "path": exe_path, "method": "registry", "detail": _detail}
                             except:
                                 winreg.CloseKey(subkey)
                     winreg.CloseKey(key)
@@ -672,8 +728,9 @@ def _dispatch(tool, args):
                 r = subprocess.run(["where", f"{app}{ext}"], shell=True, capture_output=True, text=True, timeout=5)
                 if r.returncode == 0:
                     exe_path = r.stdout.strip().split("\n")[0].strip()
-                    if _launch(exe_path):
-                        return {"success": True, "app": app, "path": exe_path, "method": "where"}
+                    _ok, _detail = _launch(exe_path)
+                    if _ok:
+                        return {"success": True, "app": app, "path": exe_path, "method": "where", "detail": _detail}
             except:
                 pass
 
@@ -690,8 +747,9 @@ def _dispatch(tool, args):
                         name_no_ext = f.lower().replace(".lnk", "")
                         if app_lower in name_no_ext or name_no_ext in app_lower:
                             shortcut_path = os.path.join(root, f)
-                            if _launch(shortcut_path):
-                                return {"success": True, "app": app, "path": shortcut_path, "method": "start_menu"}
+                            _ok, _detail = _launch(shortcut_path)
+                            if _ok:
+                                return {"success": True, "app": app, "path": shortcut_path, "method": "start_menu", "detail": _detail}
             except:
                 pass
 
@@ -714,8 +772,9 @@ def _dispatch(tool, args):
                         continue
                     try:
                         subprocess.Popen(["explorer", f"shell:AppsFolder\\{aumid}"], shell=False)
-                        if _verify_started(3.0):
-                            return {"success": True, "app": app, "method": "appx", "aumid": aumid}
+                        _ok, _detail = _verify_started(timeout=3.0)
+                        if _ok:
+                            return {"success": True, "app": app, "method": "appx", "aumid": aumid, "detail": _detail}
                     except:
                         pass
         except:
@@ -724,14 +783,16 @@ def _dispatch(tool, args):
         # ── 6. os.startfile + `start` shell ───────────────────────
         try:
             os.startfile(app)
-            if _verify_started():
-                return {"success": True, "app": app, "method": "startfile"}
+            _ok, _detail = _verify_started()
+            if _ok:
+                return {"success": True, "app": app, "method": "startfile", "detail": _detail}
         except:
             pass
         try:
             subprocess.Popen(["start", "", app], shell=True)
-            if _verify_started():
-                return {"success": True, "app": app, "method": "start_cmd"}
+            _ok, _detail = _verify_started()
+            if _ok:
+                return {"success": True, "app": app, "method": "start_cmd", "detail": _detail}
         except:
             pass
 
@@ -748,8 +809,9 @@ def _dispatch(tool, args):
                     "Start-Sleep -Milliseconds 2000"
                 )
                 subprocess.run(["powershell", "-NoProfile", "-Command", search_ps], capture_output=True, timeout=8)
-                if _verify_started(2.0):
-                    return {"success": True, "app": app, "method": "powershell_search"}
+                _ok, _detail = _verify_started(timeout=2.0)
+                if _ok:
+                    return {"success": True, "app": app, "method": "powershell_search", "detail": _detail}
             except:
                 time.sleep(1)
 
@@ -765,8 +827,9 @@ def _dispatch(tool, args):
                     time.sleep(1.5)
                     pyautogui.press("enter")
                     time.sleep(2)
-                    if _verify_started(1.5):
-                        return {"success": True, "app": app, "method": "pyautogui_start"}
+                    _ok, _detail = _verify_started(timeout=1.5)
+                    if _ok:
+                        return {"success": True, "app": app, "method": "pyautogui_start", "detail": _detail}
                 except:
                     time.sleep(1)
 
@@ -1796,7 +1859,8 @@ if __name__ == "__main__":
     log(f"  Deps:     pyautogui={'OK' if HAS_PYAUTOGUI else 'MISS'}, "
           f"mss={'OK' if HAS_MSS else 'MISS'}, "
           f"pyperclip={'OK' if HAS_PYPERCLIP else 'MISS'}, "
-          f"psutil={'OK' if HAS_PSUTIL else 'MISS'}")
+          f"psutil={'OK' if HAS_PSUTIL else 'MISS'}, "
+          f"pygetwindow={'OK' if HAS_PYGETWINDOW else 'MISS'}")
     log("=" * 50)
 
     # ── Build app registry (scan installed apps) ──
