@@ -155,7 +155,6 @@ try:
 except ImportError:
     def run_welcome_sequence(*a, **kw):
         return {"success": False, "error": "welcome_home not available"}
-import whatsapp_bridge
 import scheduler_service as scheduler
 import workflow_intent
 import workflow_data

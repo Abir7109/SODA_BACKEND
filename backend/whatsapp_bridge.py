@@ -126,16 +126,16 @@ def _search_contact_uia(contact_name):
             return False
         wa.SetActive()
         time.sleep(0.3)
+        log.info(f"[WA] uiautomation focused WhatsApp window")
+        return True  # window is focused, PyAutoGUI will now work reliably
     except Exception as e:
         log.warning(f"[WA] uia focus failed: {e}")
         return False
-    return False  # fall through to PyAutoGUI for reliable keyboard input
 
 
 def _search_contact(contact_name):
-    """Search contact: try uiautomation first, fall back to PyAutoGUI."""
-    if _search_contact_uia(contact_name):
-        return True
+    """Focus WhatsApp window, then search contact via PyAutoGUI."""
+    _search_contact_uia(contact_name)  # focus the window (may or may not have uia)
     _search_contact_pyautogui(contact_name)
     return True
 
@@ -279,3 +279,75 @@ async def message_contact(contact_name, message):
     except Exception as e:
         log.error(f"[WA] message_contact failed: {e}")
         return {"success": False, "error": str(e)}
+
+
+def _open_new_chat(contact_name):
+    """Open Ctrl+N new chat dialog, type contact, select it. Returns True if chat opened."""
+    _require_pyautogui()
+    log.info(f"[WA] Opening new chat for '{contact_name}'")
+    pyautogui.hotkey("ctrl", "n")
+    time.sleep(0.8)
+    pyautogui.write(contact_name, interval=0.05)
+    time.sleep(1.5)
+    pyautogui.press("enter")
+    time.sleep(1.5)
+    # Check if message input exists by trying to type a period and delete it
+    try:
+        pyautogui.write(".", interval=0.02)
+        time.sleep(0.2)
+        pyautogui.press("backspace")
+        time.sleep(0.1)
+    except:
+        pass
+    return True
+
+
+async def message_contact(contact_name, message):
+    """Search a contact in WhatsApp Desktop and send a message."""
+    if not _PYAUTOGUI:
+        return {"success": False, "error": "PyAutoGUI not installed"}
+    if not _WIN32:
+        return {"success": False, "error": "win32api not available"}
+    try:
+        if not _focus_or_open_whatsapp():
+            log.info("[WA] Desktop unavailable, trying web.whatsapp.com fallback")
+            try:
+                from system_app import open_url
+                encoded = message.replace(" ", "%20").replace("\n", "%0A")
+                url = f"https://web.whatsapp.com/send?text={encoded}"
+                open_url(url)
+                return {"success": True, "action": "message", "contact": contact_name, "fallback": "web"}
+            except Exception as web_e:
+                log.warning(f"[WA] Web fallback failed: {web_e}")
+                return {"success": False, "error": "Could not open WhatsApp Desktop or web version. Is WhatsApp installed?"}
+        _open_new_chat(contact_name)
+        pyautogui.write(message, interval=0.05)
+        time.sleep(0.3)
+        pyautogui.press("enter")
+        time.sleep(0.5)
+        log.info(f"[WA] Message sent to '{contact_name}': {message[:50]}")
+        return {"success": True, "action": "message", "contact": contact_name}
+    except Exception as e:
+        log.error(f"[WA] message_contact failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+# ── Sync entry point for local_agent._dispatch thread ──
+def whatsapp_handler(tool, args):
+    """Synchronous handler called by local_agent._dispatch() in a worker thread.
+
+    Routes tool calls to the appropriate async function using asyncio.run().
+    """
+    contact = args.get("contact", "") or args.get("contact_name", "") or args.get("name", "")
+    message = args.get("message", "") or args.get("text", "") or args.get("msg", "")
+    log.info(f"[WA] whatsapp_handler: tool={tool}, contact='{contact}', msg_len={len(message)}")
+
+    if tool == "whatsapp_find_and_call":
+        return asyncio.run(call_contact(contact))
+
+    if tool in ("whatsapp_find_and_message", "send_whatsapp"):
+        if not message:
+            return {"success": False, "error": "No message provided"}
+        return asyncio.run(message_contact(contact, message))
+
+    return {"success": False, "error": f"Unknown WhatsApp tool: {tool}"}
