@@ -75,7 +75,7 @@ LOCAL_TOOLS = [
     "window_focus", "window_list", "window_move",
     "window_manage", "window_get_info",
     "send_whatsapp", "whatsapp_find_and_call", "whatsapp_find_and_message",
-    "check_whatsapp", "reply_whatsapp",
+    "check_whatsapp", "reply_whatsapp", "read_whatsapp_chat",
     "send_telegram_message", "send_telegram_file",
     "get_active_window", "list_processes", "process_kill",
     "get_system_status",
@@ -1179,7 +1179,7 @@ def _dispatch(tool, args):
 
     # ── Messaging ──────────────────────────────────────────────────
     elif tool in ("send_whatsapp", "whatsapp_find_and_call", "whatsapp_find_and_message",
-                  "check_whatsapp", "reply_whatsapp"):
+                  "check_whatsapp", "reply_whatsapp", "read_whatsapp_chat"):
         try:
             from whatsapp_bridge import whatsapp_handler
             return whatsapp_handler(tool, args)

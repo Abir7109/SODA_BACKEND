@@ -268,9 +268,17 @@ def message_contact_sync(contact_name, message):
         return {"success": False, "error": str(e)}
 
 
+# ── Helper: take screenshot of a region ──
+def _screenshot_region(left, top, width, height):
+    import mss
+    with mss.mss() as sct:
+        img = sct.grab({"left": left, "top": top, "width": width, "height": height})
+        return mss.tools.to_png(img.rgb, img.size)
+
+
 # ── Check WhatsApp for unread messages ──
 async def check_whatsapp():
-    """Take a screenshot of WhatsApp and use AI Vision to find unread messages."""
+    """Take a screenshot of WhatsApp's left panel (chat list) and use AI Vision to find unread messages."""
     if not _PYAUTOGUI:
         return {"success": False, "error": "PyAutoGUI not installed"}
     if not _WIN32:
@@ -287,20 +295,23 @@ async def check_whatsapp():
     if win_w < 200 or win_h < 200:
         return {"success": False, "error": "WhatsApp window too small"}
     try:
-        import mss
         from screen_vision import analyze_screen
-        with mss.mss() as sct:
-            screenshot = sct.grab({"left": left, "top": top, "width": win_w, "height": win_h})
-            png_bytes = mss.tools.to_png(screenshot.rgb, screenshot.size)
+        crop_w = int(win_w * 0.35)
+        png_bytes = _screenshot_region(left, top, crop_w, win_h)
         prompt = (
-            "This is a screenshot of WhatsApp Desktop. "
-            "Look at the CHAT LIST on the LEFT panel. "
-            "For each chat that has UNREAD messages (green dot, green number badge, or bold contact name):\n"
-            "1. List the contact name exactly as shown\n"
-            "2. Show the last message preview text\n"
-            "3. Number of unread messages if visible\n\n"
-            "If NO chats have unread messages, say 'No unread messages'.\n"
-            "Format each unread chat as: 'CONTACT: [name] | PREVIEW: [last message] | UNREAD: [count]'"
+            "You are looking at the CHAT LIST of WhatsApp Desktop (left panel only).\n"
+            "TASK: Identify any chats with UNREAD messages.\n"
+            "Unread indicators: a green dot next to the contact name, a green number badge on the avatar, "
+            "or the contact name/partial message appearing in bold text (not greyed out).\n"
+            "STRICT RULES:\n"
+            "- ONLY report what you can CLEARLY SEE. Do NOT guess or infer.\n"
+            "- If you are UNSURE about any indicator, do NOT count it as unread.\n"
+            "- If you see NO clear unread indicators, say exactly: 'No unread messages detected'.\n"
+            "- Do NOT make up contact names or message previews.\n"
+            "- If you see a chat but cannot read the name or preview clearly, say 'unread chat (name unclear)'.\n"
+            "- When in doubt, report LESS rather than more.\n\n"
+            "OUTPUT FORMAT:\n"
+            "If unread found, list each as: '• [contact name]: [last message preview]'"
         )
         result = await analyze_screen(prompt=prompt, screenshot=png_bytes)
         return result
@@ -312,6 +323,87 @@ async def check_whatsapp():
 def check_whatsapp_sync():
     """Synchronous wrapper for check_whatsapp."""
     return asyncio.run(check_whatsapp())
+
+
+# ── Helper: search and open a chat by contact name ──
+def _search_and_open_chat(contact_name):
+    """Focus WhatsApp, search contact via Ctrl+N, open the chat. Returns True on success."""
+    _require_pyautogui()
+    if not _focus_or_open_whatsapp():
+        return False
+    _focus_whatsapp()
+    pyautogui.hotkey("ctrl", "n")
+    time.sleep(0.8)
+    pyautogui.write(contact_name, interval=0.06)
+    time.sleep(1.5)
+    pyautogui.press("enter")
+    time.sleep(1.5)
+    return True
+
+
+# ── Open a WhatsApp contact's chat and read the conversation ──
+async def read_whatsapp_chat(contact_name, message=None):
+    """Open a contact's chat in WhatsApp, take a screenshot of the conversation,
+    use AI Vision to read and describe the recent messages.
+    If `message` is provided, send it after reading."""
+    if not _PYAUTOGUI:
+        return {"success": False, "error": "PyAutoGUI not installed"}
+    if not _WIN32:
+        return {"success": False, "error": "win32api not available"}
+    if not _search_and_open_chat(contact_name):
+        return {"success": False, "error": "Could not open chat with {contact_name}"}
+    try:
+        from screen_vision import analyze_screen
+        rect = _get_window_rect()
+        if not rect:
+            return {"success": False, "error": "Could not get window position"}
+        left, top, right, bottom = rect
+        win_w = right - left
+        win_h = bottom - top
+
+        chat_left = left + int(win_w * 0.35)
+        chat_top = top + 70
+        chat_w = win_w - int(win_w * 0.35)
+        chat_h = win_h - 120
+        png_bytes = _screenshot_region(chat_left, chat_top, chat_w, chat_h)
+
+        prompt = (
+            "You are looking at a WhatsApp conversation (the right panel with messages).\n"
+            "TASK: Read and describe the most recent messages visible in this chat.\n"
+            "STRICT RULES:\n"
+            "- Only report text you can CLEARLY read from the messages.\n"
+            "- Do NOT guess, infer, or make up any message content.\n"
+            "- If you cannot read any messages clearly, say: 'Could not read the conversation clearly'.\n"
+            "- Identify who sent each message if visible (sender name/label above the bubble).\n"
+            "- If only a single side of the conversation is visible, note that.\n"
+            "- Output in format:\n"
+            "  'Most recent messages in chat with [contact]:'\n"
+            "  '[Sender]: [message text]'  (for each visible message)"
+        )
+        result = await analyze_screen(prompt=prompt, screenshot=png_bytes)
+
+        if message and result.get("success"):
+            time.sleep(0.5)
+            pyautogui.write(message, interval=0.06)
+            time.sleep(0.3)
+            pyautogui.press("enter")
+            time.sleep(0.5)
+            if isinstance(result, dict):
+                result["message_sent"] = True
+                result["sent_text"] = message
+
+        return result
+    except Exception as e:
+        log.error(f"[WA] read_whatsapp_chat failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def read_whatsapp_chat_sync(contact_name, message=None):
+    """Synchronous wrapper for read_whatsapp_chat."""
+    kwargs = {"contact_name": contact_name}
+    if message:
+        kwargs["message"] = message
+    return asyncio.run(read_whatsapp_chat(**kwargs))
 
 
 # ── Reply to an existing WhatsApp chat ──
@@ -381,5 +473,9 @@ def whatsapp_handler(tool, args):
         if not message:
             return {"success": False, "error": "No reply message provided"}
         return reply_whatsapp_sync(contact, message)
+
+    if tool == "read_whatsapp_chat":
+        msg = args.get("message", "") or args.get("text", "") or args.get("msg", "")
+        return read_whatsapp_chat_sync(contact, msg or None)
 
     return {"success": False, "error": f"Unknown WhatsApp tool: {tool}"}

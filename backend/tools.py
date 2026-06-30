@@ -1162,6 +1162,31 @@ reply_whatsapp_tool = {
     }
 }
 
+read_whatsapp_chat_tool = {
+    "name": "read_whatsapp_chat",
+    "description": (
+        "Open a specific contact's chat in WhatsApp Desktop, take a screenshot of the conversation, "
+        "and use AI Vision to read and describe the recent messages. "
+        "Use when the user says 'open [name] WhatsApp', 'show me my chat with [name]', "
+        "'what did [name] say', 'read my conversation with [name]', "
+        "'open WhatsApp and show [name]', 'I want to see my chat with [name]'. "
+        "Also use when the user asks to check a specific person's messages (not general check). "
+        "If the user also provides a message to send, it sends the message after reading the chat. "
+        "Opens WhatsApp Desktop automatically, searches the contact, opens the chat, "
+        "screenshots the conversation area, and describes what it sees. "
+        "contact_name is required. message is optional. "
+        "Example: read_whatsapp_chat(contact_name='Rubab')"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "contact_name": {"type": "STRING", "description": "Exact contact name to open and read chat from"},
+            "message": {"type": "STRING", "description": "Optional message to send after reading the chat"}
+        },
+        "required": ["contact_name"]
+    }
+}
+
 # ── Scheduled Tasks ──
 
 create_scheduled_task_tool = {
@@ -1562,6 +1587,7 @@ tools_list = [{"function_declarations": [
     whatsapp_find_and_message_tool,
     check_whatsapp_tool,
     reply_whatsapp_tool,
+    read_whatsapp_chat_tool,
     create_scheduled_task_tool,
     list_scheduled_tasks_tool,
     delete_scheduled_task_tool,

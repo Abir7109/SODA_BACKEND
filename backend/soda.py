@@ -208,7 +208,7 @@ LOCAL_AGENT_TOOLS = {
     "ui_wait_for_image", "ui_drag_drop",
     # Messaging (runs locally — WhatsApp/Telegram Desktop required)
     "send_whatsapp", "whatsapp_find_and_call", "whatsapp_find_and_message",
-    "check_whatsapp", "reply_whatsapp",
+    "check_whatsapp", "reply_whatsapp", "read_whatsapp_chat",
     "send_telegram_message", "send_telegram_file",
     # System info / agent control
     "get_system_status",
@@ -501,40 +501,52 @@ def _build_system_prompt():
 "After the last article, call news_control(complete) to close the showcase. "
 "This is NOT memory recall — do NOT narrate profile, stored facts, people, or lessons. Only narrate the news articles."
 "\n\nALL WHATSAPP TOOLS:\n"
-"- CRITICAL TOOLS — exact names you MUST use:\n"
-"  • check_whatsapp() — checks for unread messages\n"
+"- CRITICAL — ONLY use these tools for WhatsApp. NEVER call open_app('WhatsApp'):\n"
+"  • check_whatsapp() — OPENS WhatsApp, screenshots chat list, AI Vision finds unread messages. "
+"Returns what it sees. Read the 'analysis' field and report it HONESTLY. "
+"If the analysis says 'No unread messages detected', tell user 'No new messages'. "
+"If the analysis lists unread messages, read them to the user. "
+"Do NOT make up extra details — the tool only sees what's on screen.\n"
+"  • read_whatsapp_chat(contact_name, message?) — OPENS a specific contact's chat, "
+"screenshots the conversation, and uses AI Vision to read recent messages. "
+"If user says 'open [name]'s WhatsApp', 'show me chat with [name]', 'what did [name] say', "
+"'read my conversation with [name]' → call this. "
+"Optionally takes a message to send after reading.\n"
 "  • reply_whatsapp(contact_name, message) — replies to an existing chat\n"
 "  • whatsapp_find_and_message(contact_name, message) — sends a new WhatsApp message\n"
 "  • whatsapp_find_and_call(contact_name) — calls a contact on WhatsApp\n"
-"  • send_whatsapp — same as whatsapp_find_and_message (deprecated but still works)\n"
+"  • send_whatsapp — same as whatsapp_find_and_message\n"
+"- IMPORTANT — VISION ANALYSIS: The AI Vision tool analyzes a screenshot. "
+"It may sometimes be inaccurate. When reporting results:\n"
+"  • Read what the 'analysis' field says. Quote it honestly.\n"
+"  • If analysis says a name or message is unclear, tell the user it's unclear.\n"
+"  • Do NOT add extra names or messages not in the analysis.\n"
+"  • If analysis says 'Could not read clearly', say 'Sorry sir, I couldn't read the screen clearly.'\n"
 "- OBEY IMMEDIATELY:\n"
-"  • User says 'check (my) WhatsApp', 'any messages', 'read my WhatsApp', 'did I get any msgs'"
-" → call check_whatsapp(), NEVER say you can't\n"
-"  • User says 'reply to [name]', 'respond to [name]' → call reply_whatsapp(contact_name='...', message='...')\n"
-"  • User says 'send WhatsApp to [name] saying [message]', 'tell [name] [message] on WhatsApp', "
+"  • 'check (my) WhatsApp', 'any messages', 'read my WhatsApp', 'did I get any msgs'"
+" → call check_whatsapp(), NEVER open_app('WhatsApp')\n"
+"  • 'open [name] WhatsApp', 'show me chat with [name]', 'what did [name] say'"
+" → call read_whatsapp_chat(contact_name='...')\n"
+"  • 'reply to [name]', 'respond to [name]' → call reply_whatsapp(contact_name='...', message='...')\n"
+"  • 'send WhatsApp to [name] saying [message]', 'tell [name] [message] on WhatsApp', "
 "'message [name]', 'text [name]' → call "
 "whatsapp_find_and_message(contact_name='<exact name>', message='<full message>')\n"
-"  • User says 'call [name] on WhatsApp', 'WhatsApp call [name]' → call "
+"  • 'call [name] on WhatsApp', 'WhatsApp call [name]' → call "
 "whatsapp_find_and_call(contact_name='<exact name>')\n"
-"- If the user just says a name without WhatsApp context (e.g. 'call Rubab', 'tell Rubab hi'), "
-"use recall_person or recall_by_relationship first to identify the person. "
+"- If the user gives a relationship (e.g. 'message my sister'), "
+"use recall_by_relationship first to find the person's name. "
 "Then use the appropriate WhatsApp tool.\n"
 "- When user introduces someone new (e.g. 'my sister Rubab'), proactively use "
-"remember_person to save them with their relationship.\n"
+"remember_person to save them.\n"
 "- WhatsApp tool handles everything: opens the Desktop app, searches the contact, types the "
 "message, and sends it. You just provide the contact name and message text.\n"
 "- If WhatsApp Desktop is not running, the tool launches it automatically.\n"
 "- Example flows:\n"
-"  User: 'check my WhatsApp'\n"
-"  → check_whatsapp() → 'You have 2 unread: Rubab asked \"coming?\" and Mom sent \"call me\". Reply?'\n"
-"  User: 'reply to Rubab saying on my way'\n"
-"  → reply_whatsapp(contact_name='Rubab', message='On my way!')\n"
-"  User: 'WhatsApp Rubab saying I'm on my way'\n"
-"  → whatsapp_find_and_message(contact_name='Rubab', message=\"I'm on my way\")\n"
-"  User: 'message my sister that dinner is ready' → "
-"recall_by_relationship('sister') → whatsapp_find_and_message(contact_name='Rubab', message='dinner is ready')\n"
-"  User: 'call my sister' → recall_by_relationship('sister') → "
-"if 1 result: whatsapp_find_and_call('Rubab'); if multiple: ask which one\n"
+"  User: 'check my WhatsApp' → check_whatsapp() → report analysis honestly\n"
+"  User: 'open Rubab WhatsApp' → read_whatsapp_chat(contact_name='Rubab') → report what chat says\n"
+"  User: 'reply to Rubab saying on my way' → reply_whatsapp(contact_name='Rubab', message='On my way!')\n"
+"  User: 'WhatsApp Rubab saying I'm on my way' → "
+"whatsapp_find_and_message(contact_name='Rubab', message=\"I'm on my way\")\n"
 "\nSCHEDULED TASKS:\n"
 "- When the user says 'schedule [action] at [time]', 'every [interval] do [action]', "
 "'remind me to [action] at [time]' — use create_scheduled_task with the action_text "
@@ -1553,6 +1565,7 @@ class AudioLoop:
                 "whatsapp_find_and_call": 45.0,
                 "check_whatsapp": 45.0,
                 "reply_whatsapp": 45.0,
+                "read_whatsapp_chat": 60.0,
                 "open_app": 15.0,
                 "list_installed_apps": 15.0,
                 "refresh_app_registry": 30.0,
