@@ -1760,12 +1760,14 @@ def _connect_with_retry():
     retry_delay = 1
     max_delay = 60
     global _reconnect_count
+    local_attempt = 0
     while True:
         try:
-            _reconnect_count += 1
-            log(f"[LocalAgent] Connecting to {BACKEND_URL} (attempt {_reconnect_count})...")
+            local_attempt += 1
+            _reconnect_count = local_attempt
+            log(f"[LocalAgent] Connecting to {BACKEND_URL} (attempt {local_attempt})...")
             sio.connect(BACKEND_URL, transports=["websocket", "polling"], wait_timeout=10)
-            log(f"[LocalAgent] ✅ Connected (attempt {_reconnect_count})")
+            log(f"[LocalAgent] ✅ Connected (attempt {local_attempt})")
             retry_delay = 1
             _reconnect_count = 0
             return
@@ -1775,7 +1777,7 @@ def _connect_with_retry():
             log(f"[LocalAgent] ❌ Connection failed: {type(e).__name__}: {e}")
             import traceback as _tb
             log(f"[LocalAgent]    Detail: {_tb.format_exc()[:200]}")
-        log(f"[LocalAgent]    Retry #{_reconnect_count} in {retry_delay}s...")
+        log(f"[LocalAgent]    Retry #{local_attempt} in {retry_delay}s...")
         time.sleep(retry_delay)
         retry_delay = min(retry_delay * 2, max_delay)
 
