@@ -1258,10 +1258,10 @@ keyboard_press_tool = {
 
 open_app_tool = {
     "name": "open_app",
-    "description": "Search and open an application via Windows Start Menu. "
-                   "Provide the app name as the user says it. "
+    "description": "Open an installed application instantly. Uses a pre-built app registry of all installed apps "
+                   "(Start Menu, Microsoft Store, PATH, registry). Provide the app name as the user says it. "
+                   "If unsure what apps are available, call list_installed_apps first. "
                    "For example: 'open whatsapp', 'launch calculator', 'start chrome'. "
-                   "The system will search the Start Menu and open the matching app. "
                    "Do NOT use execute_command for opening apps — use this tool instead.",
     "parameters": {
         "type": "OBJECT",
@@ -1272,6 +1272,23 @@ open_app_tool = {
             }
         },
         "required": ["app_name"]
+    }
+}
+
+list_installed_apps_tool = {
+    "name": "list_installed_apps",
+    "description": "List all installed applications on the user's Windows PC. "
+                   "Returns up to 200 apps with their names. Use this when the user asks "
+                   "'what apps do I have?' or 'list my installed programs'. "
+                   "After listing, you can open any app with open_app.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "search": {
+                "type": "STRING",
+                "description": "Optional search term to filter apps (e.g. 'chrome', 'adobe', 'micro')"
+            }
+        }
     }
 }
 
@@ -1504,6 +1521,7 @@ tools_list = [{"function_declarations": [
     list_scheduled_tasks_tool,
     delete_scheduled_task_tool,
     open_app_tool,
+    list_installed_apps_tool,
     webview_action_tool,
     take_photo_tool,
     welcome_home_tool,

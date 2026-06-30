@@ -66,7 +66,7 @@ LOCAL_TOOLS = [
     "list_files", "open_file", "write_file", "read_file", "create_folder",
     "delete_items", "rename_item", "copy_item", "move_item", "list_drives",
     "scroll_file_list", "view_file",
-    "terminal_execute", "execute_command", "open_app", "close_window", "close_app",
+    "terminal_execute", "execute_command", "open_app", "list_installed_apps", "refresh_app_registry", "close_window", "close_app",
     "control_system", "screenshot", "screenshot_region",
     "clipboard_read", "clipboard_write",
     "mouse_click", "mouse_move", "mouse_scroll", "mouse_drag",
@@ -96,6 +96,219 @@ HAS_PYWIN32 = False
 HAS_PYGETWINDOW = False
 HAS_PSUTIL = False
 HAS_CV2 = False
+
+# ── App Registry ──
+# Cached map of app names -> launch info for instant open_app lookups.
+_script_root = os.path.dirname(os.path.abspath(__file__))
+_app_registry_cache = os.path.join(_script_root, "..", "app_registry.json")
+APP_REGISTRY: dict[str, dict] = {}  # name_lower -> {paths: [{path, method}], aliases: [str], name: str}
+
+
+def _build_app_registry():
+    """Scan Start Menu, registry, AppX, and known paths to build APP_REGISTRY.
+    Returns the registry dict and saves cache to app_registry.json."""
+    from collections import defaultdict
+    entries = defaultdict(list)  # name_lower -> list of {path, method, display}
+
+    def _add(name, path, method, display=None):
+        if not path or not os.path.isfile(path):
+            return
+        name_lower = name.lower().strip()
+        for existing in entries[name_lower]:
+            if existing["path"].lower() == path.lower():
+                return
+        entries[name_lower].append({
+            "path": path,
+            "method": method,
+            "display": display or os.path.splitext(os.path.basename(path))[0],
+        })
+
+    log("[AppRegistry] Scanning installed apps...")
+
+    # ── 1. Start Menu shortcuts ──
+    for sm_env in ("APPDATA", "PROGRAMDATA"):
+        sm_base = os.path.expandvars(f"%{sm_env}%\\Microsoft\\Windows\\Start Menu\\Programs")
+        if not os.path.isdir(sm_base):
+            continue
+        try:
+            for root, dirs, files in os.walk(sm_base):
+                for f in files:
+                    if f.lower().endswith(".lnk"):
+                        name_no_ext = os.path.splitext(f)[0]
+                        shortcut_path = os.path.join(root, f)
+                        _add(name_no_ext, shortcut_path, "start_menu", name_no_ext)
+                        # Also add by folder category (e.g., "Accessories\Notepad")
+                        rel = os.path.relpath(root, sm_base)
+                        if rel and rel != ".":
+                            cat_name = f"{name_no_ext} ({os.path.basename(rel)})"
+                            _add(cat_name, shortcut_path, "start_menu", name_no_ext)
+        except Exception as e:
+            log(f"[AppRegistry] Start Menu scan error: {e}")
+
+    # ── 2. App Paths registry ──
+    try:
+        import winreg
+        for root_key in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            try:
+                key = winreg.OpenKey(root_key, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths")
+                count = winreg.QueryInfoKey(key)[0]
+                for i in range(count):
+                    try:
+                        subkey_name = winreg.EnumKey(key, i)
+                        subkey = winreg.OpenKey(key, subkey_name)
+                        exe_path = winreg.QueryValue(subkey, "")
+                        winreg.CloseKey(subkey)
+                        if exe_path and os.path.isfile(exe_path):
+                            name = subkey_name.lower().replace(".exe", "").replace(".cmd", "").replace(".bat", "")
+                            display = os.path.splitext(subkey_name)[0]
+                            _add(name, exe_path, "registry", display)
+                            _add(display, exe_path, "registry", display)
+                    except:
+                        pass
+                winreg.CloseKey(key)
+            except:
+                pass
+    except Exception as e:
+        log(f"[AppRegistry] Registry scan error: {e}")
+
+    # ── 3. AppX / Microsoft Store packages ──
+    try:
+        ps_cmd = (
+            "Get-AppxPackage | Where-Object { $_.InstallLocation } | ForEach-Object { "
+            "  $manifest = [xml](Get-Content (Join-Path $_.InstallLocation 'AppxManifest.xml') -ErrorAction SilentlyContinue); "
+            "  if ($manifest.Package.Applications.Application) { "
+            "    $appId = $manifest.Package.Applications.Application.Id; "
+            "    $aumid = \"$($_.PackageFamilyName)!$appId\"; "
+            "    $name = $_.Name; "
+            "    $display = if ($manifest.Package.Applications.Application.VisualElements.DisplayName -and $manifest.Package.Applications.Application.VisualElements.DisplayName -notmatch '^ms-resource') { $manifest.Package.Applications.Application.VisualElements.DisplayName } else { $_.Name }; "
+            "    Write-Output \"$name||$display||$aumid\" "
+            "  } "
+            "}"
+        )
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_cmd],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            for line in result.stdout.strip().split("\n"):
+                parts = line.strip().split("||")
+                if len(parts) >= 3:
+                    pkg_name, display_name, aumid = parts[0], parts[1], parts[2]
+                    appx_path = f"shell:AppsFolder\\{aumid}"
+                    _add(pkg_name, appx_path, "appx", display_name)
+                    _add(display_name, appx_path, "appx", display_name)
+        log(f"[AppRegistry] Scanned AppX packages")
+    except Exception as e:
+        log(f"[AppRegistry] AppX scan error: {e}")
+
+    # ── 4. Known system utilities (guaranteed to exist) ──
+    system_utils = {
+        "notepad": r"C:\Windows\System32\notepad.exe",
+        "calculator": r"C:\Windows\System32\calc.exe",
+        "paint": r"C:\Windows\System32\mspaint.exe",
+        "cmd": r"C:\Windows\System32\cmd.exe",
+        "command prompt": r"C:\Windows\System32\cmd.exe",
+        "powershell": r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+        "explorer": r"C:\Windows\explorer.exe",
+        "file explorer": r"C:\Windows\explorer.exe",
+        "wordpad": r"C:\Program Files\Windows NT\Accessories\wordpad.exe",
+        "snipping tool": r"C:\Windows\System32\SnippingTool.exe",
+        "character map": r"C:\Windows\System32\charmap.exe",
+        "task manager": r"C:\Windows\System32\Taskmgr.exe",
+        "regedit": r"C:\Windows\regedit.exe",
+        "control panel": r"C:\Windows\System32\control.exe",
+        "settings": r"C:\Windows\System32\SystemSettings.exe",
+    }
+    for name, path in system_utils.items():
+        _add(name, path, "system", name)
+
+    # ── 5. Common third-party app locations ──
+    common_paths = [
+        (r"C:\Program Files", 2),
+        (r"C:\Program Files (x86)", 2),
+        (os.path.expandvars(r"%LOCALAPPDATA%\Programs"), 2),
+        (os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WindowsApps"), 1),
+    ]
+    for base, max_depth in common_paths:
+        if not os.path.isdir(base):
+            continue
+        try:
+            for root, dirs, files in os.walk(base):
+                depth = root.replace(base, "").count(os.sep)
+                if depth > max_depth:
+                    dirs.clear()
+                    continue
+                for f in files:
+                    if f.lower().endswith(".exe") and f.lower() not in ("uninstall.exe", "setup.exe"):
+                        name = os.path.splitext(f)[0]
+                        full_path = os.path.join(root, f)
+                        _add(name, full_path, "common", name)
+                        _add(os.path.basename(root), full_path, "common", name)
+        except:
+            pass
+
+    # ── Build final registry ──
+    global APP_REGISTRY
+    APP_REGISTRY = {}
+    for name_lower, path_list in entries.items():
+        sorted_paths = sorted(path_list, key=lambda x: (
+            0 if x["method"] in ("system", "registry") else
+            1 if x["method"] == "start_menu" else
+            2 if x["method"] == "common" else 3
+        ))
+        APP_REGISTRY[name_lower] = {
+            "paths": sorted_paths,
+            "name": sorted_paths[0]["display"] if sorted_paths else name_lower,
+            "aliases": [],
+        }
+
+    # ── Generate aliases for multi-word names ──
+    for name_lower, entry in list(APP_REGISTRY.items()):
+        words = name_lower.replace("-", " ").replace("_", " ").split()
+        if len(words) > 1:
+            for w in words:
+                if len(w) > 3 and w not in APP_REGISTRY:
+                    entry["aliases"].append(w)
+
+    # ── Save cache ──
+    try:
+        cache_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app_registry.json")
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(APP_REGISTRY, f, indent=2, ensure_ascii=False)
+        log(f"[AppRegistry] Cached {len(APP_REGISTRY)} apps to {cache_path}")
+    except Exception as e:
+        log(f"[AppRegistry] Cache save error: {e}")
+
+    log(f"[AppRegistry] ✅ Registry built: {len(APP_REGISTRY)} entries")
+    return APP_REGISTRY
+
+
+def _find_app(name):
+    """Look up an app name in APP_REGISTRY by name or alias. Returns (entry, matched_key) or None."""
+    key = name.lower().strip()
+    if key in APP_REGISTRY:
+        return APP_REGISTRY[key], key
+    for reg_key, entry in APP_REGISTRY.items():
+        if key in entry.get("aliases", []):
+            return entry, reg_key
+        if key in reg_key or reg_key in key:
+            return entry, reg_key
+    return None
+
+
+def _load_app_registry():
+    """Load cached registry, or build it if missing."""
+    global APP_REGISTRY
+    cache_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app_registry.json")
+    if os.path.isfile(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                APP_REGISTRY = json.load(f)
+            log(f"[AppRegistry] Loaded {len(APP_REGISTRY)} apps from cache")
+            return True
+        except Exception as e:
+            log(f"[AppRegistry] Cache load error: {e}")
+    return False
 
 
 def _check_deps():
@@ -137,26 +350,39 @@ def _check_deps():
         pass
 
 
+_reconnect_count = 0
+_last_connected = None
+
+
 @sio.event
 def connect():
-    log(f"[LocalAgent] Connected to {BACKEND_URL}")
+    global _reconnect_count, _last_connected
+    _reconnect_count = 0
+    _last_connected = time.strftime("%Y-%m-%d %H:%M:%S")
+    log(f"[LocalAgent] ✅ Connected to {BACKEND_URL}")
+    # Register with app registry stats
+    registry_info = {"count": len(APP_REGISTRY)} if APP_REGISTRY else {}
     sio.emit("agent_register", {
         "token": AGENT_TOKEN,
         "machine_id": MACHINE_ID,
         "platform": sys.platform,
         "tools": LOCAL_TOOLS,
+        "app_registry": registry_info,
     })
-    log(f"[LocalAgent] Registered as {MACHINE_ID}")
+    log(f"[LocalAgent] Registered as {MACHINE_ID} ({len(LOCAL_TOOLS)} tools, {len(APP_REGISTRY)} apps)")
 
 
 @sio.event
 def connect_error(data):
-    log(f"[LocalAgent] Connection error: {data}")
+    _reconnect_count += 1
+    log(f"[LocalAgent] ❌ Connection error ({_reconnect_count}): {data}")
+    log(f"[LocalAgent]    Check: (1) Backend at {BACKEND_URL} is running, (2) Internet is up, (3) No firewall blocking")
 
 
 @sio.event
 def disconnect():
-    log(f"[LocalAgent] Disconnected")
+    log(f"[LocalAgent] ⚠️  Disconnected from {BACKEND_URL}")
+    log(f"[LocalAgent]    Last connected: {_last_connected or 'never'}")
     abort()
 
 
@@ -347,7 +573,6 @@ def _dispatch(tool, args):
         app_lower = app.lower().strip()
 
         def _verify_started(timeout=2.0):
-            """Check if a new window appeared within timeout."""
             if not HAS_PYGETWINDOW:
                 return True
             import pygetwindow as gw
@@ -363,7 +588,6 @@ def _dispatch(tool, args):
             return bool(after - before)
 
         def _launch(path_or_name):
-            """Launch an executable or shortcut, return True if window appeared."""
             try:
                 subprocess.Popen([path_or_name], shell=False)
                 return _verify_started()
@@ -374,15 +598,10 @@ def _dispatch(tool, args):
                 except:
                     return False
 
-        # ── 0. Try URI scheme (fastest — no search needed) ───
-        # Apps like WhatsApp register URI handlers (whatsapp://)
+        # ── 0. URI scheme (fastest) ───────────────────────────────
         _URI_APPS = {
-            "whatsapp": "whatsapp://",
-            "telegram": "tg://",
-            "discord": "discord://",
-            "zoom": "zoommtg://",
-            "teams": "msteams://",
-            "skype": "skype://",
+            "whatsapp": "whatsapp://", "telegram": "tg://", "discord": "discord://",
+            "zoom": "zoommtg://", "teams": "msteams://", "skype": "skype://",
             "signal": "signal://",
         }
         if app_lower in _URI_APPS:
@@ -393,109 +612,92 @@ def _dispatch(tool, args):
             except:
                 pass
 
-        # ── 1. KNOWN_APPS (preset common apps) ────────────────
-        KNOWN_APPS = {
-            "chrome": ["chrome.exe", r"C:\Program Files\Google\Chrome\Application\chrome.exe"],
-            "firefox": ["firefox.exe", r"C:\Program Files\Mozilla Firefox\firefox.exe"],
-            "edge": ["msedge.exe", r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"],
-            "notepad": ["notepad.exe"],
-            "cmd": ["cmd.exe"],
-            "command prompt": ["cmd.exe"],
-            "terminal": ["wt.exe", "cmd.exe"],
-            "powershell": ["powershell.exe"],
-            "explorer": ["explorer.exe"],
-            "file explorer": ["explorer.exe"],
-            "this pc": ["explorer.exe"],
-            "calculator": ["calc.exe"],
-            "paint": ["mspaint.exe"],
-            "word": ["winword.exe"],
-            "excel": ["excel.exe"],
-            "outlook": ["outlook.exe"],
-            "vscode": ["code.exe"],
-            "visual studio code": ["code.exe"],
-            "whatsapp": ["WhatsApp.exe", os.path.expandvars(r"%LOCALAPPDATA%\WhatsApp\WhatsApp.exe")],
-            "discord": ["Discord.exe"],
-            "slack": ["slack.exe"],
-            "zoom": ["Zoom.exe"],
-            "vlc": ["vlc.exe"],
-            "soda": ["chrome.exe", "--app=https://soda-hud.netlify.app"],
-        }
+        # ── 1. APP_REGISTRY lookup (instant, no search delay) ────
+        reg_match = _find_app(app)
+        if reg_match:
+            entry, matched_key = reg_match
+            for pinfo in entry.get("paths", []):
+                p = pinfo["path"]
+                method = pinfo.get("method", "registry")
+                try:
+                    if method == "appx":
+                        subprocess.Popen(["explorer", p], shell=False)
+                    else:
+                        subprocess.Popen([p], shell=False)
+                    if _verify_started():
+                        return {
+                            "success": True, "app": app,
+                            "path": p, "method": f"registry_{method}",
+                            "matched": matched_key,
+                        }
+                except:
+                    try:
+                        subprocess.Popen(["start", "", p], shell=True)
+                        if _verify_started():
+                            return {
+                                "success": True, "app": app,
+                                "path": p, "method": f"registry_{method}_start",
+                                "matched": matched_key,
+                            }
+                    except:
+                        continue
 
-        if app_lower in KNOWN_APPS:
-            # First: try full paths that exist (direct launch, no dialog)
-            for c in KNOWN_APPS[app_lower]:
-                if os.path.isfile(c) and _launch(c):
-                    return {"success": True, "app": app, "path": c, "method": "known"}
-            # Second: use `start` command (searches App Paths registry, no error dialog)
-            _first_exe = KNOWN_APPS[app_lower][0]
-            try:
-                subprocess.Popen(["start", "", _first_exe], shell=True)
-                if _verify_started():
-                    return {"success": True, "app": app, "method": "known_start"}
-            except:
-                pass
-
-        # ── 2. Search Windows App Paths registry ──────────────
-        # This is how `start` and the Run dialog find apps
+        # ── 2. Search Windows App Paths registry ──────────────────
         try:
             import winreg
-            _app_paths = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths"
-            for _root_key in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            for root_key in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
                 try:
-                    _key = winreg.OpenKey(_root_key, _app_paths)
-                    _count = winreg.QueryInfoKey(_key)[0]
-                    for _i in range(_count):
-                        _subkey_name = winreg.EnumKey(_key, _i)
-                        if app_lower in _subkey_name.lower().replace(".exe", ""):
-                            _subkey = winreg.OpenKey(_key, _subkey_name)
+                    key = winreg.OpenKey(root_key, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths")
+                    count = winreg.QueryInfoKey(key)[0]
+                    for i in range(count):
+                        subkey_name = winreg.EnumKey(key, i)
+                        if app_lower in subkey_name.lower().replace(".exe", "").replace(".cmd", "").replace(".bat", ""):
+                            subkey = winreg.OpenKey(key, subkey_name)
                             try:
-                                _exe_path = winreg.QueryValue(_subkey, "")
-                                winreg.CloseKey(_subkey)
-                                if _exe_path and os.path.isfile(_exe_path):
-                                    if _launch(_exe_path):
-                                        return {"success": True, "app": app, "path": _exe_path, "method": "registry"}
+                                exe_path = winreg.QueryValue(subkey, "")
+                                winreg.CloseKey(subkey)
+                                if exe_path and os.path.isfile(exe_path) and _launch(exe_path):
+                                    return {"success": True, "app": app, "path": exe_path, "method": "registry"}
                             except:
-                                winreg.CloseKey(_subkey)
-                    winreg.CloseKey(_key)
+                                winreg.CloseKey(subkey)
+                    winreg.CloseKey(key)
                 except:
                     pass
         except:
             pass
 
-        # ── 3. Search PATH via where command ──────────────────
-        for _ext in ("", ".exe", ".cmd", ".bat"):
+        # ── 3. where command (PATH) ───────────────────────────────
+        for ext in ("", ".exe", ".cmd", ".bat"):
             try:
-                _result = subprocess.run(["where", f"{app}{_ext}"], shell=True, capture_output=True, text=True, timeout=5)
-                if _result.returncode == 0:
-                    _exe_path = _result.stdout.strip().split("\n")[0].strip()
-                    if _launch(_exe_path):
-                        return {"success": True, "app": app, "path": _exe_path, "method": "where"}
+                r = subprocess.run(["where", f"{app}{ext}"], shell=True, capture_output=True, text=True, timeout=5)
+                if r.returncode == 0:
+                    exe_path = r.stdout.strip().split("\n")[0].strip()
+                    if _launch(exe_path):
+                        return {"success": True, "app": app, "path": exe_path, "method": "where"}
             except:
                 pass
 
-        # ── 4. Search Start Menu shortcuts on disk ────────────
-        for _sm_env in ("APPDATA", "PROGRAMDATA"):
-            _sm_base = os.path.expandvars(f"%{_sm_env}%\\Microsoft\\Windows\\Start Menu\\Programs")
-            if not os.path.isdir(_sm_base):
+        # ── 4. Start Menu walk (live scan, slower) ────────────────
+        for sm_env in ("APPDATA", "PROGRAMDATA"):
+            sm_base = os.path.expandvars(f"%{sm_env}%\\Microsoft\\Windows\\Start Menu\\Programs")
+            if not os.path.isdir(sm_base):
                 continue
             try:
-                for _root, _dirs, _files in os.walk(_sm_base):
-                    for _f in _files:
-                        if not _f.lower().endswith(".lnk"):
+                for root, dirs, files in os.walk(sm_base):
+                    for f in files:
+                        if not f.lower().endswith(".lnk"):
                             continue
-                        _name_no_ext = _f.lower().replace(".lnk", "")
-                        if app_lower in _name_no_ext or _name_no_ext in app_lower:
-                            _shortcut_path = os.path.join(_root, _f)
-                            if _launch(_shortcut_path):
-                                return {"success": True, "app": app, "path": _shortcut_path, "method": "start_menu"}
+                        name_no_ext = f.lower().replace(".lnk", "")
+                        if app_lower in name_no_ext or name_no_ext in app_lower:
+                            shortcut_path = os.path.join(root, f)
+                            if _launch(shortcut_path):
+                                return {"success": True, "app": app, "path": shortcut_path, "method": "start_menu"}
             except:
                 pass
 
-        # ── 5. Search Microsoft Store / AppX packages ─────────
-        # Store apps (WhatsApp, Spotify, etc.) need AUMID launch via shell:AppsFolder.
-        # Uses Get-AppxPackage (fast, queries package DB) instead of Get-StartApps (slow).
+        # ── 5. AppX / Store packages ──────────────────────────────
         try:
-            _ps_cmd = (
+            ps_cmd = (
                 "$pkg = Get-AppxPackage -Name '*" + app_lower.replace("'", "''") +
                 "*' | Select-Object -First 1; "
                 "if ($pkg) { "
@@ -504,33 +706,28 @@ def _dispatch(tool, args):
                 "  Write-Output \"$($pkg.PackageFamilyName)!$appId\" "
                 "}"
             )
-            _result = subprocess.run(
-                ["powershell", "-NoProfile", "-Command", _ps_cmd],
-                capture_output=True, text=True, timeout=8
-            )
-            if _result.returncode == 0 and _result.stdout.strip():
-                for _aumid in _result.stdout.strip().split("\n"):
-                    _aumid = _aumid.strip()
-                    if not _aumid:
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True, text=True, timeout=8)
+            if r.returncode == 0 and r.stdout.strip():
+                for aumid in r.stdout.strip().split("\n"):
+                    aumid = aumid.strip()
+                    if not aumid:
                         continue
                     try:
-                        subprocess.Popen(["explorer", f"shell:AppsFolder\\{_aumid}"], shell=False)
+                        subprocess.Popen(["explorer", f"shell:AppsFolder\\{aumid}"], shell=False)
                         if _verify_started(3.0):
-                            return {"success": True, "app": app, "method": "appx", "aumid": _aumid}
+                            return {"success": True, "app": app, "method": "appx", "aumid": aumid}
                     except:
                         pass
         except:
             pass
 
-        # ── 6. os.startfile (works for registered app names) ──
+        # ── 6. os.startfile + `start` shell ───────────────────────
         try:
             os.startfile(app)
             if _verify_started():
                 return {"success": True, "app": app, "method": "startfile"}
         except:
             pass
-
-        # ── 6. `start` shell command ──────────────────────────
         try:
             subprocess.Popen(["start", "", app], shell=True)
             if _verify_started():
@@ -538,10 +735,10 @@ def _dispatch(tool, args):
         except:
             pass
 
-        # ── 7. PowerShell SendKeys Start Menu search ───────────
-        for _attempt in range(3):
+        # ── 7. PowerShell SendKeys (Start Menu search) ────────────
+        for attempt in range(3):
             try:
-                _search_ps = (
+                search_ps = (
                     "$null = Add-Type -AssemblyName System.Windows.Forms; "
                     "[System.Windows.Forms.SendKeys]::SendWait('^{ESC}'); "
                     "Start-Sleep -Milliseconds 1000; "
@@ -550,20 +747,16 @@ def _dispatch(tool, args):
                     "[System.Windows.Forms.SendKeys]::SendWait('{ENTER}'); "
                     "Start-Sleep -Milliseconds 2000"
                 )
-                subprocess.run(
-                    ["powershell", "-NoProfile", "-Command", _search_ps],
-                    capture_output=True, timeout=8
-                )
+                subprocess.run(["powershell", "-NoProfile", "-Command", search_ps], capture_output=True, timeout=8)
                 if _verify_started(2.0):
                     return {"success": True, "app": app, "method": "powershell_search"}
             except:
                 time.sleep(1)
-                continue
 
-        # ── 8. PyAutoGUI fallback (if available) ──────────────
+        # ── 8. PyAutoGUI fallback ─────────────────────────────────
         if HAS_PYAUTOGUI:
             import pyautogui
-            for _attempt in range(2):
+            for attempt in range(2):
                 try:
                     time.sleep(0.5)
                     pyautogui.hotkey("win", "s")
@@ -577,8 +770,38 @@ def _dispatch(tool, args):
                 except:
                     time.sleep(1)
 
-        # ── All methods exhausted ─────────────────────────────
+        # ── All methods exhausted ─────────────────────────────────
         return {"success": False, "error": f"Could not find '{app}' installed on this system. Try searching the web for it.", "not_found": True}
+
+    elif tool == "list_installed_apps":
+        search = (args.get("search", "") or "").lower().strip()
+        if not APP_REGISTRY:
+            return {"success": False, "error": "App registry not built yet"}
+        if search:
+            results = {k: v for k, v in APP_REGISTRY.items() if search in k or any(search in a for a in v.get("aliases", []))}
+        else:
+            results = APP_REGISTRY
+        sorted_names = sorted(results.keys())
+        return {
+            "success": True,
+            "total": len(APP_REGISTRY),
+            "matching": len(sorted_names),
+            "apps": [{"name": results[n]["name"], "key": n, "paths": len(results[n]["paths"])} for n in sorted_names[:200]],
+            "hint": "Say the app name to open it, e.g. 'open notepad' or 'launch chrome'",
+        }
+
+    elif tool == "refresh_app_registry":
+        _build_app_registry()
+        return {"success": True, "total": len(APP_REGISTRY), "message": f"Registry rebuilt: {len(APP_REGISTRY)} apps"}
+
+    elif tool == "reconnect":
+        log("[LocalAgent] Manual reconnect requested")
+        try:
+            sio.disconnect()
+        except:
+            pass
+        _connect_with_retry()
+        return {"success": True, "message": "Reconnected"}
 
     elif tool == "close_window":
         name = args.get("name", "") or args.get("window_name", "") or args.get("title", "")
@@ -1536,18 +1759,25 @@ def _connect_with_retry():
     """Connect to backend with exponential backoff retry. Never exits on failure."""
     retry_delay = 1
     max_delay = 60
+    global _reconnect_count
     while True:
         try:
-            log(f"[LocalAgent] Connecting to {BACKEND_URL}...")
+            _reconnect_count += 1
+            log(f"[LocalAgent] Connecting to {BACKEND_URL} (attempt {_reconnect_count})...")
             sio.connect(BACKEND_URL, transports=["websocket", "polling"], wait_timeout=10)
-            log(f"[LocalAgent] ✅ Connected")
+            log(f"[LocalAgent] ✅ Connected (attempt {_reconnect_count})")
             retry_delay = 1
+            _reconnect_count = 0
             return
+        except socketio.exceptions.ConnectionError as e:
+            log(f"[LocalAgent] ❌ Socket.IO connection rejected: {e}")
         except Exception as e:
-            log(f"[LocalAgent] Connection failed: {e}")
-            log(f"[LocalAgent] Retrying in {retry_delay}s...")
-            time.sleep(retry_delay)
-            retry_delay = min(retry_delay * 2, max_delay)
+            log(f"[LocalAgent] ❌ Connection failed: {type(e).__name__}: {e}")
+            import traceback as _tb
+            log(f"[LocalAgent]    Detail: {_tb.format_exc()[:200]}")
+        log(f"[LocalAgent]    Retry #{_reconnect_count} in {retry_delay}s...")
+        time.sleep(retry_delay)
+        retry_delay = min(retry_delay * 2, max_delay)
 
 
 if __name__ == "__main__":
@@ -1567,6 +1797,17 @@ if __name__ == "__main__":
           f"psutil={'OK' if HAS_PSUTIL else 'MISS'}")
     log("=" * 50)
 
+    # ── Build app registry (scan installed apps) ──
+    if not _load_app_registry():
+        log("[AppRegistry] No cached registry found — scanning installed apps...")
+        try:
+            _build_app_registry()
+        except Exception as e:
+            log(f"[AppRegistry] Build error: {e}")
+    else:
+        log(f"[AppRegistry] Using cached registry ({len(APP_REGISTRY)} apps)")
+    log(f"[AppRegistry] {len(APP_REGISTRY)} apps available for instant launch")
+
     while True:
         try:
             _connect_with_retry()
@@ -1581,8 +1822,9 @@ if __name__ == "__main__":
             sio.disconnect()
             break
         except Exception as e:
-            log(f"[LocalAgent] Connection lost: {e}")
-            traceback.print_exc()
+            log(f"[LocalAgent] ⚠️  Connection lost: {type(e).__name__}: {e}")
+            import traceback as _tb
+            log(f"[LocalAgent]    {_tb.format_exc()[:300]}")
             log(f"[LocalAgent] Reconnecting in 3s...")
             time.sleep(3)
             continue
