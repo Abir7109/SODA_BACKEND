@@ -1189,6 +1189,82 @@ read_whatsapp_chat_tool = {
     }
 }
 
+browser_command_tool = {
+    "name": "browser_command",
+    "description": (
+        "Open a URL or search the web in the user's DEFAULT SYSTEM BROWSER (Chrome/Edge/Firefox). "
+        "Use action='open' with a url to open a specific website, or action='search' with a query "
+        "to search Google. "
+        "Use when the user says 'open Chrome and search for [query]', 'Google [query]', "
+        "'search for [query] in Chrome', 'open [url] in Chrome', 'browse to [url]'. "
+        "Only use this when the user explicitly wants to use the system browser — "
+        "for internal SODA webview, use open_browser instead. "
+        "Examples: browser_command(action='search', query='cat pictures'), "
+        "browser_command(action='open', url='https://youtube.com')"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {"type": "STRING", "description": "'search' to search Google, 'open' to open a URL"},
+            "url": {"type": "STRING", "description": "Full URL to open (required if action='open')"},
+            "query": {"type": "STRING", "description": "Search query (required if action='search')"}
+        },
+        "required": ["action"]
+    }
+}
+
+app_search_tool = {
+    "name": "app_search",
+    "description": (
+        "Search inside ANY desktop app (YouTube, Spotify, browser, etc.) using keyboard automation. "
+        "Opens or focuses the app, types a keyboard shortcut to activate the search bar, "
+        "types the query, presses Enter, then takes a screenshot and uses AI Vision "
+        "to read and describe the search results. "
+        "Use when the user says 'search [query] on YouTube', 'find [query] in Spotify', "
+        "'look up [query] in [app]'. "
+        "For YouTube specifically, the search key is '/' (presses slash to focus search bar). "
+        "For most other apps, the search key is 'Ctrl+F'. "
+        "If no search_key is provided, defaults to '/'. "
+        "The result includes an 'analysis' field with what AI Vision saw on screen. "
+        "After returning, the user may ask to scroll or open a specific result. "
+        "Examples: app_search(app_name='YouTube', query='python tutorial'), "
+        "app_search(app_name='Spotify', search_key='Ctrl+F', query='lofi beats')"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "app_name": {"type": "STRING", "description": "Name of the app to search in (e.g. 'YouTube', 'Spotify')"},
+            "query": {"type": "STRING", "description": "The search query text"},
+            "search_key": {"type": "STRING", "description": "Keyboard shortcut to activate search bar. Default '/' for YouTube. Can be 'Ctrl+F' for other apps."}
+        },
+        "required": ["app_name", "query"]
+    }
+}
+
+app_scroll_tool = {
+    "name": "app_scroll",
+    "description": (
+        "Scroll up or down inside a specific desktop app window. "
+        "Focuses the app by name, then scrolls by the specified amount. "
+        "Use AFTER app_search when the user says 'scroll down', 'scroll up', "
+        "'show more results', 'go down', 'scroll further'. "
+        "direction is 'down' or 'up'. amount is number of scroll clicks (default 5, higher = more scroll). "
+        "After scrolling, takes a screenshot of the window and uses AI Vision "
+        "to read what's visible. Returns analysis of what's now on screen. "
+        "Examples: app_scroll(app_name='YouTube', direction='down'), "
+        "app_scroll(app_name='YouTube', direction='down', amount=10)"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "app_name": {"type": "STRING", "description": "Name of the app window to scroll in"},
+            "direction": {"type": "STRING", "description": "'down' or 'up'"},
+            "amount": {"type": "INTEGER", "description": "Number of scroll clicks. Higher = more scroll. Default 5."}
+        },
+        "required": ["app_name", "direction"]
+    }
+}
+
 # ── Scheduled Tasks ──
 
 create_scheduled_task_tool = {
@@ -1604,5 +1680,8 @@ tools_list = [{"function_declarations": [
     pentest_target_tool,
     pentest_browser_target_tool,
     open_pastebox_tool,
+    browser_command_tool,
+    app_search_tool,
+    app_scroll_tool,
 ]}]
 

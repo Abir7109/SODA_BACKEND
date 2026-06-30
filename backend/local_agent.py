@@ -88,6 +88,7 @@ LOCAL_TOOLS = [
     "run_script", "power_control", "service_control",
     "env_get", "file_compress", "file_download",
     "browser_command",
+    "app_search", "app_scroll",
 ]
 
 HAS_PYAUTOGUI = False
@@ -434,6 +435,87 @@ def on_agent_execute(data):
 @sio.on("agent_status")
 def on_agent_status(data):
     log(f"[LocalAgent] Status: {data}")
+
+
+# ── Generic app window helpers (for app_search / app_scroll) ──
+def _find_app_window(app_name):
+    """Find a visible window whose title contains app_name. Returns hwnd or None."""
+    if not HAS_PYWIN32:
+        return None
+    import win32gui, win32con
+    matches = []
+    def enum_cb(hwnd, _matches):
+        if win32gui.IsWindowVisible(hwnd):
+            text = win32gui.GetWindowText(hwnd)
+            if app_name.lower() in text.lower():
+                _matches.append(hwnd)
+        return True
+    win32gui.EnumWindows(enum_cb, matches)
+    return matches[0] if matches else None
+
+
+def _get_any_window_rect(app_name):
+    """Get the screen rect of the first visible window matching app_name.
+    Returns (left, top, right, bottom) or None."""
+    hwnd = _find_app_window(app_name)
+    if not hwnd:
+        return None
+    try:
+        import win32gui
+        return win32gui.GetWindowRect(hwnd)
+    except:
+        return None
+
+
+def _focus_any_app(app_name):
+    """Bring a window matching app_name to the foreground. Returns True on success."""
+    hwnd = _find_app_window(app_name)
+    if not hwnd:
+        return False
+    try:
+        import win32gui, win32con
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            time.sleep(0.2)
+        win32gui.SetForegroundWindow(hwnd)
+        time.sleep(0.5)
+        return True
+    except:
+        return False
+
+
+def _focus_or_open_app(app_name):
+    """Try to focus an app window, or open it via open_app. Returns True if focused."""
+    if _focus_any_app(app_name):
+        return True
+    try:
+        result = _dispatch("open_app", {"name": app_name})
+        time.sleep(2.0)
+        return _focus_any_app(app_name)
+    except Exception as e:
+        log.warning(f"[app_helper] Could not open '{app_name}': {e}")
+        return False
+
+
+def _screenshot_window_region(app_name):
+    """Take a screenshot of the app window. Returns PNG bytes or None."""
+    if not HAS_MSS:
+        return None
+    rect = _get_any_window_rect(app_name)
+    if not rect:
+        return None
+    left, top, right, bottom = rect
+    w = right - left
+    h = bottom - top
+    if w < 50 or h < 50:
+        return None
+    try:
+        import mss
+        with mss.mss() as sct:
+            img = sct.grab({"left": left, "top": top, "width": w, "height": h})
+            return mss.tools.to_png(img.rgb, img.size)
+    except:
+        return None
 
 
 def _dispatch(tool, args):
@@ -1729,15 +1811,105 @@ def _dispatch(tool, args):
         action = args.get("action", "")
         url = args.get("url", "")
         if action == "open":
-            import webbrowser
-            webbrowser.open(url or "https://www.google.com")
-            return {"success": True, "action": "open", "url": url}
+            subprocess.Popen(["start", "", url or "https://www.google.com"], shell=True)
+            return {"success": True, "action": "open", "url": url, "detail": f"Opened {url} in system browser"}
         elif action == "search":
-            import webbrowser
             query = args.get("query", "")
-            webbrowser.open(f"https://www.google.com/search?q={urllib.parse.quote(query)}")
-            return {"success": True}
+            encoded = urllib.parse.quote(query)
+            search_url = f"https://www.google.com/search?q={encoded}"
+            subprocess.Popen(["start", "", search_url], shell=True)
+            return {"success": True, "action": "search", "query": query, "detail": f"Searched '{query}' in system browser"}
         return {"success": False, "error": f"Unknown browser action: {action}"}
+
+    # ── App search (YouTube, Spotify, etc.) ──────────────────────────
+    elif tool == "app_search":
+        app_name = args.get("app_name", "")
+        query = args.get("query", "")
+        search_key = args.get("search_key", "/")
+        if not app_name or not query:
+            return {"success": False, "error": "app_name and query are required"}
+        log(f"[app_search] Searching '{query}' in '{app_name}' (search_key={search_key})")
+
+        if not _focus_or_open_app(app_name):
+            return {"success": False, "error": f"Could not open or focus '{app_name}'"}
+        time.sleep(1.0)
+
+        if HAS_PYAUTOGUI:
+            import pyautogui
+            if "+" in search_key:
+                keys = [k.strip() for k in search_key.split("+")]
+                pyautogui.hotkey(*keys)
+            else:
+                pyautogui.write(search_key, interval=0.05)
+            time.sleep(0.5)
+            pyautogui.write(query, interval=0.04)
+            time.sleep(0.3)
+            pyautogui.press("enter")
+            time.sleep(2.0)
+
+            try:
+                from screen_vision import analyze_screen
+                png_bytes = _screenshot_window_region(app_name)
+                if png_bytes:
+                    result = asyncio.run(analyze_screen(
+                        prompt=(
+                            f"You are looking at search results in the '{app_name}' app.\n"
+                            f"User searched for: '{query}'.\n"
+                            "STRICT RULES:\n"
+                            "- Only report what you can CLEARLY SEE.\n"
+                            "- Do NOT guess or make up results.\n"
+                            "- If nothing is clear, say 'Could not read results clearly'.\n"
+                            "OUTPUT: List visible results with titles."
+                        ),
+                        screenshot=png_bytes
+                    ))
+                    result["_app"] = app_name
+                    result["_query"] = query
+                    return result
+            except Exception as e:
+                log.warning(f"[app_search] Screenshot failed: {e}")
+
+        return {"success": True, "app": app_name, "query": query, "detail": f"Searched '{query}' in {app_name}"}
+
+    # ── App scroll (up/down in desktop apps) ─────────────────────────
+    elif tool == "app_scroll":
+        app_name = args.get("app_name", "")
+        direction = args.get("direction", "down")
+        amount = args.get("amount", 5)
+        if not app_name or direction not in ("up", "down"):
+            return {"success": False, "error": "app_name and direction required"}
+        log(f"[app_scroll] Scrolling {direction} in '{app_name}'")
+
+        if not _focus_or_open_app(app_name):
+            return {"success": False, "error": f"Could not focus '{app_name}'"}
+        time.sleep(0.5)
+
+        if HAS_PYAUTOGUI:
+            import pyautogui
+            clicks = -amount if direction == "down" else amount
+            pyautogui.scroll(clicks)
+            time.sleep(0.5)
+
+            try:
+                from screen_vision import analyze_screen
+                png_bytes = _screenshot_window_region(app_name)
+                if png_bytes:
+                    result = asyncio.run(analyze_screen(
+                        prompt=(
+                            f"You are looking at the '{app_name}' app after scrolling {direction}.\n"
+                            "TASK: List the visible items/results.\n"
+                            "Only report what you can CLEARLY SEE.\n"
+                            "OUTPUT: List each visible item."
+                        ),
+                        screenshot=png_bytes
+                    ))
+                    result["_app"] = app_name
+                    result["_direction"] = direction
+                    return result
+            except Exception as e:
+                log.warning(f"[app_scroll] Screenshot failed: {e}")
+
+        return {"success": True, "app": app_name, "direction": direction, "detail": f"Scrolled {direction} in {app_name}"}
 
     # ── Fallback ──────────────────────────────────────────────────
     return {"error": f"Tool '{tool}' not implemented in local agent"}

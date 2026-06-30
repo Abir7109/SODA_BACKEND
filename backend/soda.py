@@ -215,6 +215,8 @@ LOCAL_AGENT_TOOLS = {
     "go_to_sleep", "wake_up", "go_background", "come_back",
     # Other
     "send_keys_window",
+    # Browser / web app control
+    "browser_command", "app_search", "app_scroll",
     # Agent control
     "reconnect",
 }
@@ -574,6 +576,37 @@ def _build_system_prompt():
 "  User: 'reply to Rubab saying on my way' → reply_whatsapp(contact_name='Rubab', message='On my way!')\n"
 "  User: 'WhatsApp Rubab saying I'm on my way' → "
 "whatsapp_find_and_message(contact_name='Rubab', message=\"I'm on my way\")\n"
+"\nCHROME / BROWSER SEARCH:\n"
+"- browser_command(action='search', query='...') — opens Chrome/default browser with a Google search.\n"
+"- browser_command(action='open', url='...') — opens a URL in Chrome/default browser.\n"
+"- Use when user says 'search [query] in Chrome', 'Google [query]', 'open [url] in Chrome', "
+"'browse to [url]', 'look up [query] online'. Call IMMEDIATELY, do NOT open_app('Chrome') first.\n"
+"- browser_command opens the desktop browser, NOT the internal SODA webview. "
+"For internal webview, use open_browser instead.\n"
+"- Examples:\n"
+"  User: 'search cat videos in Chrome' → browser_command(action='search', query='cat videos')\n"
+"  User: 'open youtube in Chrome' → browser_command(action='open', url='https://youtube.com')\n"
+"\nYOUTUBE / APP SEARCH:\n"
+"- app_search(app_name, query, search_key) — searches inside ANY desktop app "
+"(YouTube, Spotify, etc.) using keyboard automation.\n"
+"- Focuses the app, types the search_key (default '/' for YouTube search bar), "
+"types the query, presses Enter, waits for results, screenshots the window, "
+"and returns AI Vision analysis of what's visible.\n"
+"- Use when user says 'search [query] on YouTube', 'find [query] in [app]', "
+"'look up [query] on YouTube'. \n"
+"- app_scroll(app_name, direction, amount) — scrolls up/down inside the app, "
+"then screenshots and returns what's visible.\n"
+"- Use app_scroll AFTER app_search when user says 'scroll down', 'scroll up', "
+"'show more', 'go down', 'see more results'.\n"
+"- WORKFLOW for YouTube search:\n"
+"  User: 'search Python tutorials on YouTube'\n"
+"  → app_search(app_name='YouTube', query='Python tutorials')\n"
+"  → 'I found these results: [list from analysis]. Which one should I open?'\n"
+"  User: 'scroll down'\n"
+"  → app_scroll(app_name='YouTube', direction='down')\n"
+"  → 'Now showing: [new results]. Which one?'\n"
+"  User: 'the third one'\n"
+"  → browser_command(action='open', url='https://youtube.com/watch?v=...') or click to open\n"
 "\nSCHEDULED TASKS:\n"
 "- When the user says 'schedule [action] at [time]', 'every [interval] do [action]', "
 "'remind me to [action] at [time]' — use create_scheduled_task with the action_text "
@@ -1593,6 +1626,9 @@ class AudioLoop:
                 "check_whatsapp": 45.0,
                 "reply_whatsapp": 45.0,
                 "read_whatsapp_chat": 60.0,
+                "browser_command": 15.0,
+                "app_search": 45.0,
+                "app_scroll": 30.0,
                 "open_app": 45.0,  # increased for WhatsApp intercept (check_whatsapp needs 45s)
                 "list_installed_apps": 15.0,
                 "refresh_app_registry": 30.0,
