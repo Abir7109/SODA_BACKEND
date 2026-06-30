@@ -5,7 +5,7 @@ Three-tier button detection:
   2. AI Vision on cropped window (Gemini sees only the WhatsApp area)
   3. Coordinate fallback (window-relative)
 
-Contact search uses Ctrl+N (New Chat dialog), NOT Ctrl+F (find in chat).
+Contact search clicks the search bar, types name, clicks first result.
 """
 
 import re
@@ -34,10 +34,7 @@ except ImportError:
 
 from logger import log
 
-SEARCH_COOLDOWN = 0.5
-TYPE_INTERVAL = 0.05
-WAIT_AFTER_SEARCH = 1.0
-WAIT_AFTER_OPEN = 1.0
+TYPE_INTERVAL = 0.06
 
 
 def _require_pyautogui():
@@ -70,7 +67,7 @@ def _find_whatsapp_window():
     return matches[0] if matches else None
 
 
-def _get_window_rect(title="WhatsApp"):
+def _get_window_rect():
     found = _find_whatsapp_window()
     if not found:
         return None
@@ -81,43 +78,152 @@ def _get_window_rect(title="WhatsApp"):
         return None
 
 
+def _focus_whatsapp():
+    """Bring WhatsApp window to foreground. Returns True if window was found."""
+    found = _find_whatsapp_window()
+    if not found:
+        log.warning("[WA] WhatsApp window not found")
+        return False
+    hwnd, title = found
+    log.info(f"[WA] Focusing window: '{title}'")
+    if win32gui.IsIconic(hwnd):
+        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        time.sleep(0.2)
+    win32gui.SetForegroundWindow(hwnd)
+    time.sleep(0.8)
+    return True
+
+
 def _focus_or_open_whatsapp():
     """Focus existing WhatsApp window or launch it. Returns True on success."""
-    found = _find_whatsapp_window()
-    if found:
-        hwnd, _ = found
-        if win32gui.IsIconic(hwnd):
-            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-            time.sleep(0.15)
-            if win32gui.IsZoomed(hwnd):
-                win32gui.ShowWindow(hwnd, win32con.SW_SHOWNORMAL)
-        win32gui.SetForegroundWindow(hwnd)
-        time.sleep(0.5)
+    if _focus_whatsapp():
         return True
     try:
         from system_app import open_app
         result = open_app("whatsapp")
-        time.sleep(2.5)
-        return "Opened" in result
+        time.sleep(4.0)
+        if _focus_whatsapp():
+            return True
+        log.warning(f"[WA] open_app result: {result}")
+        return False
     except Exception as e:
-        log.error(f"[WA] Failed to launch WhatsApp Desktop: {e}")
+        log.error(f"[WA] Failed to launch WhatsApp: {e}")
         return False
 
 
-def _search_contact_pyautogui(contact_name):
-    """Search for a contact using Ctrl+N (New Chat dialog)."""
-    _require_pyautogui()
-    pyautogui.hotkey("ctrl", "n")
+def _click_search_bar():
+    """Click the search bar at the top of WhatsApp's left panel using window-relative coords."""
+    rect = _get_window_rect()
+    if not rect:
+        log.warning("[WA] Cannot get window rect for search bar click")
+        return False
+    left, top, right, bottom = rect
+    win_w = right - left
+    search_x = left + int(win_w * 0.16)
+    search_y = top + 30
+    log.info(f"[WA] Clicking search bar at ({search_x}, {search_y})")
+    pyautogui.click(search_x, search_y)
+    time.sleep(0.8)
+    return True
+
+
+def _click_new_chat_button():
+    """Click the new chat (pencil) button at the top-left of WhatsApp."""
+    rect = _get_window_rect()
+    if not rect:
+        return False
+    left, top, right, bottom = rect
+    x = left + 40
+    y = top + 30
+    log.info(f"[WA] Clicking new chat button at ({x}, {y})")
+    pyautogui.click(x, y)
+    time.sleep(0.8)
+    return True
+
+
+def _click_first_search_result():
+    """Click the first contact in the search results list."""
+    rect = _get_window_rect()
+    if not rect:
+        return False
+    left, top, right, bottom = rect
+    win_w = right - left
+    result_x = left + int(win_w * 0.16)
+    result_y = top + 100
+    log.info(f"[WA] Clicking first search result at ({result_x}, {result_y})")
+    pyautogui.click(result_x, result_y)
+    time.sleep(1.0)
+    return True
+
+
+def _focus_message_input():
+    """Click the message input area at the bottom of the chat."""
+    rect = _get_window_rect()
+    if not rect:
+        return False
+    left, top, right, bottom = rect
+    win_w = right - left
+    win_h = bottom - top
+    msg_x = left + int(win_w * 0.6)
+    msg_y = bottom - 50
+    log.info(f"[WA] Clicking message input at ({msg_x}, {msg_y})")
+    pyautogui.click(msg_x, msg_y)
     time.sleep(0.5)
+    return True
+
+
+def _send_whatsapp_message(contact_name, message):
+    """
+    Full flow: focus WhatsApp, search contact, type message, send.
+    Uses click-based navigation with shortcut fallbacks.
+    """
+    _require_pyautogui()
+
+    # ── Step 1: Focus / open WhatsApp ──
+    log.info("[WA] Step 1: Focusing WhatsApp")
+    if not _focus_or_open_whatsapp():
+        return {"success": False, "error": "Could not open WhatsApp Desktop"}
+
+    # ── Step 2: Click search bar and type contact name ──
+    log.info(f"[WA] Step 2: Searching for '{contact_name}'")
+    _click_search_bar()
     pyautogui.write(contact_name, interval=TYPE_INTERVAL)
-    time.sleep(WAIT_AFTER_SEARCH)
+    time.sleep(1.5)
+
+    # ── Step 3: Click first result ──
+    log.info("[WA] Step 3: Selecting first contact result")
+    _click_first_search_result()
+    time.sleep(1.0)
+
+    # ── Step 4: Click message input and type ──
+    log.info("[WA] Step 4: Typing message")
+    _focus_message_input()
+    pyautogui.write(message, interval=TYPE_INTERVAL)
+    time.sleep(0.3)
+
+    # ── Step 5: Send ──
+    log.info("[WA] Step 5: Sending")
     pyautogui.press("enter")
-    time.sleep(WAIT_AFTER_OPEN)
+    time.sleep(0.5)
+
+    log.info(f"[WA] Message sent to '{contact_name}': {message[:60]}")
+    return {"success": True, "action": "message", "contact": contact_name}
+
+
+# ── Old shortcut-based contact search (kept as fallback) ──
+def _search_contact_pyautogui(contact_name):
+    _require_pyautogui()
+    log.info(f"[WA] Fallback: Ctrl+N search for '{contact_name}'")
+    pyautogui.hotkey("ctrl", "n")
+    time.sleep(0.8)
+    pyautogui.write(contact_name, interval=TYPE_INTERVAL)
+    time.sleep(1.5)
+    pyautogui.press("enter")
+    time.sleep(1.5)
     return True
 
 
 def _search_contact_uia(contact_name):
-    """Focus WhatsApp via uiautomation, then use PyAutoGUI for search."""
     if not _UIA:
         return False
     try:
@@ -127,21 +233,13 @@ def _search_contact_uia(contact_name):
         wa.SetActive()
         time.sleep(0.3)
         log.info(f"[WA] uiautomation focused WhatsApp window")
-        return True  # window is focused, PyAutoGUI will now work reliably
+        return True
     except Exception as e:
         log.warning(f"[WA] uia focus failed: {e}")
         return False
 
 
-def _search_contact(contact_name):
-    """Focus WhatsApp window, then search contact via PyAutoGUI."""
-    _search_contact_uia(contact_name)  # focus the window (may or may not have uia)
-    _search_contact_pyautogui(contact_name)
-    return True
-
-
 def _click_call_uia():
-    """Try finding the call button via uiautomation by name. Returns True if clicked."""
     if not _UIA:
         return False
     try:
@@ -162,9 +260,6 @@ def _click_call_uia():
 
 
 async def _click_call_ai_vision():
-    """Use Gemini Vision on a cropped WhatsApp window screenshot.
-    Returns True if coordinates were successfully used to click.
-    """
     rect = _get_window_rect()
     if not rect:
         return False
@@ -207,7 +302,6 @@ async def _click_call_ai_vision():
 
 
 def _click_call_fallback():
-    """Coordinate fallback: below title bar, right side of chat header."""
     rect = _get_window_rect()
     if not rect:
         return False
@@ -221,7 +315,6 @@ def _click_call_fallback():
 
 
 async def _click_call_button():
-    """Three-tier call button detection. Returns True if clicked."""
     if _click_call_uia():
         return True
     log.info("[WA] uiautomation failed, trying AI Vision...")
@@ -243,7 +336,8 @@ async def call_contact(contact_name):
     try:
         if not _focus_or_open_whatsapp():
             return {"success": False, "error": "Could not open WhatsApp Desktop. Is it installed?"}
-        _search_contact(contact_name)
+        _focus_whatsapp()
+        _search_contact_pyautogui(contact_name)
         if await _click_call_button():
             return {"success": True, "action": "call", "contact": contact_name}
         return {"success": False, "error": "Could not locate call button in WhatsApp"}
@@ -259,74 +353,22 @@ async def message_contact(contact_name, message):
     if not _WIN32:
         return {"success": False, "error": "win32api not available"}
     try:
-        if not _focus_or_open_whatsapp():
-            log.info("[WA] Desktop unavailable, trying web.whatsapp.com fallback")
-            try:
-                from system_app import open_url
-                encoded = message.replace(" ", "%20").replace("\n", "%0A")
-                url = f"https://web.whatsapp.com/send?text={encoded}"
-                open_url(url)
-                return {"success": True, "action": "message", "contact": contact_name, "fallback": "web"}
-            except Exception as web_e:
-                log.warning(f"[WA] Web fallback failed: {web_e}")
-                return {"success": False, "error": "Could not open WhatsApp Desktop or web version. Is WhatsApp installed?"}
-        _search_contact(contact_name)
+        result = _send_whatsapp_message(contact_name, message)
+        if result.get("success"):
+            return result
+
+        # Fallback: try Ctrl+N approach
+        log.info("[WA] Click-based send failed, trying Ctrl+N fallback")
+        _focus_whatsapp()
+        _search_contact_pyautogui(contact_name)
+        _focus_message_input()
         pyautogui.write(message, interval=TYPE_INTERVAL)
-        time.sleep(0.2)
-        pyautogui.press("enter")
-        time.sleep(0.3)
-        return {"success": True, "action": "message", "contact": contact_name}
-    except Exception as e:
-        log.error(f"[WA] message_contact failed: {e}")
-        return {"success": False, "error": str(e)}
-
-
-def _open_new_chat(contact_name):
-    """Open Ctrl+N new chat dialog, type contact, select it. Returns True if chat opened."""
-    _require_pyautogui()
-    log.info(f"[WA] Opening new chat for '{contact_name}'")
-    pyautogui.hotkey("ctrl", "n")
-    time.sleep(0.8)
-    pyautogui.write(contact_name, interval=0.05)
-    time.sleep(1.5)
-    pyautogui.press("enter")
-    time.sleep(1.5)
-    # Check if message input exists by trying to type a period and delete it
-    try:
-        pyautogui.write(".", interval=0.02)
-        time.sleep(0.2)
-        pyautogui.press("backspace")
-        time.sleep(0.1)
-    except:
-        pass
-    return True
-
-
-async def message_contact(contact_name, message):
-    """Search a contact in WhatsApp Desktop and send a message."""
-    if not _PYAUTOGUI:
-        return {"success": False, "error": "PyAutoGUI not installed"}
-    if not _WIN32:
-        return {"success": False, "error": "win32api not available"}
-    try:
-        if not _focus_or_open_whatsapp():
-            log.info("[WA] Desktop unavailable, trying web.whatsapp.com fallback")
-            try:
-                from system_app import open_url
-                encoded = message.replace(" ", "%20").replace("\n", "%0A")
-                url = f"https://web.whatsapp.com/send?text={encoded}"
-                open_url(url)
-                return {"success": True, "action": "message", "contact": contact_name, "fallback": "web"}
-            except Exception as web_e:
-                log.warning(f"[WA] Web fallback failed: {web_e}")
-                return {"success": False, "error": "Could not open WhatsApp Desktop or web version. Is WhatsApp installed?"}
-        _open_new_chat(contact_name)
-        pyautogui.write(message, interval=0.05)
         time.sleep(0.3)
         pyautogui.press("enter")
         time.sleep(0.5)
-        log.info(f"[WA] Message sent to '{contact_name}': {message[:50]}")
-        return {"success": True, "action": "message", "contact": contact_name}
+        log.info(f"[WA] Fallback message sent to '{contact_name}'")
+        return {"success": True, "action": "message", "contact": contact_name, "fallback": "shortcut"}
+
     except Exception as e:
         log.error(f"[WA] message_contact failed: {e}")
         return {"success": False, "error": str(e)}
@@ -334,10 +376,7 @@ async def message_contact(contact_name, message):
 
 # ── Sync entry point for local_agent._dispatch thread ──
 def whatsapp_handler(tool, args):
-    """Synchronous handler called by local_agent._dispatch() in a worker thread.
-
-    Routes tool calls to the appropriate async function using asyncio.run().
-    """
+    """Synchronous handler called by local_agent._dispatch() in a worker thread."""
     contact = args.get("contact", "") or args.get("contact_name", "") or args.get("name", "")
     message = args.get("message", "") or args.get("text", "") or args.get("msg", "")
     log.info(f"[WA] whatsapp_handler: tool={tool}, contact='{contact}', msg_len={len(message)}")
