@@ -1134,12 +1134,14 @@ check_whatsapp_tool = {
         "'open WhatsApp and read messages', 'did I get any messages', 'check WhatsApp', "
         "'any new messages on WhatsApp', 'what's on WhatsApp', 'see my WhatsApp'. "
         "If no unread messages, returns 'No unread messages'. "
-        "Example: check_whatsapp()"
+        "Example: check_whatsapp(query='any messages')"
     ),
     "parameters": {
         "type": "OBJECT",
-        "properties": {},
-        "required": []
+        "properties": {
+            "query": {"type": "STRING", "description": "What to check for. Always pass 'check messages'."}
+        },
+        "required": ["query"]
     }
 }
 

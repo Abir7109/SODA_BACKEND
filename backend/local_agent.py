@@ -573,6 +573,19 @@ def _dispatch(tool, args):
             return {"success": False, "error": "No app name provided"}
         app_lower = app.lower().strip()
 
+        # ── WhatsApp intercept: open_app("whatsapp") → check_whatsapp ──
+        if app_lower in ("whatsapp", "whatapp", "watsapp", "whats app", "what's app", "whats"):
+            log.info(f"[WA] open_app('{app_lower}') intercepted → redirecting to check_whatsapp")
+            try:
+                from whatsapp_bridge import check_whatsapp_sync
+                result = check_whatsapp_sync()
+                result["_intercepted_from"] = "open_app"
+                return result
+            except ImportError:
+                log.warning("[WA] whatsapp_bridge not available for intercept")
+            except Exception as e:
+                log.warning(f"[WA] intercept failed: {e}")
+
         def _verify_started(path_or_name=None, timeout=3.0):
             """Check that the app actually launched. Returns (ok: bool, detail: str)."""
             # Method 1: Check if process started (psutil)

@@ -509,8 +509,9 @@ def _build_system_prompt():
 "After the last article, call news_control(complete) to close the showcase. "
 "This is NOT memory recall — do NOT narrate profile, stored facts, people, or lessons. Only narrate the news articles."
 "\n\nALL WHATSAPP TOOLS:\n"
-"- CRITICAL — For ANY WhatsApp request, use these tools. NEVER call open_app('WhatsApp') — "
-"these tools open WhatsApp themselves:\n"
+"- IMPORTANT: Even if you call open_app('WhatsApp'), the system automatically redirects it "
+"to check_whatsapp. So you can use EITHER tool for WhatsApp — but check_whatsapp is best.\n"
+"- CRITICAL — For ANY WhatsApp request, use these tools. They open WhatsApp themselves:\n"
 "  • check_whatsapp() — READS WhatsApp messages from screen. Opens WhatsApp automatically, "
 "screenshots the chat list, AI Vision reads any unread messages. "
 "Read the 'analysis' field and report it HONESTLY. "
@@ -1578,7 +1579,7 @@ class AudioLoop:
                 "check_whatsapp": 45.0,
                 "reply_whatsapp": 45.0,
                 "read_whatsapp_chat": 60.0,
-                "open_app": 15.0,
+                "open_app": 45.0,  # increased for WhatsApp intercept (check_whatsapp needs 45s)
                 "list_installed_apps": 15.0,
                 "refresh_app_registry": 30.0,
             }
@@ -2545,6 +2546,14 @@ class AudioLoop:
 
         elif name == "open_app":
             app_name = args.get("app_name", "")
+            app_lower = app_name.lower().strip()
+            # WhatsApp intercept — redirect to check_whatsapp
+            if app_lower in ("whatsapp", "whatapp", "watsapp", "whats app", "what's app", "whats"):
+                log.info(f"[WA] open_app('{app_lower}') intercepted → check_whatsapp")
+                if _connected_agents:
+                    fc.name = "check_whatsapp"
+                    return await self._dispatch_tool(fc)
+                # fall through to normal open_app (will return no-agent error)
             if _connected_agents:
                 # Should have been routed to local agent above — safety fallback
                 result = system_app.open_app(app_name)

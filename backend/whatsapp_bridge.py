@@ -277,8 +277,9 @@ def _screenshot_region(left, top, width, height):
 
 
 # ── Check WhatsApp for unread messages ──
-async def check_whatsapp():
-    """Take a screenshot of WhatsApp's left panel (chat list) and use AI Vision to find unread messages."""
+async def check_whatsapp(query="check messages"):
+    """Take a screenshot of WhatsApp's left panel (chat list) and use AI Vision to find unread messages.
+    `query` parameter is accepted for Gemini compatibility but ignored — this tool always checks for unread messages."""
     if not _PYAUTOGUI:
         return {"success": False, "error": "PyAutoGUI not installed"}
     if not _WIN32:
@@ -320,9 +321,9 @@ async def check_whatsapp():
         return {"success": False, "error": str(e)}
 
 
-def check_whatsapp_sync():
+def check_whatsapp_sync(query="check messages"):
     """Synchronous wrapper for check_whatsapp."""
-    return asyncio.run(check_whatsapp())
+    return asyncio.run(check_whatsapp(query))
 
 
 # ── Helper: search and open a chat by contact name ──
@@ -467,7 +468,8 @@ def whatsapp_handler(tool, args):
         return message_contact_sync(contact, message)
 
     if tool == "check_whatsapp":
-        return check_whatsapp_sync()
+        query = args.get("query", "check messages")
+        return check_whatsapp_sync(query)
 
     if tool == "reply_whatsapp":
         if not message:
