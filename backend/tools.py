@@ -1125,14 +1125,15 @@ whatsapp_find_and_message_tool = {
 check_whatsapp_tool = {
     "name": "check_whatsapp",
     "description": (
-        "Check WhatsApp for unread messages. Takes a screenshot of WhatsApp Desktop's chat list "
-        "and uses AI Vision to identify any chats with unread messages (green dot, number badge, or bold name). "
-        "Use when the user says 'check my WhatsApp', 'any WhatsApp messages', 'read my WhatsApp', "
-        "'did I get any messages', 'check WhatsApp', 'any new messages on WhatsApp'. "
-        "Opens WhatsApp Desktop automatically if not running. "
-        "Returns a list of unread chats with contact name, last message preview, and unread count. "
-        "If no unread messages, says 'No unread messages'. "
-        "After checking, the user may ask you to reply to someone. "
+        "READ WhatsApp messages from the user's screen. Opens WhatsApp Desktop automatically, "
+        "captures a screenshot of the chat list, analyzes it with AI Vision, and returns "
+        "any unread messages found — including contact name, last message preview, and unread count. "
+        "THIS TOOL WORKS. It physically screenshots the WhatsApp window and reads text from it. "
+        "Use for ANY request about reading/checking WhatsApp messages including: "
+        "'check my WhatsApp', 'any WhatsApp messages', 'read my WhatsApp', "
+        "'open WhatsApp and read messages', 'did I get any messages', 'check WhatsApp', "
+        "'any new messages on WhatsApp', 'what's on WhatsApp', 'see my WhatsApp'. "
+        "If no unread messages, returns 'No unread messages'. "
         "Example: check_whatsapp()"
     ),
     "parameters": {
@@ -1165,16 +1166,15 @@ reply_whatsapp_tool = {
 read_whatsapp_chat_tool = {
     "name": "read_whatsapp_chat",
     "description": (
-        "Open a specific contact's chat in WhatsApp Desktop, take a screenshot of the conversation, "
-        "and use AI Vision to read and describe the recent messages. "
+        "READ a specific contact's WhatsApp conversation. Opens WhatsApp Desktop automatically, "
+        "searches for the contact, opens their chat, takes a screenshot of the conversation area, "
+        "and uses AI Vision to read and describe the recent messages visible. "
+        "THIS TOOL WORKS — it physically screenshots the WhatsApp window and reads text from it. "
         "Use when the user says 'open [name] WhatsApp', 'show me my chat with [name]', "
         "'what did [name] say', 'read my conversation with [name]', "
-        "'open WhatsApp and show [name]', 'I want to see my chat with [name]'. "
-        "Also use when the user asks to check a specific person's messages (not general check). "
-        "If the user also provides a message to send, it sends the message after reading the chat. "
-        "Opens WhatsApp Desktop automatically, searches the contact, opens the chat, "
-        "screenshots the conversation area, and describes what it sees. "
-        "contact_name is required. message is optional. "
+        "'open WhatsApp and show [name]', 'let me see [name]'s messages'. "
+        "Optionally sends a message after reading if 'message' parameter is provided. "
+        "contact_name is required (the exact name). message is optional. "
         "Example: read_whatsapp_chat(contact_name='Rubab')"
     ),
     "parameters": {
