@@ -1524,11 +1524,20 @@ class AudioLoop:
                 'tool': name,
                 'args': args,
             }, room=agent_sid)
-            timeout = 10.0
+            # Per-tool timeouts — WhatsApp needs extra time (app launch + search + typing)
+            _TOOL_TIMEOUTS = {
+                "send_whatsapp": 45.0,
+                "whatsapp_find_and_message": 45.0,
+                "whatsapp_find_and_call": 45.0,
+                "open_app": 15.0,
+                "list_installed_apps": 15.0,
+                "refresh_app_registry": 30.0,
+            }
+            timeout = _TOOL_TIMEOUTS.get(name, 10.0)
             try:
                 result = await asyncio.wait_for(future, timeout=timeout)
                 _success = result.pop('_success', True)
-                log.info(f"[AGENT] {name} result: success={_success}")
+                log.info(f"[AGENT] {name} result: success={_success} ({timeout}s timeout)")
             except asyncio.TimeoutError:
                 result = {"success": False, "error": f"Local agent did not respond within {timeout}s"}
                 _success = False
