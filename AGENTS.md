@@ -137,6 +137,9 @@ Colors, typography, and spacing are defined as CSS custom properties in
 - **Server-side VAD is ENABLED**. No client-side `activity_start`/`activity_end` signals — the Gemini server handles voice activity detection automatically.
 - `speech_config.language_code` is **NOT supported** for `gemini-2.5-flash-native-audio-latest` — the model rejects the setup with code 1007
 - `AudioTranscriptionConfig.languageCode` is NOT sent through pydantic serialization (LiveConnectParameters caches original schema — extra fields stripped)
+
+### Git Push Policy
+- **Only push to `soda-backend`** remote (`https://github.com/Abir7109/SODA_BACKEND.git`). `origin` (`soda-main.git`) is a backup — never push there.
 - `context_window_compression` should be omitted entirely — low `trigger_tokens` adds latency on every turn
 
 ### Key Notes

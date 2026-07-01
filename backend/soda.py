@@ -217,6 +217,10 @@ LOCAL_AGENT_TOOLS = {
     "send_keys_window",
     # Browser / web app control
     "browser_command", "app_search", "app_scroll",
+    # Browser automation
+    "browser_automate",
+    # Credential manager
+    "credential_save", "credential_get", "credential_list", "credential_delete",
     # Agent control
     "reconnect",
 }
@@ -607,6 +611,33 @@ def _build_system_prompt():
 "  → 'Now showing: [new results]. Which one?'\n"
 "  User: 'the third one'\n"
 "  → browser_command(action='open', url='https://youtube.com/watch?v=...') or click to open\n"
+"\nBROWSER AUTOMATION:\n"
+"- browser_automate(url, steps[]) — FULL browser automation with AI Vision.\n"
+"- Launches Chrome with profile 'rahikulmakhtum', navigates to url, executes each step.\n"
+"- SUPPORTED STEPS:\n"
+"  • navigate(url) — go to a URL\n"
+"  • click(description) — AI Vision finds and clicks an element (3 retries, bounds validation)\n"
+"  • type(text, target) — clicks target field then types text. Set press_enter=true for submit.\n"
+"  • read(prompt) — screenshots page and AI Vision reads content based on prompt\n"
+"  • wait(seconds) — pauses execution\n"
+"- LOGIN WORKFLOW (ALWAYS USE THIS):\n"
+"  1. First call credential_get(service='[site name]') to retrieve saved credentials\n"
+"  2. Then call browser_automate with url and steps:\n"
+"     - click('username/email field')\n"
+"     - type([username], 'the email input')\n"
+"     - click('password field')\n"
+"     - type([password], 'the password input')\n"
+"     - click('login/sign in button')\n"
+"  3. If no credentials found, ask user for them, then use credential_save for next time.\n"
+"- SEARCH WORKFLOW:\n"
+"  navigate → click('search box') → type(query, 'search box', press_enter=true) → read('Show me the results')\n"
+"\nCREDENTIAL MANAGER:\n"
+"- credential_save(service, username, password) — save encrypted credentials locally\n"
+"- credential_get(service) — retrieve saved credentials (returns username + password)\n"
+"- credential_list() — list all services with saved credentials (no passwords leaked)\n"
+"- credential_delete(service) — remove saved credentials\n"
+"- CRITICAL: When user asks to log in somewhere, FIRST call credential_get THEN browser_automate.\n"
+"- Store credentials whenever user provides login info voluntarily.\n"
 "\nSCHEDULED TASKS:\n"
 "- When the user says 'schedule [action] at [time]', 'every [interval] do [action]', "
 "'remind me to [action] at [time]' — use create_scheduled_task with the action_text "
@@ -1632,6 +1663,11 @@ class AudioLoop:
                 "open_app": 45.0,  # increased for WhatsApp intercept (check_whatsapp needs 45s)
                 "list_installed_apps": 15.0,
                 "refresh_app_registry": 30.0,
+                "browser_automate": 120.0,
+                "credential_save": 10.0,
+                "credential_get": 10.0,
+                "credential_list": 10.0,
+                "credential_delete": 10.0,
             }
             timeout = _TOOL_TIMEOUTS.get(name, 10.0)
             try:

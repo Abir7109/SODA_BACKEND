@@ -1265,6 +1265,147 @@ app_scroll_tool = {
     }
 }
 
+# ── Credential Manager ──
+
+credential_save_tool = {
+    "name": "credential_save",
+    "description": (
+        "Save a username/password for a service (like a website login). "
+        "Credentials are encrypted at rest using Fernet (cryptography). "
+        "Use when the user says 'save my password for [service]', "
+        "'remember my login for [service]', 'store credentials for [service]'. "
+        "service is the website/app name (e.g. 'facebook', 'gmail', 'amazon'). "
+        "username is the email or username. password is the password. "
+        "All three are required. "
+        "Returns success confirmation. "
+        "Example: credential_save(service='facebook', username='user@email.com', password='mypassword123')"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "service": {"type": "STRING", "description": "Service/app name (e.g. 'facebook', 'gmail', 'amazon')"},
+            "username": {"type": "STRING", "description": "Username or email for the service"},
+            "password": {"type": "STRING", "description": "Password for the service"}
+        },
+        "required": ["service", "username", "password"]
+    }
+}
+
+credential_get_tool = {
+    "name": "credential_get",
+    "description": (
+        "Retrieve saved credentials for a specific service. "
+        "Returns username and password that were previously saved. "
+        "Use when the user says 'what's my password for [service]', "
+        "'get my [service] login', 'show me my saved password'. "
+        "Example: credential_get(service='facebook')"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "service": {"type": "STRING", "description": "Service name to retrieve credentials for"}
+        },
+        "required": ["service"]
+    }
+}
+
+credential_list_tool = {
+    "name": "credential_list",
+    "description": (
+        "List all services that have saved credentials. "
+        "Returns an array of service names with their usernames. "
+        "Does NOT leak passwords. "
+        "Use when the user says 'list my saved passwords', 'what services do I have saved', "
+        "'show me all saved credentials'. "
+        "No parameters required."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {}
+    }
+}
+
+credential_delete_tool = {
+    "name": "credential_delete",
+    "description": (
+        "Delete saved credentials for a specific service. "
+        "Use when the user says 'delete my [service] password', "
+        "'remove [service] credentials', 'forget [service] login'. "
+        "Example: credential_delete(service='facebook')"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "service": {"type": "STRING", "description": "Service name to delete credentials for"}
+        },
+        "required": ["service"]
+    }
+}
+
+# ── Browser Automation ──
+
+browser_automate_tool = {
+    "name": "browser_automate",
+    "description": (
+        "Full browser automation: navigate to a URL, then execute a list of steps. "
+        "SUPPORTED ACTIONS:\n"
+        "- navigate(url): Navigate to a URL in Chrome (Chrome profile 'rahikulmakhtum' auto-detected).\n"
+        "- click(description): Find and click an element. Uses AI Vision to locate it on screen. "
+        "description must describe what to click clearly (e.g. 'the login button', 'the search box'). "
+        "3 retries with escalating vision prompts on failure.\n"
+        "- type(text, target): Type text into an input field. 'target' describes where to click first. "
+        "Automatically clicks the target before typing. Set press_enter=true to press Enter after typing.\n"
+        "- read(prompt): Read text from the current page. prompt explains what to look for. "
+        "Uses AI Vision to analyze the screenshot.\n"
+        "- wait(seconds): Wait a specified number of seconds.\n\n"
+        "COMMON WORKFLOWS:\n"
+        "1. LOGIN: navigate(url) → click('username/email field') → type(username, 'the email input') → "
+        "click('password field') → type(password, 'the password input') → click('login/sign in button').\n"
+        "2. SEARCH: navigate(url) → click('search box') → type(query, 'search box', press_enter=true) → "
+        "read('What are the search results on this page? List them.').\n\n"
+        "Use for ANY task that needs clicking, typing, and reading in a web browser. "
+        "Especially useful for sites without APIs (messaging platforms, social media, internal tools). "
+        "ALWAYS auto-inject saved credentials from credential_get when doing login workflows. "
+        "CRITICAL: When the user asks to log into a service, FIRST call credential_get(service=...) "
+        "to retrieve saved credentials, then inject them at the right step."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "url": {"type": "STRING", "description": "The URL to navigate to"},
+            "steps": {
+                "type": "ARRAY",
+                "description": "List of step objects to execute. Each step has 'action' and 'params' fields.",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "action": {
+                            "type": "STRING",
+                            "description": "Action: 'navigate', 'click', 'type', 'read', 'wait'"
+                        },
+                        "params": {
+                            "type": "OBJECT",
+                            "description": "Parameters for the action. See description for details per action type.",
+                            "properties": {
+                                "url": {"type": "STRING", "description": "For navigate: the URL to go to"},
+                                "description": {"type": "STRING", "description": "For click: description of the element to find and click"},
+                                "target": {"type": "STRING", "description": "For type: description of the input field to click first"},
+                                "text": {"type": "STRING", "description": "For type: the text to type"},
+                                "press_enter": {"type": "BOOLEAN", "description": "For type: press Enter after typing (default false)"},
+                                "prompt": {"type": "STRING", "description": "For read: what to look for on the page"},
+                                "seconds": {"type": "NUMBER", "description": "For wait: seconds to wait"}
+                            }
+                        }
+                    },
+                    "required": ["action", "params"]
+                }
+            },
+            "profile": {"type": "STRING", "description": "Chrome profile name (default: 'rahikulmakhtum')"}
+        },
+        "required": ["url", "steps"]
+    }
+}
+
 # ── Scheduled Tasks ──
 
 create_scheduled_task_tool = {
@@ -1683,5 +1824,10 @@ tools_list = [{"function_declarations": [
     browser_command_tool,
     app_search_tool,
     app_scroll_tool,
+    credential_save_tool,
+    credential_get_tool,
+    credential_list_tool,
+    credential_delete_tool,
+    browser_automate_tool,
 ]}]
 

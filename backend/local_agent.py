@@ -89,6 +89,8 @@ LOCAL_TOOLS = [
     "env_get", "file_compress", "file_download",
     "browser_command",
     "app_search", "app_scroll",
+    "browser_automate",
+    "credential_save", "credential_get", "credential_list", "credential_delete",
 ]
 
 HAS_PYAUTOGUI = False
@@ -516,6 +518,125 @@ def _screenshot_window_region(app_name):
             return mss.tools.to_png(img.rgb, img.size)
     except:
         return None
+
+
+# ── Chrome profile detection ──────────────────────────────────────
+CHROME_USER_DATA = os.path.expandvars(
+    r"%LOCALAPPDATA%\Google\Chrome\User Data"
+)
+_CREDENTIALS_KEY = None
+_CREDENTIALS_FILE = Path("credentials.json.enc")
+_CREDENTIALS_KEY_FILE = Path("credentials.key")
+
+
+def _detect_chrome_profile(profile_name=None):
+    """Find Chrome profile directory by display name.
+    Reads Chrome's Local State file to map profile names to directories.
+    Returns profile directory name (e.g. 'Profile 1') or 'Default'."""
+    local_state = Path(CHROME_USER_DATA) / "Local State"
+    if not local_state.exists():
+        log.warning(f"[Chrome] Local State not found at {local_state}")
+        return "Default"
+    try:
+        import json
+        data = json.loads(local_state.read_text(encoding="utf-8"))
+        info_cache = data.get("profile", {}).get("info_cache", {})
+        if profile_name:
+            for prof_dir, info in info_cache.items():
+                if profile_name.lower() in info.get("name", "").lower():
+                    log.info(f"[Chrome] Found profile '{profile_name}' → {prof_dir}")
+                    return prof_dir
+        # Fallback: return first non-Default profile, or Default
+        for prof_dir, info in info_cache.items():
+            if prof_dir != "Default":
+                return prof_dir
+        return "Default"
+    except Exception as e:
+        log.warning(f"[Chrome] Profile detection failed: {e}")
+        return "Default"
+
+
+def _launch_chrome_url(url):
+    """Open URL in Chrome using the user's profile. Returns True on success."""
+    import shutil
+    profile_dir = _detect_chrome_profile("rahikulmakhtum")
+    chrome_exe = (
+        shutil.which("chrome")
+        or shutil.which("google-chrome")
+        or shutil.which("googlechrome")
+        or rf"C:\Program Files\Google\Chrome\Application\chrome.exe"
+        or os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe")
+    )
+    if not chrome_exe or not os.path.isfile(chrome_exe):
+        log.warning("[Chrome] chrome.exe not found")
+        return False
+    try:
+        subprocess.Popen([
+            chrome_exe, f"--profile-directory={profile_dir}",
+            "--new-window", url
+        ], shell=False)
+        time.sleep(2.0)
+        return True
+    except Exception as e:
+        log.warning(f"[Chrome] Launch failed: {e}")
+        return False
+
+
+def _focus_chrome():
+    """Focus any visible Chrome window. Returns True on success."""
+    for name in ("chrome", "google chrome", "google_chrome", "chromium"):
+        if _focus_any_app(name):
+            return True
+    return False
+
+
+# ── Credential Manager ─────────────────────────────────────────────
+def _get_fernet():
+    """Get or create a Fernet key for credential encryption."""
+    global _CREDENTIALS_KEY
+    try:
+        from cryptography.fernet import Fernet
+    except ImportError:
+        return None
+    if _CREDENTIALS_KEY:
+        return Fernet(_CREDENTIALS_KEY)
+    if _CREDENTIALS_KEY_FILE.exists():
+        _CREDENTIALS_KEY = _CREDENTIALS_KEY_FILE.read_bytes()
+    else:
+        _CREDENTIALS_KEY = Fernet.generate_key()
+        _CREDENTIALS_KEY_FILE.write_bytes(_CREDENTIALS_KEY)
+    return Fernet(_CREDENTIALS_KEY)
+
+
+def _load_credentials():
+    """Decrypt and load all credentials. Returns list of dicts."""
+    f = _get_fernet()
+    if not f or not _CREDENTIALS_FILE.exists():
+        return []
+    try:
+        encrypted = _CREDENTIALS_FILE.read_bytes()
+        decrypted = f.decrypt(encrypted)
+        import json
+        return json.loads(decrypted.decode())
+    except Exception as e:
+        log.warning(f"[Credential] Load failed: {e}")
+        return []
+
+
+def _save_credentials(entries):
+    """Encrypt and save all credentials."""
+    f = _get_fernet()
+    if not f:
+        return False
+    try:
+        import json
+        plain = json.dumps(entries, indent=2).encode()
+        encrypted = f.encrypt(plain)
+        _CREDENTIALS_FILE.write_bytes(encrypted)
+        return True
+    except Exception as e:
+        log.warning(f"[Credential] Save failed: {e}")
+        return False
 
 
 def _dispatch(tool, args):
@@ -1163,8 +1284,11 @@ def _dispatch(tool, args):
         if not cap.get("success"):
             return {"success": False, "error": cap.get("error", "Screenshot failed")}
         try:
-            from screen_vision import analyze_screenshot
-            r = _await_it(analyze_screenshot(cap.get("image_base64", ""), args.get("prompt", "Describe what you see")))
+            from screen_vision import analyze_screen
+            b64 = cap.get("image_base64", "")
+            import base64, io
+            png_bytes = base64.b64decode(b64)
+            r = _await_it(analyze_screen(prompt=args.get("prompt", "Describe what you see"), screenshot=png_bytes))
             return r
         except ImportError:
             return {"success": True, "analysis": "Screenshot captured. To analyze, ensure screen_vision module is available."}
@@ -1174,8 +1298,11 @@ def _dispatch(tool, args):
         if not cap.get("success"):
             return {"success": False, "error": cap.get("error", "Screenshot failed")}
         try:
-            from screen_vision import ocr_screenshot
-            r = _await_it(ocr_screenshot(cap.get("image_base64", "")))
+            from screen_vision import analyze_screen
+            b64 = cap.get("image_base64", "")
+            import base64, io
+            png_bytes = base64.b64decode(b64)
+            r = _await_it(analyze_screen(prompt="Read all text visible in this screenshot. Output exactly what you see.", screenshot=png_bytes))
             return r
         except ImportError:
             return {"success": False, "error": "OCR not available"}
@@ -1910,6 +2037,236 @@ def _dispatch(tool, args):
                 log.warning(f"[app_scroll] Screenshot failed: {e}")
 
         return {"success": True, "app": app_name, "direction": direction, "detail": f"Scrolled {direction} in {app_name}"}
+
+    # ── Credential Manager ──────────────────────────────────────────
+    elif tool == "credential_save":
+        service = args.get("service", "")
+        username = args.get("username", "")
+        password = args.get("password", "")
+        if not all([service, username, password]):
+            return {"success": False, "error": "service, username, and password are required"}
+        entries = _load_credentials()
+        existing = [e for e in entries if e["service"] != service]
+        existing.append({"service": service, "username": username, "password": password})
+        if _save_credentials(existing):
+            return {"success": True, "service": service, "username": username, "detail": f"Saved credentials for {service}"}
+        return {"success": False, "error": "Failed to save credentials"}
+
+    elif tool == "credential_get":
+        service = args.get("service", "")
+        if not service:
+            return {"success": False, "error": "service is required"}
+        entries = _load_credentials()
+        for e in entries:
+            if e["service"] == service:
+                return {"success": True, "service": service, "username": e["username"], "password": e["password"]}
+        return {"success": False, "error": f"No credentials found for {service}"}
+
+    elif tool == "credential_list":
+        entries = _load_credentials()
+        services = [{"service": e["service"], "username": e["username"]} for e in entries]
+        return {"success": True, "services": services, "count": len(services)}
+
+    elif tool == "credential_delete":
+        service = args.get("service", "")
+        if not service:
+            return {"success": False, "error": "service is required"}
+        entries = _load_credentials()
+        filtered = [e for e in entries if e["service"] != service]
+        if len(filtered) == len(entries):
+            return {"success": False, "error": f"No credentials found for {service}"}
+        if _save_credentials(filtered):
+            return {"success": True, "service": service, "detail": f"Deleted credentials for {service}"}
+        return {"success": False, "error": "Failed to save"}
+
+    # ── Browser Automation ──────────────────────────────────────────
+    elif tool == "browser_automate":
+        url = args.get("url", "")
+        steps = args.get("steps", [])
+        profile = args.get("profile", "rahikulmakhtum")
+        if not url:
+            return {"success": False, "error": "url is required"}
+        if not steps or not isinstance(steps, list):
+            return {"success": False, "error": "steps[] is required with at least one step"}
+
+        # Launch Chrome to the URL
+        if not _launch_chrome_url(url):
+            return {"success": False, "error": "Failed to launch Chrome"}
+        if not _focus_chrome():
+            time.sleep(2.0)
+            _focus_chrome()
+        time.sleep(3.0)
+
+        from screen_vision import analyze_screen
+        results = []
+        overall_success = True
+
+        for i, step in enumerate(steps):
+            action = step.get("action", "")
+            params = step.get("params", {})
+            max_retries = 3 if action in ("click", "type") else 1
+            step_ok = False
+            last_error = ""
+
+            for attempt in range(max_retries):
+                try:
+                    if action == "navigate":
+                        target_url = params.get("url", url)
+                        _launch_chrome_url(target_url)
+                        time.sleep(3.0)
+                        results.append({"step": i, "action": "navigate", "success": True, "url": target_url})
+                        step_ok = True
+                        break
+
+                    elif action == "wait":
+                        time.sleep(params.get("seconds", 2))
+                        results.append({"step": i, "action": "wait", "success": True})
+                        step_ok = True
+                        break
+
+                    elif action in ("click", "type", "read"):
+                        # Take screenshot of Chrome window
+                        png_bytes = _screenshot_window_region("chrome")
+                        if not png_bytes:
+                            last_error = "Could not screenshot Chrome window"
+                            time.sleep(1)
+                            continue
+
+                        if action == "click":
+                            # Vision element location: get coordinates relative to cropped screenshot
+                            desc = params.get("description", "the element")
+                            import json
+                            coords_str = asyncio.run(analyze_screen(
+                                prompt=(
+                                    f"You are looking at a screenshot of a Chrome browser.\n"
+                                    f"TASK: Find the coordinates (x, y) of: {desc}\n"
+                                    f"RULES:\n"
+                                    f"- Return ONLY a JSON object with 'x' and 'y' as integers.\n"
+                                    f"- Coordinates must be RELATIVE to the screenshot (NOT the full screen).\n"
+                                    f"- If you cannot find it, return {{'x': -1, 'y': -1}}.\n"
+                                    f"Do NOT include any other text."
+                                ),
+                                screenshot=png_bytes
+                            ))
+                        else:
+                            vision_prompt = params.get("prompt", "Describe what you see on this page")
+
+                        if action == "click":
+                            try:
+                                coords = json.loads(coords_str) if isinstance(coords_str, str) else coords_str
+                            except:
+                                try:
+                                    import re
+                                    m = re.search(r'\{\s*"x"\s*:\s*(-?\d+)\s*,\s*"y"\s*:\s*(-?\d+)\s*\}', coords_str if isinstance(coords_str, str) else str(coords_str))
+                                    if m:
+                                        coords = {"x": int(m.group(1)), "y": int(m.group(2))}
+                                    else:
+                                        raise ValueError("No coordinates found")
+                                except:
+                                    last_error = f"Could not parse coordinates from Vision: {coords_str}"
+                                    time.sleep(1)
+                                    continue
+                            if coords.get("x", -1) < 0 or coords.get("y", -1) < 0:
+                                last_error = f"Vision could not find '{desc}'"
+                                time.sleep(1)
+                                continue
+
+                            # Validate coordinates against window bounds
+                            rect = _get_any_window_rect("chrome")
+                            if rect:
+                                screen_x = rect[0] + coords["x"]
+                                screen_y = rect[1] + coords["y"]
+                                if screen_x < rect[0] or screen_x > rect[2] or screen_y < rect[1] or screen_y > rect[3]:
+                                    last_error = f"Coordinates ({screen_x},{screen_y}) out of window bounds {rect}"
+                                    time.sleep(1)
+                                    continue
+                            else:
+                                screen_x, screen_y = coords["x"], coords["y"]
+
+                            if not HAS_PYAUTOGUI:
+                                last_error = "pyautogui required for click"
+                                continue
+                            import pyautogui
+                            pyautogui.moveTo(screen_x, screen_y, duration=0.3)
+                            time.sleep(0.2)
+                            pyautogui.click()
+                            time.sleep(1.0)
+                            results.append({"step": i, "action": "click", "success": True, "element": desc, "coordinates": {"x": screen_x, "y": screen_y}})
+                            step_ok = True
+                            break
+
+                        elif action == "type":
+                            text = params.get("text", "")
+                            if not text:
+                                last_error = "No text provided for typing"
+                                continue
+                            # Click target first
+                            desc = params.get("target", "the input field")
+                            import json as _json
+                            _inner_png = _screenshot_window_region("chrome")
+                            if not _inner_png:
+                                last_error = "Could not screenshot"
+                                continue
+                            _target_coords = asyncio.run(analyze_screen(
+                                prompt=(
+                                    f"You are looking at a Chrome screenshot.\n"
+                                    f"TASK: Find the coordinates (x, y) of: {desc}\n"
+                                    f"Return ONLY a JSON object with 'x' and 'y' integers relative to the screenshot.\n"
+                                    f"If not found, return {{'x': -1, 'y': -1}}."
+                                ),
+                                screenshot=_inner_png
+                            ))
+                            try:
+                                _tc = _json.loads(_target_coords) if isinstance(_target_coords, str) else _target_coords
+                            except:
+                                last_error = f"Could not parse target coordinates: {_target_coords}"
+                                continue
+                            _tc_x = _tc.get("x", -1)
+                            _tc_y = _tc.get("y", -1)
+                            if _tc_x < 0 or _tc_y < 0:
+                                last_error = f"Vision could not find '{desc}'"
+                                continue
+                            _inner_rect = _get_any_window_rect("chrome")
+                            _sx = (_inner_rect[0] if _inner_rect else 0) + _tc_x
+                            _sy = (_inner_rect[1] if _inner_rect else 0) + _tc_y
+                            import pyautogui as _pg
+                            _pg.moveTo(_sx, _sy, duration=0.3)
+                            time.sleep(0.2)
+                            _pg.click()
+                            time.sleep(0.5)
+                            _pg.write(text, interval=0.05)
+                            if params.get("press_enter"):
+                                _pg.press("enter")
+                            time.sleep(1.0)
+                            results.append({"step": i, "action": "type", "success": True, "target": desc, "text_length": len(text)})
+                            step_ok = True
+                            break
+
+                        elif action == "read":
+                            text_result = asyncio.run(analyze_screen(
+                                prompt=vision_prompt,
+                                screenshot=png_bytes
+                            ))
+                            results.append({"step": i, "action": "read", "success": True, "content": text_result})
+                            step_ok = True
+                            break
+
+                except Exception as e:
+                    last_error = str(e)
+                    time.sleep(1)
+                    continue
+
+            if not step_ok:
+                overall_success = False
+                results.append({"step": i, "action": action, "success": False, "error": last_error or "Failed after retries"})
+
+        return {
+            "success": overall_success,
+            "url": url,
+            "profile": profile,
+            "steps_executed": len(results),
+            "results": results
+        }
 
     # ── Fallback ──────────────────────────────────────────────────
     return {"error": f"Tool '{tool}' not implemented in local agent"}
