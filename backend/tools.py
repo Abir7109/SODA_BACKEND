@@ -1199,6 +1199,7 @@ browser_command_tool = {
         "'search for [query] in Chrome', 'open [url] in Chrome', 'browse to [url]'. "
         "Only use this when the user explicitly wants to use the system browser — "
         "for internal SODA webview, use open_browser instead. "
+        "Do NOT use this for checking Gmail/email — use browser_automate with a read step instead. "
         "Examples: browser_command(action='search', query='cat pictures'), "
         "browser_command(action='open', url='https://youtube.com')"
     ),

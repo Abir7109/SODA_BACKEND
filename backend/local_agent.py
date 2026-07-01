@@ -911,6 +911,11 @@ def _dispatch(tool, args):
         if app_lower in _WEB_APPS:
             url = _WEB_APPS[app_lower]
             log.info(f"[LocalAgent] Opening web app '{app}' → {url}")
+            if _launch_chrome_url(url):
+                _ok, _detail = _verify_started()
+                if _ok:
+                    return {"success": True, "app": app, "url": url, "method": "web_app_chrome", "detail": _detail}
+                return {"success": True, "app": app, "url": url, "method": "web_app_chrome", "detail": f"Opened {url} in Chrome"}
             try:
                 subprocess.Popen(["start", "", url], shell=True)
                 _ok, _detail = _verify_started()
@@ -1938,12 +1943,17 @@ def _dispatch(tool, args):
         action = args.get("action", "")
         url = args.get("url", "")
         if action == "open":
-            subprocess.Popen(["start", "", url or "https://www.google.com"], shell=True)
-            return {"success": True, "action": "open", "url": url, "detail": f"Opened {url} in system browser"}
+            target = url or "https://www.google.com"
+            if _launch_chrome_url(target):
+                return {"success": True, "action": "open", "url": target, "detail": f"Opened {target} in Chrome"}
+            subprocess.Popen(["start", "", target], shell=True)
+            return {"success": True, "action": "open", "url": target, "detail": f"Opened {target} in system browser"}
         elif action == "search":
             query = args.get("query", "")
             encoded = urllib.parse.quote(query)
             search_url = f"https://www.google.com/search?q={encoded}"
+            if _launch_chrome_url(search_url):
+                return {"success": True, "action": "search", "query": query, "detail": f"Searched '{query}' in Chrome"}
             subprocess.Popen(["start", "", search_url], shell=True)
             return {"success": True, "action": "search", "query": query, "detail": f"Searched '{query}' in system browser"}
         return {"success": False, "error": f"Unknown browser action: {action}"}
