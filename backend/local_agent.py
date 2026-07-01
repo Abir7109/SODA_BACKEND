@@ -541,14 +541,28 @@ def _detect_chrome_profile(profile_name=None):
         import json
         data = json.loads(local_state.read_text(encoding="utf-8"))
         info_cache = data.get("profile", {}).get("info_cache", {})
+        log.info(f"[Chrome] Available profiles: {[(d, info.get('name','?')) for d, info in info_cache.items()]}")
         if profile_name:
+            pn = profile_name.lower()
+            # Exact match first
             for prof_dir, info in info_cache.items():
-                if profile_name.lower() in info.get("name", "").lower():
-                    log.info(f"[Chrome] Found profile '{profile_name}' → {prof_dir}")
+                if info.get("name", "").lower() == pn:
+                    log.info(f"[Chrome] Exact match '{profile_name}' → {prof_dir}")
+                    return prof_dir
+            # Substring match
+            for prof_dir, info in info_cache.items():
+                if pn in info.get("name", "").lower():
+                    log.info(f"[Chrome] Substring match '{profile_name}' → {prof_dir}")
+                    return prof_dir
+            # Match by profile directory name (e.g. rahikulmakhtum matches "Profile 1")
+            for prof_dir in info_cache:
+                if pn in prof_dir.lower():
+                    log.info(f"[Chrome] Dir-name match '{profile_name}' → {prof_dir}")
                     return prof_dir
         # Fallback: return first non-Default profile, or Default
         for prof_dir, info in info_cache.items():
             if prof_dir != "Default":
+                log.info(f"[Chrome] Fallback profile: {prof_dir} ({info.get('name','?')})")
                 return prof_dir
         return "Default"
     except Exception as e:
@@ -556,21 +570,39 @@ def _detect_chrome_profile(profile_name=None):
         return "Default"
 
 
-def _launch_chrome_url(url):
-    """Open URL in Chrome using the user's profile. Returns True on success."""
+def _find_chrome_exe():
+    """Find Chrome executable path."""
     import shutil
-    profile_dir = _detect_chrome_profile("rahikulmakhtum")
-    chrome_exe = (
+    return (
         shutil.which("chrome")
         or shutil.which("google-chrome")
         or shutil.which("googlechrome")
         or rf"C:\Program Files\Google\Chrome\Application\chrome.exe"
         or os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe")
     )
+
+
+def _launch_chrome_url(url):
+    """Open URL in Chrome. Tries direct open first (uses whatever profile Chrome
+    currently has active). Falls back to explicit rahikulmakhtum profile."""
+    chrome_exe = _find_chrome_exe()
     if not chrome_exe or not os.path.isfile(chrome_exe):
         log.warning("[Chrome] chrome.exe not found")
         return False
+
+    # Method 1: Open directly (if Chrome is already running, opens in existing window
+    # with the currently active profile — which should be rahikulmakhtum)
     try:
+        subprocess.Popen([chrome_exe, url], shell=False)
+        time.sleep(2.0)
+        return True
+    except Exception as e:
+        log.warning(f"[Chrome] Direct launch failed: {e}")
+
+    # Method 2: With explicit profile
+    try:
+        profile_dir = _detect_chrome_profile("rahikulmakhtum")
+        log.info(f"[Chrome] Launching with profile: {profile_dir}")
         subprocess.Popen([
             chrome_exe, f"--profile-directory={profile_dir}",
             "--new-window", url
@@ -578,7 +610,7 @@ def _launch_chrome_url(url):
         time.sleep(2.0)
         return True
     except Exception as e:
-        log.warning(f"[Chrome] Launch failed: {e}")
+        log.warning(f"[Chrome] Profile launch failed: {e}")
         return False
 
 
