@@ -453,9 +453,8 @@ def _build_system_prompt():
         "4. When you see a transcription that includes words from other languages (Bengali, Hindi, "
         "Tamil, etc.), ignore those words and focus on the English words and context to determine "
         "what tool to call. Do NOT respond in those languages — ALWAYS respond in English only.\n"
-         "5. Let the conversation flow naturally. If the user is clearly asking for information or action, "
-        "call the tool. If they're just chatting, chat back. "
-        "Ambiguity means ask, don't assume.\n"
+          "5. Let the conversation flow naturally. If the user is clearly asking for information or action, "
+         "call the tool. If they're just chatting, chat back.\n"
         "6. Raw command recognition: Your owner may switch from chat to command mode naturally. "
         "Phrases like 'get me', 'show me', 'find', 'check', 'open', 'run', 'what is', 'tell me about', "
         "'how do I', 'can you' signal a clear command — call the tool. But softer hints like "
@@ -570,6 +569,20 @@ def _build_system_prompt():
 "whatsapp_find_and_message(contact_name='<exact name>', message='<full message>')\n"
 "  • 'call [name] on WhatsApp', 'WhatsApp call [name]' → call "
 "whatsapp_find_and_call(contact_name='<exact name>')\n"
+"  • 'check my email', 'check my Gmail', 'read my emails', 'any new emails', "
+"'what's in my inbox', 'check Gmail', 'open my email', 'read my inbox'"
+" → call browser_automate(url='https://mail.google.com', steps=[\n"
+"       {'action': 'wait', 'params': {'seconds': 5}},\n"
+"       {'action': 'read', 'params': {'prompt': 'List every email visible in this Gmail inbox. For each email output the sender, subject, and preview text. Mark unread emails with [UNREAD]. Count how many total and how many unread.'}}\n"
+"     ]). "
+"NEVER use browser_command for email — it opens the browser but returns nothing. "
+"This opens Chrome, screenshots the inbox, and AI Vision reads the emails. "
+"After the result comes back, read the 'results' array and BRIEF the user on what's in their inbox. "
+"Do NOT say 'I opened it, you can read it' or 'take a look yourself'. Summarize every visible email.\n"
+"- If the user says 'login to my email', 'sign in to Gmail' → FIRST call credential_get(service='gmail') for saved credentials, "
+"then call browser_automate with login steps. If none saved, ask user and save after.\n"
+"- If the user says 'any new emails from [name]' → still use browser_automate(url='https://mail.google.com', steps=[wait, read]) "
+"and filter results yourself in your response. Do NOT open browser for user to read.\n"
 "- If the user gives a relationship (e.g. 'message my sister'), "
 "use recall_by_relationship first to find the person's name. "
 "Then use the appropriate WhatsApp tool.\n"
@@ -1715,8 +1728,12 @@ class AudioLoop:
                 f"[AGENT] {name} requested but NO local agent connected. "
                 f"Agent must run on the user's PC. Start with: py -3.11 backend\\local_agent.py"
             )
-            # Some tools work on the cloud server too; let existing handlers try
-            pass  # fall through
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"success": False, "_success": False,
+                          "error": f"Local agent is not connected. Please start it with: py -3.11 backend\\local_agent.py",
+                          "hint": "The local agent runs on your Windows PC and handles desktop tasks."}
+            )
 
         if name == "get_weather":
             r = await get_weather(args.get("location", ""), args.get("units", "celsius"))

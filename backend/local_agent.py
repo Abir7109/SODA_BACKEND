@@ -1988,15 +1988,15 @@ def _dispatch(tool, args):
                 from screen_vision import analyze_screen
                 png_bytes = _screenshot_window_region(app_name)
                 if png_bytes:
-                    result = asyncio.run(analyze_screen(
+                    result = _await_it(analyze_screen(
                         prompt=(
                             f"You are looking at search results in the '{app_name}' app.\n"
                             f"User searched for: '{query}'.\n"
                             "STRICT RULES:\n"
-                            "- Only report what you can CLEARLY SEE.\n"
-                            "- Do NOT guess or make up results.\n"
-                            "- If nothing is clear, say 'Could not read results clearly'.\n"
-                            "OUTPUT: List visible results with titles."
+                            "TASK: Look at the visible search results.\n"
+                            "Only report the items/results you can clearly see.\n"
+                            "Do NOT guess or add items not visible.\n"
+                            "OUTPUT: List each visible result with its number, title, and key detail."
                         ),
                         screenshot=png_bytes
                     ))
@@ -2031,7 +2031,7 @@ def _dispatch(tool, args):
                 from screen_vision import analyze_screen
                 png_bytes = _screenshot_window_region(app_name)
                 if png_bytes:
-                    result = asyncio.run(analyze_screen(
+                    result = _await_it(analyze_screen(
                         prompt=(
                             f"You are looking at the '{app_name}' app after scrolling {direction}.\n"
                             "TASK: List the visible items/results.\n"
@@ -2146,7 +2146,7 @@ def _dispatch(tool, args):
                             # Vision element location: get coordinates relative to cropped screenshot
                             desc = params.get("description", "the element")
                             import json
-                            coords_str = asyncio.run(analyze_screen(
+                            coords_str = _await_it(analyze_screen(
                                 prompt=(
                                     f"You are looking at a screenshot of a Chrome browser.\n"
                                     f"TASK: Find the coordinates (x, y) of: {desc}\n"
@@ -2217,7 +2217,7 @@ def _dispatch(tool, args):
                             if not _inner_png:
                                 last_error = "Could not screenshot"
                                 continue
-                            _target_coords = asyncio.run(analyze_screen(
+                            _target_coords = _await_it(analyze_screen(
                                 prompt=(
                                     f"You are looking at a Chrome screenshot.\n"
                                     f"TASK: Find the coordinates (x, y) of: {desc}\n"
@@ -2253,7 +2253,7 @@ def _dispatch(tool, args):
                             break
 
                         elif action == "read":
-                            text_result = asyncio.run(analyze_screen(
+                            text_result = _await_it(analyze_screen(
                                 prompt=vision_prompt,
                                 screenshot=png_bytes
                             ))
