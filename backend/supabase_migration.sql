@@ -26,12 +26,12 @@ ALTER TABLE custom_schemas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE custom_entries ENABLE ROW LEVEL SECURITY;
 
 -- Public read/write for anon key (service_role already has full access)
-CREATE POLICY "anon_read_custom_schemas" ON custom_schemas FOR SELECT USING (true);
-CREATE POLICY "anon_insert_custom_schemas" ON custom_schemas FOR INSERT WITH CHECK (true);
-CREATE POLICY "anon_update_custom_schemas" ON custom_schemas FOR UPDATE USING (true);
-CREATE POLICY "anon_read_custom_entries" ON custom_entries FOR SELECT USING (true);
-CREATE POLICY "anon_insert_custom_entries" ON custom_entries FOR INSERT WITH CHECK (true);
-CREATE POLICY "anon_delete_custom_entries" ON custom_entries FOR DELETE USING (true);
+CREATE POLICY IF NOT EXISTS "anon_read_custom_schemas" ON custom_schemas FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "anon_insert_custom_schemas" ON custom_schemas FOR INSERT WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "anon_update_custom_schemas" ON custom_schemas FOR UPDATE USING (true);
+CREATE POLICY IF NOT EXISTS "anon_read_custom_entries" ON custom_entries FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "anon_insert_custom_entries" ON custom_entries FOR INSERT WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "anon_delete_custom_entries" ON custom_entries FOR DELETE USING (true);
 
 -- Camera photos table (saved via camera_control save action)
 CREATE TABLE IF NOT EXISTS camera_photos (
@@ -43,6 +43,6 @@ CREATE TABLE IF NOT EXISTS camera_photos (
 );
 
 ALTER TABLE camera_photos ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "anon_read_camera_photos" ON camera_photos FOR SELECT USING (true);
-CREATE POLICY "anon_insert_camera_photos" ON camera_photos FOR INSERT WITH CHECK (true);
-CREATE POLICY "anon_delete_camera_photos" ON camera_photos FOR DELETE USING (true);
+CREATE POLICY IF NOT EXISTS "anon_read_camera_photos" ON camera_photos FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "anon_insert_camera_photos" ON camera_photos FOR INSERT WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "anon_delete_camera_photos" ON camera_photos FOR DELETE USING (true);
