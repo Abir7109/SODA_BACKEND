@@ -830,6 +830,9 @@ export default function App() {
     const onToolResult = (data) => {
       if (!data || !data.tool) return
 
+      // Suppress popup for camera tools — Gemini handles these via speech
+      if (data.tool === 'camera_control' || data.tool === 'open_camera') return
+
       const persistentAnims = new Set([
         'get_system_status', 'get_weather', 'get_news', 'get_exchange_rate',
         'list_files', 'show_tools', 'browse_webpage',
@@ -1188,7 +1191,10 @@ export default function App() {
     socket.on('open_pastebox', onOpenPastebox)
 
     const onCameraOpen = () => {
-      openFloatingWindow('camera_window', 'CAMERA', { type: 'camera' }, 40, 60, 320, 280)
+      const vw = window.innerWidth
+      const camW = Math.min(320, vw - 16)
+      const camX = Math.max(0, Math.floor((vw - camW) / 2))
+      openFloatingWindow('camera_window', 'CAMERA', { type: 'camera' }, camX, 60, camW, 280)
     }
     socket.on('camera_open', onCameraOpen)
 
@@ -1529,6 +1535,10 @@ export default function App() {
     if (saved) {
       x = saved.x
       y = saved.y
+    } else if (preferredX !== undefined && preferredY !== undefined) {
+      const vw = window.innerWidth
+      x = Math.max(0, Math.min(preferredX, vw - (w || 320) - 8))
+      y = Math.max(0, preferredY)
     } else {
       const pos = findFreeFloatPosition(w || 480, h || 360)
       x = pos.x

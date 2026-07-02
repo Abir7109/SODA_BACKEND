@@ -18,37 +18,72 @@ export default function FloatingWindow({
   const dragOrigin = useRef(null)
   const winRef = useRef(null)
 
-  const handleMouseDown = useCallback((e) => {
-    if (e.button !== 0) return
-    dragOrigin.current = { mx: e.clientX, my: e.clientY, ox: pos.x, oy: pos.y }
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-    e.preventDefault()
+  const handleDragStart = useCallback((clientX, clientY) => {
+    dragOrigin.current = { mx: clientX, my: clientY, ox: pos.x, oy: pos.y }
   }, [pos])
 
-  const handleMouseMove = useCallback((e) => {
+  const handleDragMove = useCallback((clientX, clientY) => {
     if (!dragOrigin.current) return
-    const dx = e.clientX - dragOrigin.current.mx
-    const dy = e.clientY - dragOrigin.current.my
+    const dx = clientX - dragOrigin.current.mx
+    const dy = clientY - dragOrigin.current.my
+    const vw = window.innerWidth
+    const vh = window.innerHeight
     setPos({
-      x: dragOrigin.current.ox + dx,
-      y: dragOrigin.current.oy + dy,
+      x: Math.max(0, Math.min(dragOrigin.current.ox + dx, vw - width - 8)),
+      y: Math.max(0, Math.min(dragOrigin.current.oy + dy, vh - height - 8)),
     })
-  }, [])
+  }, [width, height])
 
-  const handleMouseUp = useCallback(() => {
+  const handleDragEnd = useCallback(() => {
     dragOrigin.current = null
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
+    document.removeEventListener('touchmove', handleTouchMove)
+    document.removeEventListener('touchend', handleTouchEnd)
     if (onPositionChange) onPositionChange(id, pos.x, pos.y)
-  }, [handleMouseMove, id, pos, onPositionChange])
+  }, [id, pos, onPositionChange])
+
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return
+    handleDragStart(e.clientX, e.clientY)
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    e.preventDefault()
+  }, [handleDragStart])
+
+  const handleMouseMove = useCallback((e) => {
+    handleDragMove(e.clientX, e.clientY)
+  }, [handleDragMove])
+
+  const handleMouseUp = useCallback(() => {
+    handleDragEnd()
+  }, [handleDragEnd])
+
+  const handleTouchStart = useCallback((e) => {
+    const t = e.touches[0]
+    handleDragStart(t.clientX, t.clientY)
+    document.addEventListener('touchmove', handleTouchMove, { passive: false })
+    document.addEventListener('touchend', handleTouchEnd)
+  }, [handleDragStart])
+
+  const handleTouchMove = useCallback((e) => {
+    e.preventDefault()
+    const t = e.touches[0]
+    handleDragMove(t.clientX, t.clientY)
+  }, [handleDragMove])
+
+  const handleTouchEnd = useCallback(() => {
+    handleDragEnd()
+  }, [handleDragEnd])
 
   useEffect(() => {
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('touchmove', handleTouchMove)
+      document.removeEventListener('touchend', handleTouchEnd)
     }
-  }, [handleMouseMove, handleMouseUp])
+  }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd])
 
   const handleHeaderClick = useCallback(() => {
     if (onFocus) onFocus(id)
@@ -72,6 +107,7 @@ export default function FloatingWindow({
       <div
         className="floating-window-header"
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
       >
         <div className="floating-window-dots">
           <span className="floating-window-dot" style={{ background: '#ff5f57' }} />

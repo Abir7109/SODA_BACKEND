@@ -3540,7 +3540,7 @@ TEXT: {text}"""
                 if frame:
                     raw = base64.b64decode(frame["data"])
                     await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type=frame["mime_type"]))
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": "I can see the camera feed. Here's what's in front of the camera:"})
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera frame sent. Analyze what's in the frame and describe it to the user naturally."})
             elif action == "save":
                 import camera_capture
                 desc = args.get("description", "Camera photo")
