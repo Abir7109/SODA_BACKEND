@@ -118,7 +118,7 @@ def recall_person(query, limit=5):
                     "traits": row.get("traits", ""),
                     "preferences": row.get("preferences", ""),
                     "notes": row.get("notes", ""),
-                    "ts": row.get("created_at", "") or row.get("updated_at", ""),
+                    "ts": row.get("ts", ""),
                 })
             return {"success": True, "query": query, "count": len(matches), "matches": matches}
         except Exception:
@@ -163,7 +163,7 @@ def recall_by_relationship(relationship, limit=5):
                     "traits": row.get("traits", ""),
                     "preferences": row.get("preferences", ""),
                     "notes": row.get("notes", ""),
-                    "ts": row.get("created_at", "") or row.get("updated_at", ""),
+                    "ts": row.get("ts", ""),
                 })
             return {"success": True, "relationship": relationship, "count": len(matches), "matches": matches}
         except Exception:
@@ -195,7 +195,7 @@ def list_people(limit=20):
     db = _db()
     if db:
         try:
-            r = db.table("people").select("*").order("created_at", desc=True).limit(limit).execute()
+            r = db.table("people").select("*").order("ts", desc=True).limit(limit).execute()
             entries = []
             for row in reversed(r.data or []):
                 entries.append({
@@ -204,7 +204,7 @@ def list_people(limit=20):
                     "traits": row.get("traits", ""),
                     "preferences": row.get("preferences", ""),
                     "notes": row.get("notes", ""),
-                    "ts": row.get("created_at", "") or row.get("updated_at", ""),
+                    "ts": row.get("ts", ""),
                 })
             return entries
         except Exception:
@@ -244,15 +244,14 @@ def remember_lesson(situation, correction):
             payload = {
                 "situation": situation,
                 "correction": correction,
-                "updated_at": now,
+                "count": 1,
+                "ts": now,
             }
             if existing.data and len(existing.data) > 0:
                 row = existing.data[0]
                 payload["count"] = (row.get("count") or 0) + 1
                 db.table("lessons").update(payload).eq("id", row["id"]).execute()
             else:
-                payload["count"] = 1
-                payload["created_at"] = now
                 db.table("lessons").insert(payload).execute()
             return {"success": True, "situation": situation, "action": "updated" if existing.data else "created"}
         except Exception:
@@ -299,7 +298,7 @@ def recall_lessons(query="", limit=5):
     if db:
         try:
             r = (db.table("lessons").select("*")
-                 .order("created_at", desc=True)
+                 .order("ts", desc=True)
                  .limit(limit).execute())
             entries = []
             for row in reversed(r.data or []):
@@ -310,7 +309,7 @@ def recall_lessons(query="", limit=5):
                         "situation": situation,
                         "correction": correction,
                         "count": row.get("count", 1),
-                        "ts": row.get("updated_at", "") or row.get("created_at", ""),
+                        "ts": row.get("ts", ""),
                     })
             return entries
         except Exception:
@@ -403,13 +402,11 @@ def save_summary(session_id, topics=None, key_decisions=None, last_exchanges=Non
     db = _db()
     if db:
         try:
-            db.table("conversation_summaries").insert({
+            db.table("summaries").insert({
                 "session_id": session_id,
-                "summary_data": {
-                    "topics": topics or [],
-                    "key_decisions": key_decisions or [],
-                    "last_exchanges": (last_exchanges or [])[:5],
-                },
+                "topics": topics or [],
+                "key_decisions": key_decisions or [],
+                "last_exchanges": (last_exchanges or [])[:5],
             }).execute()
         except Exception:
             pass
@@ -434,18 +431,17 @@ def get_recent_summaries(limit=3):
     db = _db()
     if db:
         try:
-            r = (db.table("conversation_summaries").select("*")
-                 .order("created_at", desc=True)
+            r = (db.table("summaries").select("*")
+                 .order("ts", desc=True)
                  .limit(limit).execute())
             entries = []
             for row in reversed(r.data or []):
-                sd = row.get("summary_data", {})
                 entries.append({
                     "session_id": row.get("session_id", ""),
-                    "topics": sd.get("topics", []) if isinstance(sd, dict) else [],
-                    "key_decisions": sd.get("key_decisions", []) if isinstance(sd, dict) else [],
-                    "last_exchanges": sd.get("last_exchanges", []) if isinstance(sd, dict) else [],
-                    "ts": row.get("created_at", ""),
+                    "topics": row.get("topics", []),
+                    "key_decisions": row.get("key_decisions", []),
+                    "last_exchanges": row.get("last_exchanges", []),
+                    "ts": row.get("ts", ""),
                 })
             return entries
         except Exception:

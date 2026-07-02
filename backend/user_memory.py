@@ -46,7 +46,7 @@ def _load_profile() -> dict:
     db = _db()
     if db:
         try:
-            r = db.table("profiles").select("*").limit(1).execute()
+            r = db.table("profile").select("*").limit(1).execute()
             if r.data and len(r.data) > 0:
                 row = r.data[0]
                 prefs = row.get("preferences") or {}
@@ -57,8 +57,8 @@ def _load_profile() -> dict:
                     "nationality": row.get("nationality", ""),
                     "language": row.get("language", "en"),
                     "preferences": prefs if isinstance(prefs, dict) else {},
-                    "created": row.get("created_at", ""),
-                    "updated": row.get("updated_at", ""),
+                    "created": row.get("created", "") or row.get("created_at", ""),
+                    "updated": row.get("updated", "") or row.get("updated_at", ""),
                 }
         except Exception:
             pass
@@ -76,21 +76,22 @@ def _save_profile(profile: dict) -> None:
     db = _db()
     if db:
         try:
-            existing = db.table("profiles").select("id").limit(1).execute()
+            existing = db.table("profile").select("id").limit(1).execute()
+            now_iso = datetime.now().isoformat()
             payload = {
                 "name": profile.get("name", "Sir"),
                 "creator": profile.get("creator", ""),
                 "nationality": profile.get("nationality", ""),
                 "language": profile.get("language", "en"),
                 "preferences": profile.get("preferences", {}),
-                "updated_at": datetime.now().isoformat(),
+                "updated": now_iso,
             }
             if existing.data and len(existing.data) > 0:
                 row_id = existing.data[0]["id"]
-                db.table("profiles").update(payload).eq("id", row_id).execute()
+                db.table("profile").update(payload).eq("id", row_id).execute()
             else:
-                payload["created_at"] = datetime.now().isoformat()
-                db.table("profiles").insert(payload).execute()
+                payload["created"] = now_iso
+                db.table("profile").insert(payload).execute()
         except Exception:
             pass
     with open(PROFILE_PATH, "w", encoding="utf-8") as f:
