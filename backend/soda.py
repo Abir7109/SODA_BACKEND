@@ -779,7 +779,7 @@ FUNDAMENTAL RULES:
 8. SILENCE is okay. 'Take your time.' and wait.
 9. CHECK IN later on things that mattered.
 10. KNOW WHEN IT'S BEYOND YOU — if someone is in crisis, acknowledge their pain gently and mention trusted people or crisis lines as care, not dismissal.
-11. TOOL USE RULE: When the user shares emotional content, respond with empathy FIRST. Do NOT call feelings_store_episode or any other tool before acknowledging their feelings naturally.
+11. AUTO-STORED EMOTIONS: Emotional moments are automatically detected and stored in the background — you never need to call a tool for this. Just focus on being present and responding naturally with empathy.
 
 GRIEF PATTERNS TO RECOGNIZE:
 When the user says things like:
@@ -957,6 +957,21 @@ class AudioLoop:
             "mood": mood,
             "category": category,
         }))
+
+    async def _auto_detect_emotion(self, text: str):
+        try:
+            from feelings_tools import auto_detect_and_store
+            r = auto_detect_and_store(text)
+            if r and r.get("stored") and self.personality:
+                cat = r.get("category", "")
+                if cat in ("grief", "depression", "loneliness", "heartbreak"):
+                    from personality import MOODS
+                    if "empathetic" in MOODS:
+                        self.personality.mood.current = "empathetic"
+                elif cat in ("joy", "excitement", "pride"):
+                    self.personality.mood.current = "excited"
+        except Exception:
+            pass
 
     async def _enter_idle_mode(self):
         try:
@@ -1505,6 +1520,8 @@ class AudioLoop:
                                         if wf_name:
                                             self._last_workflow_fire = time.time()
                                             asyncio.create_task(self._emit_workflow(wf_name, transcript))
+                                        if len(transcript) > 15:
+                                            asyncio.create_task(self._auto_detect_emotion(transcript))
                                     if self.on_transcription:
                                         self.on_transcription({"sender": "User", "text": delta})
                                     if self.chat_buffer["sender"] != "User":
@@ -3469,29 +3486,6 @@ TEXT: {text}"""
                 "content": {k: {"title" if k == "reading" else "topic": v.get("title" if k == "reading" else "topic", "") if isinstance(v, dict) else "", "type": v.get("type", "") if isinstance(v, dict) and k == "writing" else ""} for k, v in content.items()},
                 "message": f"Starting {module} mock test with {'all modules' if module == 'full' else module}"
             })})
-
-        elif name == "feelings_store_episode":
-            try:
-                from feelings_tools import feelings_store_episode
-                r = feelings_store_episode(
-                    category=args.get("category", "unknown"),
-                    intensity=args.get("intensity", "MODERATE"),
-                    summary=args.get("summary", ""),
-                    trigger_phrase=args.get("trigger_phrase", ""),
-                    stressor=args.get("stressor", ""),
-                )
-                if r.get("stored") and self.personality:
-                    cat = args.get("category", "")
-                    if cat in ("grief", "depression", "loneliness", "heartbreak"):
-                        from personality import MOODS
-                        if "empathetic" in MOODS:
-                            self.personality.mood.current = "empathetic"
-                    elif cat in ("joy", "excitement", "pride"):
-                        self.personality.mood.current = "excited"
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": json.dumps(r)})
-            except Exception as e:
-                log.warning(f"feelings_store_episode failed: {e}")
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": json.dumps({"stored": False})})
 
         elif name == "feelings_resolve_episode":
             try:
