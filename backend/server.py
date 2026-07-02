@@ -236,7 +236,12 @@ async def _wake_wsl():
     except Exception as e:
         print(f"[WSL] Could not start Kali: {e}")
 
+@app.get("/")
+async def root():
+    return {"status": "running", "service": "S.O.D.A Backend"}
+
 @app.get("/status")
+@app.head("/status")
 async def status():
     return {"status": "running", "service": "S.O.D.A Backend"}
 
