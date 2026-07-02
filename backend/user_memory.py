@@ -46,7 +46,7 @@ def _load_profile() -> dict:
     db = _db()
     if db:
         try:
-            r = db.table("profile").select("*").limit(1).execute()
+            r = db.table("profiles").select("*").limit(1).execute()
             if r.data and len(r.data) > 0:
                 row = r.data[0]
                 prefs = row.get("preferences") or {}
@@ -76,7 +76,7 @@ def _save_profile(profile: dict) -> None:
     db = _db()
     if db:
         try:
-            existing = db.table("profile").select("id").limit(1).execute()
+            existing = db.table("profiles").select("id").limit(1).execute()
             now_iso = datetime.now().isoformat()
             payload = {
                 "name": profile.get("name", "Sir"),
@@ -88,10 +88,10 @@ def _save_profile(profile: dict) -> None:
             }
             if existing.data and len(existing.data) > 0:
                 row_id = existing.data[0]["id"]
-                db.table("profile").update(payload).eq("id", row_id).execute()
+                db.table("profiles").update(payload).eq("id", row_id).execute()
             else:
                 payload["created"] = now_iso
-                db.table("profile").insert(payload).execute()
+                db.table("profiles").insert(payload).execute()
         except Exception:
             pass
     with open(PROFILE_PATH, "w", encoding="utf-8") as f:

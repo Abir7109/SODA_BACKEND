@@ -323,6 +323,19 @@ recall_person_tool = {
     }
 }
 
+recall_by_relationship_tool = {
+    "name": "recall_by_relationship",
+    "description": "Search people by relationship keyword (e.g. 'sister', 'boss', 'neighbor'). Use this when the user says 'call my sister', 'message my brother', etc. — before calling any phone/WhatsApp action.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "relationship": {"type": "STRING", "description": "Relationship keyword to search (e.g. 'sister', 'boss', 'neighbor', 'dad')"},
+            "limit": {"type": "INTEGER", "description": "Maximum results to return (default 5)"}
+        },
+        "required": ["relationship"]
+    }
+}
+
 remember_lesson_tool = {
     "name": "remember_lesson",
     "description": "Learn from a mistake or correction. Store what went wrong and what should be done differently next time. CALL THIS PROACTIVELY whenever you receive feedback or realize a better approach. Also use when the user explicitly corrects you, or when you identify a pattern to improve.",
@@ -1917,6 +1930,7 @@ tools_list = [{"function_declarations": [
     set_preference_tool,
     remember_person_tool,
     recall_person_tool,
+    recall_by_relationship_tool,
     remember_lesson_tool,
     forget_fact_tool,
     list_memory_tool,

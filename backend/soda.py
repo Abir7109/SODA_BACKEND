@@ -2254,6 +2254,13 @@ class AudioLoop:
             r = memory_store.recall_person(args.get("query", ""))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
+        elif name == "recall_by_relationship":
+            r = memory_store.recall_by_relationship(
+                args.get("relationship", ""),
+                limit=args.get("limit", 5)
+            )
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
         elif name == "remember_lesson":
             r = memory_store.remember_lesson(args.get("situation", ""), args.get("correction", ""))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
