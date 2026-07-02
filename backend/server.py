@@ -67,7 +67,7 @@ async def lifespan(_app):
     reminder_task = None
     try:
         from reminders import reminder_loop
-        reminder_task = asyncio.create_task(reminder_loop(sio, interval=30))
+        reminder_task = asyncio.create_task(reminder_loop(sio, interval=5))
         print("[SERVER] Reminder scheduler started")
     except Exception as e:
         log.warning(f"Reminder scheduler failed to start: {e}")
