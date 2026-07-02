@@ -6,10 +6,12 @@ Extends user_memory.py with:
 - Conversation summaries
 - Context block builder for session start injection
 - Deduplicated fact storage with categories
+
+Storage: Supabase (if configured) or file-based fallback
 """
+import asyncio
 import json
 import re
-import time
 from pathlib import Path
 from datetime import datetime
 
@@ -18,18 +20,50 @@ MEM_DIR.mkdir(parents=True, exist_ok=True)
 PEOPLE_PATH = MEM_DIR / "people.jsonl"
 LESSONS_PATH = MEM_DIR / "lessons.jsonl"
 SUMMARIES_PATH = MEM_DIR / "summaries.jsonl"
-FACTS_PATH = MEM_DIR / "facts.jsonl"
 MAX_ENTRIES = 200
+
+_SUPABASE = None
+
+def _db():
+    global _SUPABASE
+    if _SUPABASE is None:
+        from supabase_client import get_supabase
+        _SUPABASE = get_supabase()
+    return _SUPABASE
 
 
 # ── People ──
 
 def remember_person(name, relationship="", traits="", preferences="", notes=""):
     """Store info about a person. Deduplicates by name."""
-    PEOPLE_PATH.touch(exist_ok=True)
     name = name.strip()
     if not name:
         return {"success": False, "error": "Name is required"}
+    now = datetime.now().isoformat()
+
+    db = _db()
+    if db:
+        try:
+            existing = db.table("people").select("id").eq("name", name).limit(1).execute()
+            payload = {
+                "name": name,
+                "relationship": relationship,
+                "traits": traits,
+                "preferences": preferences,
+                "notes": notes,
+                "updated_at": now,
+            }
+            if existing.data and len(existing.data) > 0:
+                db.table("people").update(payload).eq("id", existing.data[0]["id"]).execute()
+                return {"success": True, "name": name, "action": "updated"}
+            else:
+                payload["created_at"] = now
+                db.table("people").insert(payload).execute()
+                return {"success": True, "name": name, "action": "created"}
+        except Exception:
+            pass
+
+    PEOPLE_PATH.touch(exist_ok=True)
     entries = []
     found = False
     if PEOPLE_PATH.exists():
@@ -47,7 +81,7 @@ def remember_person(name, relationship="", traits="", preferences="", notes=""):
                     entry["traits"] = traits or entry.get("traits", "")
                     entry["preferences"] = preferences or entry.get("preferences", "")
                     entry["notes"] = notes or entry.get("notes", "")
-                    entry["ts"] = datetime.now().isoformat()
+                    entry["ts"] = now
                     found = True
                 entries.append(entry)
     if not found:
@@ -57,7 +91,7 @@ def remember_person(name, relationship="", traits="", preferences="", notes=""):
             "traits": traits,
             "preferences": preferences,
             "notes": notes,
-            "ts": datetime.now().isoformat(),
+            "ts": now,
         })
     if len(entries) > MAX_ENTRIES:
         entries = entries[-MAX_ENTRIES:]
@@ -69,9 +103,28 @@ def remember_person(name, relationship="", traits="", preferences="", notes=""):
 
 def recall_person(query, limit=5):
     """Search people by name, relationship, or traits."""
+    q = query.lower()
+    db = _db()
+    if db:
+        try:
+            r = db.table("people").select("*").or_(
+                f"name.ilike.%{q}%,relationship.ilike.%{q}%,traits.ilike.%{q}%,notes.ilike.%{q}%"
+            ).limit(limit).execute()
+            matches = []
+            for row in r.data or []:
+                matches.append({
+                    "name": row.get("name", ""),
+                    "relationship": row.get("relationship", ""),
+                    "traits": row.get("traits", ""),
+                    "preferences": row.get("preferences", ""),
+                    "notes": row.get("notes", ""),
+                    "ts": row.get("created_at", "") or row.get("updated_at", ""),
+                })
+            return {"success": True, "query": query, "count": len(matches), "matches": matches}
+        except Exception:
+            pass
     if not PEOPLE_PATH.exists():
         return {"success": True, "query": query, "matches": []}
-    q = query.lower()
     matches = []
     try:
         with open(PEOPLE_PATH, "r", encoding="utf-8") as f:
@@ -94,12 +147,29 @@ def recall_person(query, limit=5):
 
 
 def recall_by_relationship(relationship, limit=5):
-    """Search people whose relationship field contains the given keyword.
-    e.g. recall_by_relationship('sister') matches 'sister', 'little sister', 'elder sister'.
-    """
-    if not PEOPLE_PATH.exists() or not relationship:
+    """Search people whose relationship field contains the given keyword."""
+    if not relationship:
         return {"success": True, "relationship": relationship, "matches": []}
     q = relationship.lower().strip()
+    db = _db()
+    if db:
+        try:
+            r = db.table("people").select("*").ilike("relationship", f"%{q}%").limit(limit).execute()
+            matches = []
+            for row in r.data or []:
+                matches.append({
+                    "name": row.get("name", ""),
+                    "relationship": row.get("relationship", ""),
+                    "traits": row.get("traits", ""),
+                    "preferences": row.get("preferences", ""),
+                    "notes": row.get("notes", ""),
+                    "ts": row.get("created_at", "") or row.get("updated_at", ""),
+                })
+            return {"success": True, "relationship": relationship, "count": len(matches), "matches": matches}
+        except Exception:
+            pass
+    if not PEOPLE_PATH.exists():
+        return {"success": True, "relationship": relationship, "matches": []}
     matches = []
     try:
         with open(PEOPLE_PATH, "r", encoding="utf-8") as f:
@@ -122,6 +192,23 @@ def recall_by_relationship(relationship, limit=5):
 
 
 def list_people(limit=20):
+    db = _db()
+    if db:
+        try:
+            r = db.table("people").select("*").order("created_at", desc=True).limit(limit).execute()
+            entries = []
+            for row in reversed(r.data or []):
+                entries.append({
+                    "name": row.get("name", ""),
+                    "relationship": row.get("relationship", ""),
+                    "traits": row.get("traits", ""),
+                    "preferences": row.get("preferences", ""),
+                    "notes": row.get("notes", ""),
+                    "ts": row.get("created_at", "") or row.get("updated_at", ""),
+                })
+            return entries
+        except Exception:
+            pass
     if not PEOPLE_PATH.exists():
         return []
     entries = []
@@ -144,11 +231,34 @@ def list_people(limit=20):
 
 def remember_lesson(situation, correction):
     """Learn from a mistake or correction. Tracks frequency."""
-    LESSONS_PATH.touch(exist_ok=True)
     situation = situation.strip()
     correction = correction.strip()
     if not situation or not correction:
         return {"success": False, "error": "situation and correction are required"}
+    now = datetime.now().isoformat()
+
+    db = _db()
+    if db:
+        try:
+            existing = db.table("lessons").select("id,count").eq("situation", situation).limit(1).execute()
+            payload = {
+                "situation": situation,
+                "correction": correction,
+                "updated_at": now,
+            }
+            if existing.data and len(existing.data) > 0:
+                row = existing.data[0]
+                payload["count"] = (row.get("count") or 0) + 1
+                db.table("lessons").update(payload).eq("id", row["id"]).execute()
+            else:
+                payload["count"] = 1
+                payload["created_at"] = now
+                db.table("lessons").insert(payload).execute()
+            return {"success": True, "situation": situation, "action": "updated" if existing.data else "created"}
+        except Exception:
+            pass
+
+    LESSONS_PATH.touch(exist_ok=True)
     entries = []
     found = False
     if LESSONS_PATH.exists():
@@ -164,7 +274,7 @@ def remember_lesson(situation, correction):
                 if entry.get("situation", "").lower() == situation.lower():
                     entry["correction"] = correction
                     entry["count"] = entry.get("count", 0) + 1
-                    entry["ts"] = datetime.now().isoformat()
+                    entry["ts"] = now
                     found = True
                 entries.append(entry)
     if not found:
@@ -172,7 +282,7 @@ def remember_lesson(situation, correction):
             "situation": situation,
             "correction": correction,
             "count": 1,
-            "ts": datetime.now().isoformat(),
+            "ts": now,
         })
     if len(entries) > MAX_ENTRIES:
         entries = entries[-MAX_ENTRIES:]
@@ -184,9 +294,29 @@ def remember_lesson(situation, correction):
 
 def recall_lessons(query="", limit=5):
     """Search lessons by situation or correction. Empty query returns all recent."""
+    q = query.lower().strip()
+    db = _db()
+    if db:
+        try:
+            r = (db.table("lessons").select("*")
+                 .order("created_at", desc=True)
+                 .limit(limit).execute())
+            entries = []
+            for row in reversed(r.data or []):
+                situation = row.get("situation", "")
+                correction = row.get("correction", "")
+                if not q or q in f"{situation} {correction}".lower():
+                    entries.append({
+                        "situation": situation,
+                        "correction": correction,
+                        "count": row.get("count", 1),
+                        "ts": row.get("updated_at", "") or row.get("created_at", ""),
+                    })
+            return entries
+        except Exception:
+            pass
     if not LESSONS_PATH.exists():
         return []
-    q = query.lower().strip()
     entries = []
     try:
         with open(LESSONS_PATH, "r", encoding="utf-8") as f:
@@ -207,16 +337,84 @@ def recall_lessons(query="", limit=5):
 
 # ── Conversation Summaries ──
 
+async def summarize_exchanges(exchanges):
+    """Take a list of {user, model} exchange dicts and produce a structured summary.
+    Uses Gemini REST API to compress the conversation into key points.
+    Returns {key_points, topics, action_items, user_preferences} or None on failure.
+    """
+    if not exchanges or not isinstance(exchanges, list) or len(exchanges) < 2:
+        return None
+    import os, json, google.genai as genai
+    lines = []
+    for e in exchanges:
+        if "user" in e:
+            lines.append(f"User: {e['user'][:200]}")
+        if "model" in e:
+            lines.append(f"SODA: {e['model'][:200]}")
+    if not lines:
+        return None
+    text = "\n".join(lines)
+    prompt = f"""Summarize this conversation exchange. Return ONLY valid JSON with these fields:
+- key_points: list of important statements, facts, or decisions (max 3)
+- topics: list of topics discussed (max 3)
+- action_items: list of tasks or follow-ups mentioned (max 2)
+- user_preferences: list of user preferences revealed (max 2)
+
+Keep each item under 15 words. Respond with JSON only.
+
+CONVERSATION:
+{text}"""
+    try:
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        resp = await asyncio.to_thread(
+            lambda: client.models.generate_content(
+                model="models/gemini-2.5-flash", contents=prompt
+            )
+        )
+        raw = resp.text or ""
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        result = json.loads(raw)
+        if isinstance(result, dict):
+            return {
+                "key_points": result.get("key_points", []),
+                "topics": result.get("topics", []),
+                "action_items": result.get("action_items", []),
+                "user_preferences": result.get("user_preferences", []),
+            }
+    except Exception:
+        pass
+    return None
+
+
 def save_summary(session_id, topics=None, key_decisions=None, last_exchanges=None):
     """Store a conversation summary at session end."""
-    SUMMARIES_PATH.touch(exist_ok=True)
+    now = datetime.now().isoformat()
     entry = {
         "session_id": session_id,
         "topics": topics or [],
         "key_decisions": key_decisions or [],
         "last_exchanges": (last_exchanges or [])[:5],
-        "ts": datetime.now().isoformat(),
+        "ts": now,
     }
+
+    db = _db()
+    if db:
+        try:
+            db.table("conversation_summaries").insert({
+                "session_id": session_id,
+                "summary_data": {
+                    "topics": topics or [],
+                    "key_decisions": key_decisions or [],
+                    "last_exchanges": (last_exchanges or [])[:5],
+                },
+            }).execute()
+        except Exception:
+            pass
+
+    SUMMARIES_PATH.touch(exist_ok=True)
     entries = []
     if SUMMARIES_PATH.exists():
         with open(SUMMARIES_PATH, "r", encoding="utf-8") as f:
@@ -233,6 +431,25 @@ def save_summary(session_id, topics=None, key_decisions=None, last_exchanges=Non
 
 def get_recent_summaries(limit=3):
     """Get last N conversation summaries."""
+    db = _db()
+    if db:
+        try:
+            r = (db.table("conversation_summaries").select("*")
+                 .order("created_at", desc=True)
+                 .limit(limit).execute())
+            entries = []
+            for row in reversed(r.data or []):
+                sd = row.get("summary_data", {})
+                entries.append({
+                    "session_id": row.get("session_id", ""),
+                    "topics": sd.get("topics", []) if isinstance(sd, dict) else [],
+                    "key_decisions": sd.get("key_decisions", []) if isinstance(sd, dict) else [],
+                    "last_exchanges": sd.get("last_exchanges", []) if isinstance(sd, dict) else [],
+                    "ts": row.get("created_at", ""),
+                })
+            return entries
+        except Exception:
+            pass
     if not SUMMARIES_PATH.exists():
         return []
     entries = []
@@ -353,11 +570,7 @@ _REL_PATTERN = re.compile(
 
 
 def extract_and_store_people(text):
-    """
-    Scan user text for introduction patterns (e.g. 'this is my friend John')
-    and auto-store detected people via remember_person().
-    Returns list of people stored.
-    """
+    """Scan user text for introduction patterns and auto-store detected people."""
     if not text or not isinstance(text, str):
         return []
     stored = []

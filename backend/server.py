@@ -79,21 +79,47 @@ async def lifespan(_app):
     except Exception as e:
         log.warning(f"Telegram bot failed to start: {e}")
 
-    # ── Agent health monitor (logs every 60s) ──
+    # ── Agent health monitor (logs every 60s) + stale agent eviction ──
     async def _agent_health_logger():
         while True:
             await asyncio.sleep(60)
+            now = datetime.now()
+            stale_threshold = 90  # seconds without pong → stale
+            stale_sids = []
             if _connected_agents:
                 for sid, agent_info in list(_connected_agents.items()):
                     machine_id = agent_info.get('machine_id', sid)
                     tools = len(agent_info.get('tools', []))
                     apps = agent_info.get('app_registry_count', '?')
-                    last_pong = agent_info.get('last_pong', 'never')
-                    print(f"[AGENT] Health: {machine_id} — {tools} tools, {apps} apps, last_pong: {last_pong}")
+                    last_pong = agent_info.get('last_pong')
+                    if last_pong:
+                        last_pong_dt = datetime.fromisoformat(last_pong)
+                        elapsed = (now - last_pong_dt).total_seconds()
+                        print(f"[AGENT] Health: {machine_id} — {tools} tools, {apps} apps, last_pong: {elapsed:.0f}s ago")
+                        if elapsed > stale_threshold:
+                            stale_sids.append(sid)
+                    else:
+                        print(f"[AGENT] Health: {machine_id} — {tools} tools, {apps} apps, never ponged")
+                        # Give new agents 120s grace period before marking stale
+                        connected_at = agent_info.get('connected_at')
+                        if connected_at:
+                            connected_dt = datetime.fromisoformat(connected_at)
+                            if (now - connected_dt).total_seconds() > 120:
+                                stale_sids.append(sid)
+                for stale_sid in stale_sids:
+                    stale_agent = _connected_agents.pop(stale_sid, None)
+                    if stale_agent:
+                        print(f"[AGENT] Evicted stale agent: {stale_agent.get('machine_id', stale_sid)} (no pong >{stale_threshold}s)")
+                        await sio.emit('agent_connection_status', {
+                            'connected': False,
+                            'machine_id': stale_agent.get('machine_id', stale_sid),
+                            'evicted': True,
+                            'reason': 'stale_timeout'
+                        })
             else:
                 print("[AGENT] Health: NO AGENTS CONNECTED — local desktop agent not running")
     _health_task = asyncio.create_task(_agent_health_logger())
-    print("[SERVER] Agent health logger started (60s interval)")
+    print("[SERVER] Agent health logger started (60s interval, stale eviction >90s)")
 
     yield
 
@@ -242,6 +268,12 @@ async def disconnect(sid):
         tools_count = len(agent.get('tools', []))
         print(f"[AGENT] Agent disconnected: {machine_id} ({tools_count} tools, connected since {connected_at})")
         print(f"[AGENT] Active agents remaining: {len(_connected_agents)}")
+        await sio.emit('agent_connection_status', {
+            'connected': False,
+            'machine_id': machine_id,
+            'tools_count': 0,
+            'reason': 'socket_disconnect'
+        })
 
 # ── Local Agent Events ──
 @sio.event
@@ -272,13 +304,27 @@ async def agent_register(sid, data):
         'sid': sid,
     }
     print(f"[AGENT] Registered: {machine_id} ({platform}) — {len(tools)} tools, {app_count} apps in registry")
+    await sio.emit('agent_connection_status', {
+        'connected': True,
+        'machine_id': machine_id,
+        'platform': platform,
+        'tools_count': len(tools),
+        'app_count': app_count,
+    })
 
 @sio.event
 async def agent_disconnect(sid, data=None):
     """Explicit agent disconnect notification."""
     agent = _connected_agents.pop(sid, None)
     if agent:
-        print(f"[AGENT] Agent disconnected (explicit): {agent.get('machine_id', sid)}")
+        machine_id = agent.get('machine_id', sid)
+        print(f"[AGENT] Agent disconnected (explicit): {machine_id}")
+        await sio.emit('agent_connection_status', {
+            'connected': False,
+            'machine_id': machine_id,
+            'tools_count': 0,
+            'reason': 'explicit_disconnect'
+        })
 
 @sio.event
 async def agent_tool_result(sid, data):

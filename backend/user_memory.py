@@ -5,12 +5,9 @@ Persistent user memory for SODA.
 - History: last N user/model exchanges (rolling buffer)
 - Recall: search facts by keyword
 
-Storage: projects/long_term_memory/user_profile.json
-         projects/long_term_memory/facts.jsonl  (append-only)
-         projects/long_term_memory/history.jsonl
+Storage: Supabase (if configured) or file-based fallback
 """
 import json
-import time
 from pathlib import Path
 from datetime import datetime
 
@@ -33,8 +30,38 @@ DEFAULT_PROFILE = {
     "updated": datetime.now().isoformat(),
 }
 
+_SUPABASE = None
+
+def _db():
+    global _SUPABASE
+    if _SUPABASE is None:
+        from supabase_client import get_supabase
+        _SUPABASE = get_supabase()
+    return _SUPABASE
+
+
+# ── Profile ──
 
 def _load_profile() -> dict:
+    db = _db()
+    if db:
+        try:
+            r = db.table("profiles").select("*").limit(1).execute()
+            if r.data and len(r.data) > 0:
+                row = r.data[0]
+                prefs = row.get("preferences") or {}
+                return {
+                    **DEFAULT_PROFILE,
+                    "name": row.get("name", "Sir"),
+                    "creator": row.get("creator", ""),
+                    "nationality": row.get("nationality", ""),
+                    "language": row.get("language", "en"),
+                    "preferences": prefs if isinstance(prefs, dict) else {},
+                    "created": row.get("created_at", ""),
+                    "updated": row.get("updated_at", ""),
+                }
+        except Exception:
+            pass
     if not PROFILE_PATH.exists():
         return dict(DEFAULT_PROFILE)
     try:
@@ -46,6 +73,26 @@ def _load_profile() -> dict:
 
 def _save_profile(profile: dict) -> None:
     profile["updated"] = datetime.now().isoformat()
+    db = _db()
+    if db:
+        try:
+            existing = db.table("profiles").select("id").limit(1).execute()
+            payload = {
+                "name": profile.get("name", "Sir"),
+                "creator": profile.get("creator", ""),
+                "nationality": profile.get("nationality", ""),
+                "language": profile.get("language", "en"),
+                "preferences": profile.get("preferences", {}),
+                "updated_at": datetime.now().isoformat(),
+            }
+            if existing.data and len(existing.data) > 0:
+                row_id = existing.data[0]["id"]
+                db.table("profiles").update(payload).eq("id", row_id).execute()
+            else:
+                payload["created_at"] = datetime.now().isoformat()
+                db.table("profiles").insert(payload).execute()
+        except Exception:
+            pass
     with open(PROFILE_PATH, "w", encoding="utf-8") as f:
         json.dump(profile, f, indent=2, ensure_ascii=False)
 
@@ -55,7 +102,6 @@ def get_profile() -> dict:
 
 
 def set_profile_field(field: str, value) -> dict:
-    """Update a top-level profile field (name, favorite_color, etc.)"""
     p = _load_profile()
     if field in DEFAULT_PROFILE or field == "preferences":
         p[field] = value
@@ -71,24 +117,49 @@ def set_preference(key: str, value) -> dict:
     return {"success": True, "key": key, "value": value}
 
 
+# ── Facts ──
+
 def add_fact(key: str, value: str) -> dict:
-    """Remember a fact about the user."""
-    FACTS_PATH.touch(exist_ok=True)
     entry = {
         "key": key.strip().lower(),
         "value": value.strip(),
         "ts": datetime.now().isoformat(),
     }
+    db = _db()
+    if db:
+        try:
+            db.table("facts").insert({
+                "key": entry["key"],
+                "value": entry["value"],
+                "category": "general",
+            }).execute()
+            return {"success": True, "key": entry["key"], "value": entry["value"], "ts": entry["ts"]}
+        except Exception:
+            pass
+    FACTS_PATH.touch(exist_ok=True)
     with open(FACTS_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     return {"success": True, "key": entry["key"], "value": entry["value"], "ts": entry["ts"]}
 
 
 def search_facts(query: str, limit: int = 5) -> dict:
-    """Search facts by keyword (case-insensitive substring match on key or value)."""
+    q = query.lower()
+    db = _db()
+    if db:
+        try:
+            r = db.table("facts").select("*").or_(f"key.ilike.%{q}%,value.ilike.%{q}%").limit(limit).execute()
+            matches = []
+            for row in r.data or []:
+                matches.append({
+                    "key": row.get("key", ""),
+                    "value": row.get("value", ""),
+                    "ts": row.get("created_at", ""),
+                })
+            return {"success": True, "query": query, "count": len(matches), "matches": matches}
+        except Exception:
+            pass
     if not FACTS_PATH.exists():
         return {"success": True, "query": query, "matches": []}
-    q = query.lower()
     matches = []
     try:
         with open(FACTS_PATH, "r", encoding="utf-8") as f:
@@ -110,6 +181,20 @@ def search_facts(query: str, limit: int = 5) -> dict:
 
 
 def list_facts(limit: int = 50) -> dict:
+    db = _db()
+    if db:
+        try:
+            r = db.table("facts").select("*").order("created_at", desc=True).limit(limit).execute()
+            facts = []
+            for row in reversed(r.data or []):
+                facts.append({
+                    "key": row.get("key", ""),
+                    "value": row.get("value", ""),
+                    "ts": row.get("created_at", ""),
+                })
+            return {"success": True, "count": len(facts), "facts": facts}
+        except Exception:
+            pass
     if not FACTS_PATH.exists():
         return {"success": True, "count": 0, "facts": []}
     facts = []
@@ -130,10 +215,17 @@ def list_facts(limit: int = 50) -> dict:
 
 
 def delete_fact(key: str) -> dict:
-    """Delete a fact by key. Keeps latest entry per key."""
+    key = key.strip().lower()
+    db = _db()
+    if db:
+        try:
+            r = db.table("facts").delete().eq("key", key).execute()
+            deleted = len(r.data) if r.data else 0
+            return {"success": True, "key": key, "deleted": deleted}
+        except Exception:
+            pass
     if not FACTS_PATH.exists():
         return {"success": False, "error": "No facts stored"}
-    key = key.strip().lower()
     kept = []
     deleted = 0
     try:
@@ -158,8 +250,9 @@ def delete_fact(key: str) -> dict:
     return {"success": True, "key": key, "deleted": deleted}
 
 
+# ── History (file-only, lightweight) ──
+
 def add_history(role: str, text: str) -> None:
-    """Append an exchange to rolling history buffer (max 200)."""
     HISTORY_PATH.touch(exist_ok=True)
     entry = {
         "role": role,
@@ -179,7 +272,6 @@ def add_history(role: str, text: str) -> None:
 
 
 def search_history(query: str, limit: int = 5) -> dict:
-    """Search history by keyword."""
     if not HISTORY_PATH.exists():
         return {"success": True, "query": query, "matches": []}
     q = query.lower()
@@ -204,7 +296,6 @@ def search_history(query: str, limit: int = 5) -> dict:
 
 
 def memory_summary() -> dict:
-    """One-shot overview for the model to recall on startup."""
     p = _load_profile()
     facts = list_facts(limit=20).get("facts", [])
     return {

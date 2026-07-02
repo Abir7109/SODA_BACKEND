@@ -1759,6 +1759,87 @@ email_config_tool = {
     }
 }
 
+create_memory_schema_tool = {
+    "name": "create_memory_schema",
+    "description": (
+        "Create a new custom memory schema for storing structured data about a recurring topic. "
+        "Use this when the user mentions a topic that would benefit from structured memory "
+        "(e.g. projects, books, movies, recipes, contacts, vehicles, collections). "
+        "Define the columns you need as a list of {name, type, description} objects. "
+        "Example: create_memory_schema(name='books', description='Books I want to read', "
+        "columns=[{name='title', type='string', description='Book title'}, "
+        "{name='author', type='string', description='Author name'}, "
+        "{name='status', type='string', description='Reading status'}])"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "name": {"type": "STRING", "description": "Schema name (e.g. 'books', 'projects', 'recipes')"},
+            "description": {"type": "STRING", "description": "What this schema stores"},
+            "columns": {
+                "type": "ARRAY",
+                "description": "List of column definitions, each with name (string), type (string), and description (string)",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "name": {"type": "STRING", "description": "Column name"},
+                        "type": {"type": "STRING", "description": "Data type: 'string', 'number', 'boolean', 'date', 'json'"},
+                        "description": {"type": "STRING", "description": "What this column stores"}
+                    },
+                    "required": ["name", "type"]
+                }
+            }
+        },
+        "required": ["name", "columns"]
+    }
+}
+
+list_custom_schemas_tool = {
+    "name": "list_custom_schemas",
+    "description": "List all custom memory schemas. Returns schema names, descriptions, and column definitions. Use when the user asks 'what schemas do I have', 'show my memory schemas', 'what topics can I store data about'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
+store_custom_memory_tool = {
+    "name": "store_custom_memory",
+    "description": (
+        "Store a structured data entry in a custom memory schema. "
+        "Use after creating a schema with create_memory_schema. "
+        "The data dict must match the schema's column definitions. "
+        "Example: store_custom_memory(schema_name='books', data={title='1984', author='George Orwell', status='want to read'})"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "schema_name": {"type": "STRING", "description": "Name of the schema to store data in"},
+            "data": {
+                "type": "OBJECT",
+                "description": "Key-value pairs matching the schema's column definitions",
+                "additionalProperties": True
+            }
+        },
+        "required": ["schema_name", "data"]
+    }
+}
+
+query_custom_memory_tool = {
+    "name": "query_custom_memory",
+    "description": "Query entries from a custom memory schema. Returns matching entries with their stored data. Empty query returns all recent entries. Use when the user asks 'what books do I have', 'show me my recipes', 'find projects about X'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "schema_name": {"type": "STRING", "description": "Schema name to query"},
+            "query": {"type": "STRING", "description": "Search text to filter entries by (optional, case-insensitive)"},
+            "limit": {"type": "INTEGER", "description": "Max entries to return (default 20)"}
+        },
+        "required": ["schema_name"]
+    }
+}
+
 tools_list = [{"function_declarations": [
     write_file_tool,
     read_file_tool,
@@ -1900,5 +1981,11 @@ tools_list = [{"function_declarations": [
     read_emails_tool,
     send_email_tool,
     email_config_tool,
+
+    # ── Custom Memory Schemas ──
+    create_memory_schema_tool,
+    list_custom_schemas_tool,
+    store_custom_memory_tool,
+    query_custom_memory_tool,
 ]}]
 

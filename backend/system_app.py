@@ -40,7 +40,8 @@ DESTRUCTIVE_PATTERNS = ["rm -rf", "del /f", "format ", "shutdown", "mkfs", "dd i
 
 
 async def _run_terminal_command_unchecked(command: str, timeout: int = 30) -> dict:
-    """Run a shell command without destructive-pattern check. Use after user confirmation."""
+    """Run a shell command without destructive-pattern check. Use after user confirmation.
+    Uses hidden window on Windows to prevent popups."""
     kwargs = {
         "stdout": asyncio.subprocess.PIPE,
         "stderr": asyncio.subprocess.STDOUT,
@@ -48,6 +49,11 @@ async def _run_terminal_command_unchecked(command: str, timeout: int = 30) -> di
     }
     if sys.platform == "win32":
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        # Hide console window on Windows
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        kwargs["startupinfo"] = startupinfo
     proc = None
     try:
         proc = await asyncio.create_subprocess_shell(command, **kwargs)

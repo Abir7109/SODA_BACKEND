@@ -18,6 +18,14 @@ import websockets
 from dotenv import load_dotenv
 load_dotenv()
 
+# Init Supabase client on startup (if configured)
+from supabase_client import get_supabase, is_configured
+_SUPABASE_AVAILABLE = is_configured()
+if _SUPABASE_AVAILABLE:
+    print("[Supabase] Connected — using database memory")
+else:
+    print("[Supabase] Not configured — using file-based memory")
+
 # IELTS lazy singletons (created on first tool call)
 _ielts_engine = None
 _ielts_speaking_session = None
@@ -527,8 +535,13 @@ def _build_system_prompt():
         "- At session start, the MEMORY RESTORED block below shows background context from past sessions. "
         "Use it to inform your conversation naturally — do NOT call show_memory, get_news, or start_workflow on startup or during greeting. "
         "Only call workflow tools when the user explicitly asks for them.\n"
-        "- When the user explicitly asks to see what you remember, call show_memory — this opens the MEMORY DATABASE HUD. Narrate each section as it appears on screen (profile, facts, people, lessons) at a natural pace. Do NOT call this proactively.\n"
+        "- When the user explicitly asks to see what you remember, call show_memory — this opens the MEMORY DATABASE HUD. Narrate each section as it appears on screen (profile, facts, people, lessons, custom schemas) at a natural pace. Do NOT call this proactively.\n"
         "- When narrating the memory database, speak as if you're walking them through your files. Start with 'Accessing memory database, sir...' then describe each section one by one. Pause briefly between sections so the animation can keep pace."
+        "- CUSTOM SCHEMAS — You can create structured memory schemas for recurring topics using create_memory_schema. "
+        "For example, if the user mentions books, movies, projects, recipes, or contacts — create a schema, "
+        "then use store_custom_memory to add entries and query_custom_memory to retrieve them. "
+        "PROACTIVELY create schemas when a topic with repeated fields comes up. "
+        "Use list_custom_schemas to see what's already stored."
 "\n\nNEWS — Only call get_news if the user EXPLICITLY asks for news or current events. "
 "Do NOT call it proactively during greetings or general conversation. "
 "When called, it fetches latest stories AND opens the newsroom HUD. "
@@ -812,6 +825,9 @@ class AudioLoop:
         self._turn_count = 0
         self._context_refresh_interval = 999
         self._last_refresh_turn = 0
+        self._summary_interval = 20
+        self._last_summary_turn = 0
+        self._session_id = str(uuid.uuid4())[:8]
         self._exchange_history = []
         self._context_history_path = str(Path.home() / ".soda" / "context_history.json")
         self._load_context_history()
@@ -1007,27 +1023,66 @@ class AudioLoop:
                     pass
         self.chat_buffer = {"sender": None, "text": ""}
 
-    async def _inject_context_refresh(self):
-        if not self._exchange_history or not self.session:
+    async def _auto_summarize(self):
+        """Summarize recent exchanges and persist via memory_store."""
+        try:
+            recent = self._exchange_history[-20:]
+            summary = await memory_store.summarize_exchanges(recent)
+            if summary:
+                memory_store.save_summary(
+                    session_id=self._session_id,
+                    topics=summary.get("topics", []),
+                    key_decisions=summary.get("key_points", []),
+                    last_exchanges=[{k: v for k, v in e.items() if k in ("user", "model")}
+                                    for e in recent[-3:]],
+                )
+                log.info(f"[Summary] Saved at turn {self._turn_count}: {summary.get('topics', [])}")
+        except Exception as e:
+            log.warning(f"[Summary] Failed: {e}")
+
+    async def _inject_context_refresh(self, include_summaries=True):
+        if not self.session:
             return
-        recent = self._exchange_history[-10:]
-        lines = []
-        for e in recent:
-            if "user" in e:
-                lines.append(f"User: {e['user']}")
-            if "model" in e:
-                lines.append(f"SODA: {e['model']}")
-        if not lines:
+        parts = []
+        if include_summaries:
+            try:
+                summaries = memory_store.get_recent_summaries(limit=3)
+                if summaries:
+                    summary_lines = []
+                    for s in summaries:
+                        topics = s.get("topics", [])
+                        decisions = s.get("key_decisions", [])
+                        if topics:
+                            summary_lines.append(f"  Topics: {', '.join(topics[:3])}")
+                        if decisions:
+                            summary_lines.append(f"  Key: {'; '.join(decisions[:2])}")
+                    if summary_lines:
+                        parts.append("Session summaries:")
+                        parts.extend(summary_lines)
+            except Exception:
+                pass
+        if self._exchange_history:
+            recent = self._exchange_history[-6:]
+            lines = []
+            for e in recent:
+                if "user" in e:
+                    lines.append(f"User: {e['user']}")
+                if "model" in e:
+                    lines.append(f"SODA: {e['model']}")
+            if lines:
+                parts.append("Recent exchanges:")
+                parts.extend(lines)
+        if not parts:
             return
-        summary = (
+        full = (
             "[Internal context refresh — do NOT read this aloud. "
             "Silently update your understanding of the conversation so far.]\n"
-            + "\n".join(lines)
+            + "\n".join(parts)
         )
         try:
-            await self.session.send_realtime_input(text=summary)
+            await self.session.send_realtime_input(text=full)
             self._last_refresh_turn = self._turn_count
-            log.info(f"Context refresh injected at turn {self._turn_count}")
+            log.info(f"Context refresh injected at turn {self._turn_count} ({len(parts)} lines)")
         except Exception as e:
             log.warning(f"Context refresh failed: {e}")
 
@@ -1297,20 +1352,8 @@ class AudioLoop:
                             )
                     else:
                         log.info(f"Reconnected")
-                        context_lines = []
-                        for e in self._exchange_history[-10:]:
-                            if "user" in e:
-                                context_lines.append(f"User: {e['user']}")
-                            if "model" in e:
-                                context_lines.append(f"SODA: {e['model']}")
-                        if context_lines:
-                            context = (
-                                "[Conversation history before reconnect — use this to continue "
-                                "from where we left off. Do NOT read this aloud.]\n"
-                                + "\n".join(context_lines)
-                            )
-                            await self.session.send_realtime_input(text=context)
-                            log.info(f"Injected {len(context_lines)} context lines on reconnect")
+                        await self._inject_context_refresh(include_summaries=True)
+                        self._last_summary_turn = self._turn_count
 
                     retry_delay = 1
                     await self.stop_event.wait()
@@ -1531,6 +1574,13 @@ class AudioLoop:
                     if self._exchange_history and self.session:
                         await self._inject_context_refresh()
                     self._last_refresh_turn = self._turn_count
+
+                # Auto-summarization every N turns
+                if (self._turn_count - self._last_summary_turn >= self._summary_interval
+                        and len(self._exchange_history) >= 4
+                        and self._turn_count > 0):
+                    self._last_summary_turn = self._turn_count
+                    asyncio.create_task(self._auto_summarize())
 
         except (websockets.exceptions.ConnectionClosedError,
                 websockets.exceptions.ConnectionClosed) as e:
@@ -2161,12 +2211,28 @@ class AudioLoop:
                 facts = facts_data.get("facts", [])
                 people = memory_store.list_people(limit=20)
                 lessons = memory_store.recall_lessons("", limit=10)
+                custom_schemas_data = {"schemas": [], "entries": {}}
+                try:
+                    import custom_memory
+                    schemas_result = custom_memory.list_custom_schemas()
+                    if schemas_result.get("success"):
+                        schemas = schemas_result.get("schemas", [])
+                        custom_schemas_data["schemas"] = schemas
+                        for s in schemas:
+                            name = s.get("name", "")
+                            if name:
+                                entries_result = custom_memory.query_custom_memory(name, "", 10)
+                                if entries_result.get("success"):
+                                    custom_schemas_data["entries"][name] = entries_result.get("entries", [])
+                except Exception:
+                    pass
                 payload = {
                     "workflow": "memory-view",
                     "profile": profile,
                     "facts": facts,
                     "people": people,
                     "lessons": lessons,
+                    "custom_schemas": custom_schemas_data,
                 }
                 if self.sio:
                     await self.sio.emit("workflow_start", payload)
@@ -3493,6 +3559,38 @@ TEXT: {text}"""
                     response={"success": False, "error": "Recipient, subject, and body are required"}
                 )
             r = await send_email(to, subject, body)
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        # ── Custom Memory Schemas ─────────────────────────────────
+        elif name == "create_memory_schema":
+            import custom_memory
+            r = custom_memory.create_memory_schema(
+                name=args.get("name", ""),
+                description=args.get("description", ""),
+                columns=args.get("columns", []),
+            )
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "list_custom_schemas":
+            import custom_memory
+            r = custom_memory.list_custom_schemas()
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "store_custom_memory":
+            import custom_memory
+            r = custom_memory.store_custom_memory(
+                schema_name=args.get("schema_name", ""),
+                data=args.get("data", {}),
+            )
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "query_custom_memory":
+            import custom_memory
+            r = custom_memory.query_custom_memory(
+                schema_name=args.get("schema_name", ""),
+                query=args.get("query", ""),
+                limit=args.get("limit", 20),
+            )
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         log.warning(f"Unknown tool: {name}")

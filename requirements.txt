@@ -14,3 +14,4 @@ trafilatura
 python-docx
 numpy
 elevenlabs
+supabase>=2.0.0

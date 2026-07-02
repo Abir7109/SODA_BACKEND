@@ -636,6 +636,50 @@
 .wf-db-lesson-entry .sit { color: rgba(255,255,255,0.35); margin-bottom: 3px; }
 .wf-db-lesson-entry .cor { color: var(--wf-db-green); margin-top: 2px; }
 .wf-db-lesson-entry .cor::before { content: "→ "; color: rgba(0,255,136,0.3); }
+.wf-db-schemas-area {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 70%; max-height: 60%; z-index: 10; opacity: 0;
+  transition: opacity 0.5s; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.wf-db-schemas-area.active { opacity: 1; }
+.wf-db-schemas-list {
+  display: flex; flex-direction: column; gap: 8px; overflow-y: auto;
+}
+.wf-db-schema-block {
+  background: var(--wf-db-panel);
+  border: 1px solid rgba(0,240,255,0.08);
+  border-left: 2px solid var(--wf-db-cyan);
+  padding: 10px 14px; opacity: 0; transform: translateX(-10px);
+  transition: all 0.4s var(--wf-db-ease);
+  border-radius: 0;
+}
+.wf-db-schema-block.active { opacity: 1; transform: translateX(0); }
+.wf-db-schema-block .schema-header {
+  color: var(--wf-db-cyan); font-size: 11px; letter-spacing: 2px; margin-bottom: 4px;
+}
+.wf-db-schema-block .schema-cols {
+  color: rgba(0,240,255,0.25); font-size: 9px; letter-spacing: 1px; margin-bottom: 4px;
+}
+.wf-db-schema-block .schema-desc {
+  color: rgba(255,255,255,0.3); font-size: 10px; margin-bottom: 6px;
+}
+.wf-db-schema-block .schema-entries {
+  display: flex; flex-direction: column; gap: 3px; margin-top: 4px;
+}
+.wf-db-schema-block .schema-entry {
+  color: #d0d0d0; font-size: 10px; padding: 3px 6px;
+  background: rgba(0,240,255,0.03); border-left: 1px solid rgba(0,240,255,0.12);
+}
+.wf-db-schema-block .schema-field {
+  display: inline-block; margin-right: 8px;
+}
+.wf-db-schema-block .schema-field em {
+  color: rgba(0,240,255,0.35); font-style: normal; margin-right: 3px;
+}
+.wf-db-schema-block .schema-more {
+  color: rgba(0,240,255,0.2); font-size: 9px; letter-spacing: 1px; margin-top: 2px;
+}
 .wf-db-bottom-line {
   position: absolute; bottom: 54px; left: 24px; right: 24px;
   height: 1px; background: rgba(0,240,255,0.04);

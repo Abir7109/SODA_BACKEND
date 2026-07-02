@@ -795,11 +795,18 @@ def _dispatch(tool, args):
         if not command:
             return {"success": False, "output": "", "error": "No command"}
         try:
-            r = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=args.get("timeout", 30))
-            output = r.stdout + r.stderr
-            return {"success": r.returncode == 0, "output": output, "returncode": r.returncode}
-        except subprocess.TimeoutExpired:
-            return {"success": False, "output": "", "error": "Timed out"}
+            from background_cmd import run_hidden_command
+            timeout = args.get("timeout", 30)
+            r = run_hidden_command(command, timeout=timeout)
+            return {
+                "success": r["success"],
+                "output": r["output"],
+                "returncode": r["returncode"],
+                "error": r.get("error", ""),
+                "hidden": True,
+            }
+        except Exception as e:
+            return {"success": False, "output": "", "error": str(e), "hidden": True}
 
     # ── App / System Control ──────────────────────────────────────
     elif tool == "open_app":

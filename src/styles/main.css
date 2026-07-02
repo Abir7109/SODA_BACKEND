@@ -120,6 +120,7 @@
   left: 12px;
   bottom: 12px;
   width: 400px;
+  max-width: calc(100vw - 24px);
 }
 
 .slide-panel-right {
@@ -127,6 +128,26 @@
   right: 12px;
   bottom: 12px;
   width: 400px;
+  max-width: calc(100vw - 24px);
+}
+
+@media (max-width: 480px) {
+  .slide-panel-right {
+    right: 6px;
+    max-width: calc(100vw - 12px);
+  }
+  .slide-panel-left {
+    left: 6px;
+    max-width: calc(100vw - 12px);
+  }
+  .slide-panel-top {
+    width: calc(100vw - 12px);
+    margin-left: calc(-50vw + 6px);
+  }
+  .slide-panel-bottom {
+    width: calc(100vw - 12px);
+    margin-left: calc(-50vw + 6px);
+  }
 }
 
 .slide-panel-top {

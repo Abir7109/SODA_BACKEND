@@ -7,7 +7,8 @@ const PHASES = [
   { id: 3, name: 'FACTS RETRIEVAL',      start: 13000, dur: 7000 },
   { id: 4, name: 'PEOPLE DIRECTORY',     start: 20000, dur: 5000 },
   { id: 5, name: 'LESSONS ARCHIVE',      start: 25000, dur: 5000 },
-  { id: 6, name: 'STANDBY',              start: 30000, dur: Infinity },
+  { id: 6, name: 'CUSTOM SCHEMAS',       start: 30000, dur: 5000 },
+  { id: 7, name: 'STANDBY',              start: 35000, dur: Infinity },
 ]
 
 const CONNECT_TEXT = 'ACCESSING MEMORY DATABASE'
@@ -128,8 +129,23 @@ export default function WorkflowMemoryView({ data, onComplete }) {
         break
       }
 
-      case 6:
+      case 6: {
         hide(e('.wf-db-lessons-area'))
+        ct(() => {
+          show(e('.wf-db-schemas-area'))
+          show(e('.wf-db-section-title.schemas'))
+          populateSchemas()
+          const sc = data?.custom_schemas?.schemas?.length || 0
+          ct(() => {
+            const s = e('.wf-db-status')
+            if (s) s.textContent = 'STATUS: ' + sc + ' CUSTOM SCHEMAS'
+          }, 100)
+        }, 450)
+        break
+      }
+
+      case 7:
+        hide(e('.wf-db-schemas-area'))
         show(e('.wf-db-bottom-line'))
         show(e('.wf-db-summary'))
         ct(() => {
@@ -265,6 +281,44 @@ export default function WorkflowMemoryView({ data, onComplete }) {
     if (s) s.textContent = lessons.length
   }
 
+  function populateSchemas() {
+    const container = e('.wf-db-schemas-list')
+    if (!container) return
+    container.innerHTML = ''
+    hide(e('.wf-db-empty'))
+    const schemas = dataRef.current?.custom_schemas?.schemas
+    const entries = dataRef.current?.custom_schemas?.entries || {}
+    if (!schemas || !schemas.length) {
+      e('.wf-db-empty .msg').textContent = 'NO CUSTOM SCHEMAS CREATED YET — THEY\'LL APPEAR HERE AS WE TALK'
+      show(e('.wf-db-empty'))
+      return
+    }
+    schemas.forEach((s, i) => {
+      const block = document.createElement('div')
+      block.className = 'wf-db-schema-block'
+      const name = s.name || 'unnamed'
+      const cols = (s.columns || []).map(c => c.name).join(', ')
+      const entryList = entries[name] || []
+      let html = '<div class="schema-header">■ ' + name.toUpperCase() + '</div>'
+      if (cols) html += '<div class="schema-cols">' + cols + '</div>'
+      if (s.description) html += '<div class="schema-desc">' + s.description + '</div>'
+      if (entryList.length) {
+        html += '<div class="schema-entries">'
+        entryList.slice(0, 5).forEach(e => {
+          const vals = Object.entries(e.data || {}).map(([k, v]) => '<span class="schema-field"><em>' + k + '</em> ' + v + '</span>').join(' ')
+          html += '<div class="schema-entry">' + vals + '</div>'
+        })
+        if (entryList.length > 5) html += '<div class="schema-more">+' + (entryList.length - 5) + ' more</div>'
+        html += '</div>'
+      }
+      block.innerHTML = html
+      container.appendChild(block)
+      ct(() => block.classList.add('active'), i * 200)
+    })
+    const s = e('.wf-db-summary .num.schemas')
+    if (s) s.textContent = schemas.length
+  }
+
   useEffect(() => {
     startTime.current = performance.now()
     currentPid.current = -1
@@ -275,7 +329,7 @@ export default function WorkflowMemoryView({ data, onComplete }) {
       if (pid !== currentPid.current) {
         activatePhase(pid)
       }
-      if (pid < 6) {
+      if (pid < 7) {
         rafs.current.push(requestAnimationFrame(tick))
       }
     }
@@ -336,6 +390,11 @@ export default function WorkflowMemoryView({ data, onComplete }) {
         <div className="wf-db-lessons-list"></div>
       </div>
 
+      <div className="wf-db-schemas-area">
+        <div className="wf-db-section-title schemas">■ CUSTOM SCHEMAS — STRUCTURED DATA</div>
+        <div className="wf-db-schemas-list"></div>
+      </div>
+
       <div className="wf-db-empty">
         <div className="icon">🗄️</div>
         <div className="msg">NO RECORDS FOUND</div>
@@ -344,7 +403,7 @@ export default function WorkflowMemoryView({ data, onComplete }) {
       <div className="wf-db-bottom-line"></div>
 
       <div className="wf-db-summary">
-        MEMORY DATABASE — <span className="num facts">0</span> FACTS · <span className="num people">0</span> PEOPLE · <span className="num lessons">0</span> LESSONS
+        MEMORY DATABASE — <span className="num facts">0</span> FACTS · <span className="num people">0</span> PEOPLE · <span className="num lessons">0</span> LESSONS · <span className="num schemas">0</span> SCHEMAS
       </div>
     </div>
   )
