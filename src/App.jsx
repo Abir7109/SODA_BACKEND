@@ -1,6 +1,74 @@
 import { useState, useEffect, useRef, useCallback, Suspense, Component } from 'react'
 import socket from './services/SocketService'
 import { getCategory, CATEGORIES, getAnimationForTool, getVariantForTool, getSpecializedPanel } from './components/animations'
+
+function getCapacitorNotifications() {
+  try {
+    const cap = window.Capacitor
+    if (cap && cap.Plugins && cap.Plugins.LocalNotifications) {
+      return cap.Plugins.LocalNotifications
+    }
+  } catch (e) { /* not in Capacitor */ }
+  return null
+}
+
+async function showNotification(title, body, id) {
+  const ln = getCapacitorNotifications()
+  if (!ln) return
+  try {
+    await ln.requestPermissions()
+    await ln.schedule({
+      notifications: [{
+        id: id || Math.floor(Math.random() * 1000000),
+        title,
+        body,
+        schedule: { at: new Date() },
+        smallIcon: 'ic_stat_soda',
+        iconColor: '#0a0a0f',
+        channelId: 'soda-reminders',
+      }]
+    })
+  } catch (e) { /* notification failed */ }
+}
+
+async function prescheduleNotification(id, title, body, fireAt) {
+  const ln = getCapacitorNotifications()
+  if (!ln) return
+  try {
+    console.log('[Preschedule]', { id, title, fireAt })
+    const result = await ln.schedule({
+      notifications: [{
+        id,
+        title,
+        body,
+        schedule: { at: new Date(fireAt) },
+        smallIcon: 'ic_stat_soda',
+        iconColor: '#0a0a0f',
+        channelId: 'soda-reminders',
+      }]
+    })
+    console.log('[Preschedule] Success', JSON.stringify(result))
+  } catch (e) { console.error('[Preschedule] Error', e) }
+}
+
+async function requestNotifPermission() {
+  const ln = getCapacitorNotifications()
+  if (!ln) return
+  try {
+    await ln.requestPermissions()
+  } catch (e) { /* permission denied */ }
+  try {
+    await ln.createChannel({
+      id: 'soda-reminders',
+      name: 'SODA Reminders',
+      importance: 4,
+      visibility: 1,
+      sound: 'default',
+      vibration: true,
+      lights: true
+    })
+  } catch (e) { /* channel exists or not supported */ }
+}
 import SearchResultsPanel from './components/panels/SearchResultsPanel'
 import FileOutputPanel from './components/panels/FileOutputPanel'
 import InfoPanel from './components/panels/InfoPanel'
@@ -183,8 +251,8 @@ function TerminalPanel({ visible, command, output, success, onClose, attempts, t
   const handleMouseMove = (e) => {
     if (!dragRef.current) return
     setPos({
-      x: dragRef.current.ox + e.clientX - dragRef.current.mx,
-      y: dragRef.current.oy + e.clientY - dragRef.current.my,
+      x: Math.max(0, Math.min(dragRef.current.ox + e.clientX - dragRef.current.mx, window.innerWidth - 408)),
+      y: Math.max(0, Math.min(dragRef.current.oy + e.clientY - dragRef.current.my, window.innerHeight - 60)),
     })
   }
 
@@ -859,6 +927,24 @@ export default function App() {
 
       const toolName = data.tool
 
+      // Pre-schedule native notification for set_reminder with future time
+      if (toolName === 'set_reminder' && result) {
+        let parsed = result
+        if (typeof result.result === 'string') {
+          try { parsed = JSON.parse(result.result) } catch (e) { parsed = result }
+        }
+        const reminder = parsed.reminder || parsed
+        const nextFire = reminder.next_fire
+        if (nextFire) {
+          prescheduleNotification(
+            parseInt(reminder.id || '0', 36) % 1000000 || Math.floor(Math.random() * 1000000),
+            'SODA Reminder',
+            reminder.message || 'Reminder triggered',
+            new Date(nextFire * 1000).toISOString()
+          )
+        }
+      }
+
       // Check for specialized panel first
       const specializedPanel = getSpecializedPanel(toolName)
       if (specializedPanel) {
@@ -1233,7 +1319,7 @@ export default function App() {
 
     const onUserTranscription = () => {
       if (workflowRef.current) {
-        const animated = ['news-briefing', 'memory-view', 'ielts-speaking', 'ielts-mock', 'pentest-scan']
+        const animated = ['news-briefing', 'memory-view', 'ielts-speaking', 'ielts-mock', 'pentest-scan', 'reminder']
         if (animated.includes(workflowRef.current.workflow)) return
         if (workflowDismissRef.current) clearTimeout(workflowDismissRef.current)
         workflowDismissRef.current = setTimeout(() => {
@@ -1361,6 +1447,21 @@ export default function App() {
     const onRemoteCount = (data) => { if (data && typeof data.count === 'number') setRemoteCount(data.count) }
     socket.on('soda_remote_count', onRemoteCount)
 
+    socket.on('reminder_fired', (data) => {
+      if (data && data.message) {
+        showNotification('SODA Reminder', data.message, data.id ? parseInt(data.id, 36) || undefined : undefined)
+        setWorkflow({
+          workflow: 'reminder',
+          message: data.message,
+          id: data.id,
+          fired_at: data.fired_at,
+        })
+        workflowRef.current = { workflow: 'reminder', message: data.message }
+      }
+    })
+
+    setTimeout(requestNotifPermission, 2000)
+
     socket.connect()
 
     // Handle already-connected edge case (e.g., StrictMode double-mount in dev)
@@ -1407,6 +1508,7 @@ export default function App() {
       socket.off('shutdown', onShutdown)
       socket.off('stop_audio', stopAudio)
       socket.off('soda_remote_count', onRemoteCount)
+      socket.off('reminder_fired')
       socket.off('workflow_start', onWorkflowStart)
       socket.off('pentest_scan_progress', onPentestProgress)
       socket.off('pentest_output', onPentestOutput)

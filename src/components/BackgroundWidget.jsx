@@ -2,8 +2,15 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 
 export default function BackgroundWidget({ speakingState, onRestore, widgetMode }) {
   const [displayState, setDisplayState] = useState('idle')
+  const [rightPos, setRightPos] = useState(() => window.innerWidth - 150)
   const dragRef = useRef(null)
   const rafRef = useRef(null)
+
+  useEffect(() => {
+    const onResize = () => setRightPos(window.innerWidth - 150)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     if (speakingState === 'wake') {
@@ -57,7 +64,7 @@ export default function BackgroundWidget({ speakingState, onRestore, widgetMode 
   return (
     <div
       className={`bgw-pill${wakeFlash ? ' bgw-wake' : ''}${widgetMode ? ' bgw-widget-mode' : ''}`}
-      style={widgetMode ? {} : { left: window.innerWidth - 150, top: 8 }}
+      style={widgetMode ? {} : { left: rightPos, top: 8 }}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
     >

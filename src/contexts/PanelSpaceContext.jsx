@@ -25,18 +25,19 @@ export function PanelSpaceProvider({ children }) {
   const getOffset = useCallback((direction) => {
     let offsetX = 0
     let offsetY = 0
+    const vw = window.innerWidth
     if (direction === 'top') {
       if (visibleDirections.has('right')) {
         offsetX = -(PANEL_RIGHT + 40)
       } else {
-        offsetX = 160
+        offsetX = vw < 800 ? 80 : vw < 1024 ? 120 : 160
       }
     }
     if (direction === 'bottom') {
       if (visibleDirections.has('left')) {
         offsetX = PANEL_LEFT + 40
       } else {
-        offsetX = 200
+        offsetX = vw < 800 ? 80 : vw < 1024 ? 140 : 200
       }
     }
     return { offsetX, offsetY }

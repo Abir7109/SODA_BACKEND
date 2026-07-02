@@ -1857,3 +1857,176 @@
   font-size: 10px; letter-spacing: 2px; color: #00ff88;
   text-align: center;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   WorkflowReminder (wrem-)
+   REMINDER HUD — Signal pulse, message decode, alert display
+   ═══════════════════════════════════════════════════════════ */
+.wrem-hud {
+  background: #08080C;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wrem-scanline { opacity: 0; transition: opacity 0.6s; }
+.wrem-scanline.active { opacity: 1; }
+.wrem-grid { opacity: 0; transition: opacity 0.5s; }
+.wrem-grid.active { opacity: 1; }
+
+.wrem-corner {
+  position: absolute;
+  width: 40px; height: 40px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s var(--wf-ease);
+}
+.wrem-corner.active { opacity: 0.6; }
+.wrem-corner.tl { top: 24px; left: 24px; }
+.wrem-corner.tr { top: 24px; right: 24px; }
+.wrem-corner.bl { bottom: 24px; left: 24px; }
+.wrem-corner.br { bottom: 24px; right: 24px; }
+
+.wrem-signal-area {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.wrem-signal-pulse {
+  position: relative;
+  width: 100px; height: 100px;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+.wrem-signal-pulse.active { opacity: 1; }
+.wrem-pulse-ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--wf-cyan);
+  border-radius: 50%;
+  animation: wrem-pulse 2s ease-out infinite;
+  box-shadow: 0 0 20px rgba(0,240,255,0.15), inset 0 0 20px rgba(0,240,255,0.05);
+}
+.wrem-pulse-ring-2 { animation-delay: 0.6s; }
+.wrem-pulse-dot {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 14px; height: 14px;
+  transform: translate(-50%, -50%);
+  background: var(--wf-cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 30px var(--wf-cyan), 0 0 60px rgba(0,240,255,0.3);
+}
+@keyframes wrem-pulse {
+  0% { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+.wrem-signal-label {
+  font-size: 11px;
+  letter-spacing: 5px;
+  color: var(--wf-cyan);
+  text-shadow: 0 0 20px rgba(0,240,255,0.3);
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.wrem-signal-label.active { opacity: 0.7; }
+
+.wrem-decoder {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 70%;
+  max-width: 560px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s var(--wf-ease), transform 0.5s var(--wf-ease-overshoot);
+}
+.wrem-decoder.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.wrem-decoder-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: rgba(0,240,255,0.5);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0,240,255,0.08);
+}
+.wrem-decoder-icon {
+  font-size: 12px;
+  color: var(--wf-cyan);
+}
+.wrem-decoder-badge {
+  margin-left: auto;
+  font-size: 8px;
+  letter-spacing: 2px;
+  padding: 2px 8px;
+  border: 1px solid var(--wf-amber);
+  color: var(--wf-amber);
+}
+.wrem-message-text {
+  font-family: 'Courier New', 'Consolas', monospace;
+  font-size: 18px;
+  line-height: 1.6;
+  color: #ffffff;
+  min-height: 50px;
+  word-wrap: break-word;
+  text-shadow: 0 0 10px rgba(255,255,255,0.1);
+}
+.wrem-message-cursor {
+  font-size: 18px;
+  color: var(--wf-cyan);
+  opacity: 0;
+  animation: wrem-blink 0.6s step-end infinite;
+}
+@keyframes wrem-blink {
+  50% { opacity: 0; }
+}
+
+.wrem-display {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 75%;
+  max-width: 600px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s var(--wf-ease);
+}
+.wrem-display.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.wrem-display-bar {
+  width: 60px; height: 3px;
+  background: var(--wf-cyan);
+  margin: 0 auto 20px;
+  box-shadow: 0 0 20px var(--wf-cyan), 0 0 40px rgba(0,240,255,0.2);
+}
+.wrem-display-icon {
+  font-size: 40px;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 0 20px rgba(0,240,255,0.3));
+}
+.wrem-display-title {
+  font-size: 11px;
+  letter-spacing: 6px;
+  color: var(--wf-cyan);
+  margin-bottom: 12px;
+  text-shadow: 0 0 20px rgba(0,240,255,0.2);
+}
+.wrem-display-body {
+  font-family: 'Courier New', 'Consolas', monospace;
+  font-size: 22px;
+  line-height: 1.5;
+  color: #ffffff;
+  word-wrap: break-word;
+}

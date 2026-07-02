@@ -131,7 +131,7 @@
   max-width: calc(100vw - 24px);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 540px) {
   .slide-panel-right {
     right: 6px;
     max-width: calc(100vw - 12px);
@@ -141,12 +141,14 @@
     max-width: calc(100vw - 12px);
   }
   .slide-panel-top {
+    left: 6px;
     width: calc(100vw - 12px);
-    margin-left: calc(-50vw + 6px);
+    margin-left: 0;
   }
   .slide-panel-bottom {
+    left: 6px;
     width: calc(100vw - 12px);
-    margin-left: calc(-50vw + 6px);
+    margin-left: 0;
   }
 }
 
@@ -154,6 +156,7 @@
   top: 12px;
   left: 50%;
   width: 480px;
+  max-width: calc(100vw - 24px);
   max-height: 50vh;
   margin-left: -240px;
 }
@@ -162,6 +165,7 @@
   bottom: 12px;
   left: 50%;
   width: 520px;
+  max-width: calc(100vw - 24px);
   max-height: 45vh;
   margin-left: -260px;
 }
@@ -250,7 +254,9 @@
 .terminal-panel {
   position: fixed;
   width: 400px;
+  max-width: calc(100vw - 24px);
   height: calc(100vh - 24px);
+  max-height: calc(100vh - 24px);
   z-index: var(--z-panel);
   display: flex;
   flex-direction: column;

@@ -9,6 +9,7 @@ import WorkflowNewsBriefing from './WorkflowNewsBriefing'
 const WorkflowIELTSSpeaking = lazy(() => import('./WorkflowIELTSSpeaking'))
 const WorkflowIELTSMock = lazy(() => import('./WorkflowIELTSMock'))
 const WorkflowPentestScan = lazy(() => import('./WorkflowPentestScan'))
+const WorkflowReminder = lazy(() => import('./WorkflowReminder'))
 
 export const WORKFLOW_MAP = {
   outside: WorkflowOutside,
@@ -20,6 +21,7 @@ export const WORKFLOW_MAP = {
   'ielts-speaking': WorkflowIELTSSpeaking,
   'ielts-mock': WorkflowIELTSMock,
   'pentest-scan': WorkflowPentestScan,
+  'reminder': WorkflowReminder,
 }
 
 export function getWorkflowComponent(name) {
