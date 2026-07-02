@@ -1,10 +1,13 @@
 import { useEffect, useRef } from 'react'
 import socket from '../services/SocketService'
 
+const CAPTURE_INTERVAL = 5000
+
 export default function CameraCapture() {
   const streamRef = useRef(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
+  const timerRef = useRef(null)
 
   useEffect(() => {
     let active = true
@@ -13,27 +16,39 @@ export default function CameraCapture() {
       const canvas = canvasRef.current
       const video = videoRef.current
       if (!canvas || !video || video.readyState < 2) return null
+      canvas.width = video.videoWidth || 1280
+      canvas.height = video.videoHeight || 720
       const ctx = canvas.getContext('2d')
-      ctx.drawImage(video, 0, 0, 640, 480)
+      ctx.drawImage(video, 0, 0)
       return new Promise(resolve => {
         canvas.toBlob(blob => {
           if (!blob) { resolve(null); return }
           const reader = new FileReader()
           reader.onloadend = () => resolve(reader.result.split(',')[1])
           reader.readAsDataURL(blob)
-        }, 'image/jpeg', 0.6)
+        }, 'image/jpeg', 0.85)
       })
+    }
+
+    async function sendFrame() {
+      if (!active) return
+      const b64 = await captureFrame()
+      if (b64 && socket.connected) {
+        socket.emit('video_frame', { image: b64 })
+      }
     }
 
     async function start() {
       try {
-        console.log('[CameraCapture] Requesting camera...')
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480, facingMode: 'user' }
+          video: {
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 },
+            facingMode: { ideal: 'environment' },
+          }
         })
         if (!active) { stream.getTracks().forEach(t => t.stop()); return }
         streamRef.current = stream
-        console.log('[CameraCapture] Camera streaming')
 
         const video = document.createElement('video')
         video.srcObject = stream
@@ -42,31 +57,37 @@ export default function CameraCapture() {
         videoRef.current = video
 
         const canvas = document.createElement('canvas')
-        canvas.width = 640
-        canvas.height = 480
         canvasRef.current = canvas
 
         video.onloadeddata = async () => {
-          const b64 = await captureFrame()
-          if (b64) socket.emit('video_frame', { image: b64 })
+          await sendFrame()
+          timerRef.current = setInterval(sendFrame, CAPTURE_INTERVAL)
         }
       } catch (err) {
         console.warn('[CameraCapture] Camera unavailable:', err?.message)
       }
     }
 
-    const onRequestFrame = async (data) => {
+    const onRequestFaceFrame = async (data) => {
       const b64 = await captureFrame()
       if (b64) socket.emit('face_frame_response', { id: data.id, image: b64 })
     }
 
-    socket.on('request_face_frame', onRequestFrame)
+    const onRequestFrame = async (data) => {
+      const b64 = await captureFrame()
+      if (b64) socket.emit('frame_response', { id: data.id, image: b64 })
+    }
+
+    socket.on('request_face_frame', onRequestFaceFrame)
+    socket.on('request_frame', onRequestFrame)
     start()
 
     return () => {
       active = false
+      if (timerRef.current) clearInterval(timerRef.current)
       if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
-      socket.off('request_face_frame', onRequestFrame)
+      socket.off('request_face_frame', onRequestFaceFrame)
+      socket.off('request_frame', onRequestFrame)
     }
   }, [])
 

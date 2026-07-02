@@ -1368,6 +1368,19 @@ async def face_frame_response(sid, data=None):
 
 
 @sio.event
+async def frame_response(sid, data=None):
+    """Receive a fresh camera frame from the frontend for analysis."""
+    if not data or not data.get('id'):
+        return
+    request_id = data['id']
+    if hasattr(audio_loop, '_pending_frames'):
+        future = audio_loop._pending_frames.get(request_id)
+        if future and not future.done():
+            future.set_result(data.get('image'))
+    else:
+        print(f"[SERVER] frame_response: audio_loop has no _pending_frames")
+
+@sio.event
 async def browser_url_response(sid, data=None):
     """Receive active browser URL from the frontend for pentesting."""
     url = (data or {}).get("url", "")

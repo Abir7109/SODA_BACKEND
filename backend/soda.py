@@ -836,6 +836,7 @@ class AudioLoop:
         self._processed_fc_ids = set()
         self._pending_confirmations = {}
         self._pending_face_frames = {}
+        self._pending_frames = {}
         self._pending_notepad_reads = {}
         self._pending_webview_results = {}
         self._last_input_transcription = ""
@@ -1316,9 +1317,9 @@ class AudioLoop:
             return None
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = PIL.Image.fromarray(frame_rgb)
-        img.thumbnail([1024, 1024])
+        img.thumbnail([1280, 1280])
         buf = io.BytesIO()
-        img.save(buf, format="jpeg")
+        img.save(buf, format="jpeg", quality=85)
         return {"mime_type": "image/jpeg", "data": base64.b64encode(buf.getvalue()).decode()}
 
     async def play_audio(self):
@@ -3552,35 +3553,78 @@ TEXT: {text}"""
 
         elif name == "camera_control":
             action = args.get("action", "")
-            frame = getattr(self, '_latest_camera_frame', None)
 
-            async def _send_frame():
-                if frame:
-                    raw = base64.b64decode(frame["data"])
-                    await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type=frame["mime_type"]))
+            async def _request_frontend_frame():
+                request_id = str(uuid.uuid4())
+                future = asyncio.get_event_loop().create_future()
+                self._pending_frames[request_id] = future
+                try:
+                    await self.sio.emit("request_frame", {"id": request_id})
+                    frame_data = await asyncio.wait_for(future, timeout=5.0)
+                    raw = base64.b64decode(frame_data)
+                    payload = {"mime_type": "image/jpeg", "data": frame_data}
+                    await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type="image/jpeg"))
                     if self.video_queue:
-                        await self.video_queue.put(frame)
+                        await self.video_queue.put(payload)
                     return True
-                return False
+                except asyncio.TimeoutError:
+                    return False
+                finally:
+                    self._pending_frames.pop(request_id, None)
+
+            async def _send_server_frame():
+                cap = None
+                for idx in [0, 1, 2]:
+                    try:
+                        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+                        if cap and cap.isOpened():
+                            break
+                        if cap:
+                            cap.release()
+                            cap = None
+                    except Exception:
+                        continue
+                if not cap:
+                    return False
+                try:
+                    ret, frame = cap.read()
+                    cap.release()
+                    if not ret:
+                        return False
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    img = PIL.Image.fromarray(frame_rgb)
+                    img.thumbnail([1280, 1280])
+                    buf = io.BytesIO()
+                    img.save(buf, format="jpeg", quality=85)
+                    b64 = base64.b64encode(buf.getvalue()).decode()
+                    payload = {"mime_type": "image/jpeg", "data": b64}
+                    raw = buf.getvalue()
+                    await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type="image/jpeg"))
+                    if self.video_queue:
+                        await self.video_queue.put(payload)
+                    return True
+                except Exception:
+                    return False
 
             if action == "snapshot":
-                sent = await _send_frame()
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Snapshot {'taken and sent' if sent else 'failed — no frame available'}."})
-            elif action == "analyze":
-                sent = await _send_frame()
+                sent = await _request_frontend_frame()
                 if sent:
-                    return types.FunctionResponse(id=fc.id, name=name, response={"result": "Frame sent via real-time video. Describe what you see in detail to the user now."})
-                else:
-                    await self._capture_and_send()
+                    return types.FunctionResponse(id=fc.id, name=name, response={"result": "Front camera snapshot captured and sent to your view."})
+                sent = await _send_server_frame()
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Server camera snapshot {'captured and sent' if sent else 'failed — no camera available'}."})
+            elif action == "analyze":
+                sent = await _request_frontend_frame()
+                if sent:
+                    return types.FunctionResponse(id=fc.id, name=name, response={"result": "Live camera frame captured from your device. Describe what you see in detail to the user now."})
+                sent = await _send_server_frame()
+                if sent:
                     return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera snapshot taken via server camera. Describe what you see in detail to the user now."})
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "No camera available. Ask the user to open the camera."})
             elif action == "save":
                 import camera_capture
                 desc = args.get("description", "Camera photo")
-                sent = await _send_frame()
-                if sent:
-                    result = camera_capture.save_photo(frame["data"], desc)
-                else:
-                    result = camera_capture.save_photo("", desc)
+                sent = await _request_frontend_frame()
+                result = camera_capture.save_photo("", desc)
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Photo saved. {result.get('record', {})}"})
             elif action == "switch":
                 await self.sio.emit("camera_switch", {})

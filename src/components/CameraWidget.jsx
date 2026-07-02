@@ -24,13 +24,17 @@ export default function CameraWidget({ socket }) {
         socket.emit('camera_frame', { image: b64 })
       }
       reader.readAsDataURL(blob)
-    }, 'image/jpeg', 0.5)
+    }, 'image/jpeg', 0.85)
   }, [socket])
 
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: 'user' }
+        video: {
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 },
+          facingMode: { ideal: 'environment' },
+        }
       })
       streamRef.current = stream
       if (videoRef.current) {
@@ -50,7 +54,11 @@ export default function CameraWidget({ socket }) {
       streamRef.current.getTracks().forEach(t => t.stop())
     }
     navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 480, facingMode: newFacing }
+      video: {
+        width: { min: 640, ideal: 1280, max: 1920 },
+        height: { min: 480, ideal: 720, max: 1080 },
+        facingMode: { ideal: newFacing },
+      }
     }).then(stream => {
       streamRef.current = stream
       video.srcObject = stream
