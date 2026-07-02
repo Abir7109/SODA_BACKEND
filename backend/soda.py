@@ -549,7 +549,7 @@ def _build_system_prompt():
         "On reconnect, summaries are injected so you remember past sessions naturally."
 
         "\n\nCAMERA — You have a live camera viewfinder tool (open_camera) and a control tool (camera_control).\n"
-        "- When the user says 'open the camera', 'show me the camera', 'turn on the camera', or wants to take a photo, call open_camera immediately. This opens a small draggable window on their screen with live video.\n"
+        "- When the user says 'open the camera', 'show me the camera', 'turn on the camera', 'take a photo', or wants to take a picture, call open_camera. NOT open_app — open_camera opens a small floating window on their screen with live video. open_app('Camera') opens the desktop camera app which does NOT work with this system.\n"
         "- After the camera is open, use camera_control for everything:\n"
         "  • snapshot = silent capture (you see the frame, keep talking)\n"
         "  • analyze = capture and describe what you see out loud to the user\n"
@@ -2872,6 +2872,12 @@ class AudioLoop:
         elif name == "open_app":
             app_name = args.get("app_name", "")
             app_lower = app_name.lower().strip()
+            # Camera intercept — redirect to open_camera
+            camera_keywords = ("camera", "webcam", "selfie", "take a photo", "take photo", "take picture")
+            if any(kw in app_lower for kw in camera_keywords):
+                log.info(f"[CAMERA] open_app('{app_lower}') intercepted → open_camera")
+                await self.sio.emit("camera_open", {})
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera opened on your screen, sir."})
             # WhatsApp intercept — redirect to check_whatsapp
             if app_lower in ("whatsapp", "whatapp", "watsapp", "whats app", "what's app", "whats"):
                 log.info(f"[WA] open_app('{app_lower}') intercepted → check_whatsapp")
@@ -3527,17 +3533,20 @@ TEXT: {text}"""
             frame = getattr(self, '_latest_camera_frame', None)
             if action == "snapshot":
                 if frame:
-                    await self.video_queue.put(frame)
+                    raw = base64.b64decode(frame["data"])
+                    await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type=frame["mime_type"]))
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": "Snapshot taken."})
             elif action == "analyze":
                 if frame:
-                    await self.video_queue.put(frame)
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Frame sent for analysis."})
+                    raw = base64.b64decode(frame["data"])
+                    await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type=frame["mime_type"]))
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "I can see the camera feed. Here's what's in front of the camera:"})
             elif action == "save":
                 import camera_capture
                 desc = args.get("description", "Camera photo")
                 if frame:
-                    await self.video_queue.put(frame)
+                    raw = base64.b64decode(frame["data"])
+                    await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type=frame["mime_type"]))
                     result = camera_capture.save_photo(frame["data"], desc)
                 else:
                     result = camera_capture.save_photo("", desc)
