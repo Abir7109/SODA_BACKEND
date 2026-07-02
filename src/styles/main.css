@@ -603,7 +603,9 @@
     0 8px 32px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 rgba(0, 251, 251, 0.06);
   min-width: 260px;
+  max-width: calc(100vw - 16px);
   min-height: 120px;
+  max-height: calc(100vh - 16px);
   pointer-events: auto;
   border-radius: 8px;
   overflow: hidden;
@@ -692,7 +694,7 @@
 .floating-window-body {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
   position: relative;
   z-index: 1;
 }

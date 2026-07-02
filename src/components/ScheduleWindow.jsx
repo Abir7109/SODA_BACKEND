@@ -44,7 +44,7 @@ function AnalogClock() {
   const sDeg = (s / 60) * 360
 
   return (
-    <svg width="130" height="130" viewBox="0 0 130 130">
+    <svg width="100" height="100" viewBox="0 0 130 130">
       <defs>
         <filter id="clockGlow">
           <feGaussianBlur stdDeviation="1.5" result="blur"/>
@@ -124,9 +124,9 @@ function Calendar({ schedules, highlightDate }) {
         <button onClick={() => setMonth(m => m === 11 ? (setYear(y => y + 1), 0) : m + 1)}
           style={navBtnStyle}>&gt;</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0 }}>
         {DAYS.map(d => (
-          <div key={d} style={{ color: 'var(--text-dim)', fontSize: 9, textAlign: 'center', padding: '2px 0' }}>{d}</div>
+          <div key={d} style={{ color: 'var(--text-dim)', fontSize: 8, textAlign: 'center', padding: '2px 0' }}>{d}</div>
         ))}
         {grid.flat().map((day, i) => {
           if (day === null) return <div key={`e${i}`}/>
@@ -136,7 +136,7 @@ function Calendar({ schedules, highlightDate }) {
           const isHighlight = highlightDate === dateStr
           return (
             <div key={dateStr} style={{
-              position: 'relative', textAlign: 'center', padding: '3px 0', fontSize: 11,
+              position: 'relative', textAlign: 'center', padding: '2px 0', fontSize: 10,
               color: isToday ? 'var(--accent, #00fbfb)' : 'var(--text-primary)',
               fontWeight: isToday ? 700 : 400,
               background: isToday ? 'rgba(0,251,251,0.08)' : 'transparent',
@@ -196,11 +196,11 @@ export default function ScheduleWindow({ data }) {
 
   return (
     <div style={{ padding: 12, height: '100%', display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
         <div style={{ flexShrink: 0 }}>
           <AnalogClock />
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
           <Calendar schedules={schedules} highlightDate={highlightDate} />
         </div>
       </div>
@@ -237,9 +237,9 @@ export default function ScheduleWindow({ data }) {
                 </div>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 600 }}>{s.title}</div>
-                {s.time && <div style={{ color: 'var(--accent, #00fbfb)', fontSize: 10 }}>{s.time}</div>}
-                {s.details && <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 2 }}>{s.details}</div>}
+                <div style={{ color: 'var(--text-primary)', fontSize: 11, fontWeight: 600 }}>{s.title}</div>
+                {s.time && <div style={{ color: 'var(--accent, #00fbfb)', fontSize: 9 }}>{s.time}</div>}
+                {s.details && <div style={{ color: 'var(--text-dim)', fontSize: 9, marginTop: 1 }}>{s.details}</div>}
               </div>
               <button onClick={() => handleDelete(s.id)}
                 style={{
