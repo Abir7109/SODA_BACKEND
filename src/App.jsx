@@ -1191,10 +1191,12 @@ export default function App() {
     socket.on('open_pastebox', onOpenPastebox)
 
     const onCameraOpen = () => {
+      try { localStorage.removeItem('float_pos_camera') } catch {}
       const vw = window.innerWidth
       const camW = Math.min(320, vw - 16)
       const camX = Math.max(0, Math.floor((vw - camW) / 2))
-      openFloatingWindow('camera_window', 'CAMERA', { type: 'camera' }, camX, 60, camW, 280)
+      const camY = Math.max(0, Math.floor((window.innerHeight - 280) / 2))
+      openFloatingWindow('camera_window', 'CAMERA', { type: 'camera' }, camX, camY, camW, 280)
     }
     socket.on('camera_open', onCameraOpen)
 
