@@ -307,6 +307,46 @@ export default function DataAnim({ status, variant = 'weather', data = null }) {
         )
       }
 
+      case 'email': {
+        const emails = data?.emails || []
+        return (
+          <g>
+            <g stroke={stroke} strokeWidth="1.2" fill="none" strokeOpacity="0.3">
+              <rect x="28" y="32" width="84" height="14" rx="2" />
+              <polyline points="28,32 70,42 112,32" strokeOpacity="0.5" />
+              <rect x="28" y="50" width="84" height="10" rx="1.5" strokeOpacity="0.15" />
+              <rect x="28" y="64" width="84" height="10" rx="1.5" strokeOpacity="0.12" />
+              <rect x="28" y="78" width="84" height="10" rx="1.5" strokeOpacity="0.1" />
+            </g>
+            {isRunning && (
+              <g>
+                <rect x="34" y="54" width="40" height="2" rx="1" fill={stroke} fillOpacity="0.15" />
+                <rect x="34" y="68" width="60" height="2" rx="1" fill={stroke} fillOpacity="0.12" />
+                <rect x="34" y="82" width="50" height="2" rx="1" fill={stroke} fillOpacity="0.1" />
+              </g>
+            )}
+            {isDone && emails.length > 0 && (
+              <g>
+                <text x="34" y="58" fill={stroke} fillOpacity="0.5" fontSize="3.5" fontFamily="monospace">
+                  {(emails[0]?.from || '').slice(0, 14)}
+                </text>
+                <text x="34" y="72" fill={stroke} fillOpacity="0.6" fontSize="3.5" fontFamily="monospace">
+                  {(emails[0]?.subject || '').slice(0, 16)}
+                </text>
+                <text x="70" y="100" textAnchor="middle" fill={stroke} fillOpacity="0.35" fontSize="3" fontFamily="monospace">
+                  +{emails.length - 1} more
+                </text>
+              </g>
+            )}
+            {isDone && emails.length === 0 && (
+              <text x="70" y="80" textAnchor="middle" fill={stroke} fillOpacity="0.35" fontSize="3.5" fontFamily="monospace">
+                No emails
+              </text>
+            )}
+          </g>
+        )
+      }
+
       default:
         return (
           <circle cx="70" cy="70" r="20" fill="none" stroke={stroke} strokeWidth="1.5"

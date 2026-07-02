@@ -313,6 +313,12 @@ def _get_client():
             http_options={"api_version": "v1beta"},
             api_key=os.getenv("GEMINI_API_KEY"),
         )
+        # Share the client with background_cmd for alternative command generation
+        try:
+            from background_cmd import set_gemini_client
+            set_gemini_client(_client_instance)
+        except ImportError:
+            pass
     return _client_instance
 
 def _build_system_prompt():
@@ -571,18 +577,14 @@ def _build_system_prompt():
 "whatsapp_find_and_call(contact_name='<exact name>')\n"
 "  • 'check my email', 'check my Gmail', 'read my emails', 'any new emails', "
 "'what's in my inbox', 'check Gmail', 'open my email', 'read my inbox'"
-" → call browser_automate(url='https://mail.google.com', steps=[\n"
-"       {'action': 'wait', 'params': {'seconds': 5}},\n"
-"       {'action': 'read', 'params': {'prompt': 'List every email visible in this Gmail inbox. For each email output the sender, subject, and preview text. Mark unread emails with [UNREAD]. Count how many total and how many unread.'}}\n"
-"     ]). "
-"NEVER use browser_command for email — it opens the browser but returns nothing. "
-"This opens Chrome, screenshots the inbox, and AI Vision reads the emails. "
-"After the result comes back, read the 'results' array and BRIEF the user on what's in their inbox. "
-"Do NOT say 'I opened it, you can read it' or 'take a look yourself'. Summarize every visible email.\n"
-"- If the user says 'login to my email', 'sign in to Gmail' → FIRST call credential_get(service='gmail') for saved credentials, "
-"then call browser_automate with login steps. If none saved, ask user and save after.\n"
-"- If the user says 'any new emails from [name]' → still use browser_automate(url='https://mail.google.com', steps=[wait, read]) "
-"and filter results yourself in your response. Do NOT open browser for user to read.\n"
+" → call read_emails(query='UNSEEN', max_results=10). "
+"This connects via IMAP and returns subject/sender/date/body for each email. "
+"NEVER use browser_automate or open_browser for email — they are blocked. "
+"After results come back, BRIEF the user on what's in their inbox. "
+"If email is not configured, guide the user through App Password setup.\n"
+"- If the user says 'reply to [sender]' or 'send an email' → FIRST ask the user what they want to say, "
+"draft the reply, show the draft to the user, ask 'Send this?', and ONLY if confirmed call send_email.\n"
+"- For email replies: Gemini drafts, user confirms, then sends. Never send without confirmation.\n"
 "- If the user gives a relationship (e.g. 'message my sister'), "
 "use recall_by_relationship first to find the person's name. "
 "Then use the appropriate WhatsApp tool.\n"
@@ -630,21 +632,18 @@ def _build_system_prompt():
 "  → browser_command(action='open', url='https://youtube.com/watch?v=...') or click to open\n"
 "\nCHECK EMAIL / GMAIL:\n"
 "- When user says 'check my email', 'check my Gmail', 'read my emails', 'any new emails', "
-"'what's in my inbox', 'check gmail' — ALWAYS use browser_automate, NOT browser_command.\n"
-"- browser_command only opens the browser and returns NOTHING. You MUST use browser_automate "
-"to actually READ the emails.\n"
+"'what's in my inbox', 'check gmail' — ALWAYS use read_emails(query='UNSEEN', max_results=10). "
+"Do NOT use browser_automate or open_browser — they are BLOCKED by the backend.\n"
+"- read_emails connects directly via IMAP and returns sender, subject, date, and body for each email.\n"
 "- WORKFLOW:\n"
-"  1. browser_automate(url='https://mail.google.com', steps=[\n"
-"       {'action': 'wait', 'params': {'seconds': 5}},\n"
-"       {'action': 'read', 'params': {'prompt': 'List every email visible in this inbox. For each email output the sender, subject, and preview. Mark unread emails with [UNREAD]. Count total and unread.'}}\n"
-"     ])\n"
-"  2. The read action screenshots Gmail and AI Vision reads the inbox.\n"
-"  3. BRIEF the user on what's in their inbox — sender, subject, preview for each email.\n"
-"  4. If AI Vision returns unclear results, say 'I took a screenshot but couldn't read it clearly. "
-"Would you like me to try again or open Gmail for you?'\n"
+"  1. call read_emails(query='UNSEEN', max_results=10)\n"
+"  2. If it returns emails, BRIEF the user — sender, subject, preview for each email.\n"
+"  3. If it returns 'not configured', guide user through App Password setup.\n"
+"  4. If the user says 'reply to [sender]' or 'send an email', ask what they want to say, "
+"draft the reply, show it, ask 'Send this?', and call send_email only after confirmation.\n"
 "- CRITICAL: NEVER tell the user 'you can read it yourself' or 'I opened it, check it'. "
 "ALWAYS read the inbox contents and BRIEF them directly.\n"
-"- If browser_automate returns an error, tell the user what went wrong and offer alternatives.\n"
+"- NEVER use browser-based tools for email — they will fail.\n"
 "\nBROWSER AUTOMATION:\n"
 "- browser_automate(url, steps[]) — FULL browser automation with AI Vision.\n"
 "- Launches Chrome with profile 'rahikulmakhtum', navigates to url, executes each step.\n"
@@ -1665,6 +1664,22 @@ class AudioLoop:
         name = fc.name
         args = fc.args
 
+        # ── Block browser email access: force IMAP-based read_emails ──
+        if name in ("browser_automate", "open_browser", "browser_command"):
+            url = args.get("url", "") or args.get("command", "") or ""
+            query = args.get("query", "") or ""
+            checked_text = url + " " + query
+            if any(domain in checked_text.lower() for domain in
+                   ["gmail", "mail.google", "mail.yahoo", "outlook.live", "mail.", " mail ", "email"]):
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={
+                        "result": "Email cannot be accessed via browser. Use the read_emails tool instead.",
+                        "error": "Browser email access blocked. Use read_emails tool.",
+                        "_force_tool": "read_emails",
+                    }
+                )
+
         # ── Route to local desktop agent if applicable ──
         if name in LOCAL_AGENT_TOOLS and _connected_agents:
             import uuid as _uuid
@@ -1678,6 +1693,19 @@ class AudioLoop:
             )
             agent_info = _connected_agents.get(agent_sid, {})
             log.info(f"[AGENT] Routing {name} to agent {agent_info.get('machine_id', agent_sid)} (callback={callback_id})")
+            if name in ("execute_command", "terminal_execute"):
+                cmd = args.get("command", "")
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("background_cmd_status", {
+                    "phase": "thinking", "tool": name, "command": cmd,
+                    "attempt": 1, "total": 5,
+                    "output": "", "error": "", "success": None,
+                }))
+                loop.create_task(self.sio.emit("background_cmd_status", {
+                    "phase": "running", "tool": name, "command": cmd,
+                    "attempt": 1, "total": 5,
+                    "output": "", "error": "", "success": None,
+                }))
             await self.sio.emit('agent_execute', {
                 'callback_id': callback_id,
                 'tool': name,
@@ -1694,7 +1722,7 @@ class AudioLoop:
                 "browser_command": 15.0,
                 "app_search": 45.0,
                 "app_scroll": 30.0,
-                "open_app": 45.0,  # increased for WhatsApp intercept (check_whatsapp needs 45s)
+                "open_app": 45.0,
                 "list_installed_apps": 15.0,
                 "refresh_app_registry": 30.0,
                 "browser_automate": 120.0,
@@ -1702,8 +1730,11 @@ class AudioLoop:
                 "credential_get": 10.0,
                 "credential_list": 10.0,
                 "credential_delete": 10.0,
+                # Terminal/command execution needs extra time for retries
+                "terminal_execute": 90.0,
+                "execute_command": 90.0,
             }
-            timeout = _TOOL_TIMEOUTS.get(name, 10.0)
+            timeout = _TOOL_TIMEOUTS.get(name, 30.0)
             try:
                 result = await asyncio.wait_for(future, timeout=timeout)
                 _success = result.pop('_success', True)
@@ -1714,6 +1745,74 @@ class AudioLoop:
                 log.warning(f"[AGENT] {name} TIMEOUT — agent {agent_info.get('machine_id', agent_sid)} did not respond in {timeout}s")
             finally:
                 _pending_agent_results.pop(callback_id, None)
+            # For command execution tools, emit status events and handle retries
+            if name in ("execute_command", "terminal_execute"):
+                cmd = args.get("command", "")
+                max_attempts = 5
+                total_attempts = 1
+                all_attempts = []
+                last_result = result
+
+                if not result.get('success'):
+                    from background_cmd import generate_alternatives
+                    loop = asyncio.get_event_loop()
+
+                    while total_attempts < max_attempts:
+                        total_attempts += 1
+                        alternatives = await generate_alternatives(cmd, result.get("error", ""), context=name)
+                        if not alternatives:
+                            break
+
+                        alt_cmd = alternatives[0]
+                        all_attempts.append({"command": alt_cmd, "error": result.get("error", "")})
+
+                        loop.create_task(self.sio.emit("background_cmd_status", {
+                            "phase": "retrying", "tool": name, "command": alt_cmd,
+                            "attempt": total_attempts, "total": max_attempts,
+                            "output": result.get("output", ""), "error": result.get("error", ""), "success": None,
+                        }))
+
+                        callback_id = str(_uuid.uuid4())
+                        future = asyncio.Future()
+                        _pending_agent_results[callback_id] = future
+                        await self.sio.emit('agent_execute', {
+                            'callback_id': callback_id,
+                            'tool': name,
+                            'args': {**args, "command": alt_cmd},
+                        }, room=agent_sid)
+                        try:
+                            result = await asyncio.wait_for(future, timeout=timeout)
+                            result['_success'] = result.pop('_success', True)
+                        except asyncio.TimeoutError:
+                            result = {"success": False, "error": f"Agent timeout on retry attempt {total_attempts}"}
+                        finally:
+                            _pending_agent_results.pop(callback_id, None)
+
+                        if result.get('success'):
+                            break
+
+                    last_result = result
+
+                success = last_result.get('success', False)
+                output_text = last_result.get("output", "")
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("background_cmd_status", {
+                    "phase": "done" if success else "failed",
+                    "tool": name, "command": cmd,
+                    "attempt": total_attempts,
+                    "total": max_attempts,
+                    "output": output_text,
+                    "error": last_result.get("error", "") if not success else "",
+                    "success": success,
+                }))
+                loop.create_task(self.sio.emit("command_output", {
+                    "command": cmd, "output": output_text,
+                    "success": success,
+                    "attempts": all_attempts,
+                    "total_attempts": total_attempts,
+                }))
+                return types.FunctionResponse(id=fc.id, name=name, response=last_result)
+
             # Emit file_list for file browsing tools
             if name == "list_files" and result.get('success'):
                 await self.sio.emit('file_list', {
@@ -2503,28 +2602,42 @@ class AudioLoop:
 
         elif name == "execute_command":
             cmd = args.get("command", "")
-            r = await system_app.run_terminal_command(cmd)
-            output_text = r.get("output", "") if isinstance(r, dict) else (str(r) if r else "")
             if self.sio:
                 loop = asyncio.get_event_loop()
+                from background_cmd import execute_with_retry
+                async def _status_cb(status):
+                    loop.create_task(self.sio.emit("background_cmd_status", {
+                        **status, "tool": name, "command": cmd,
+                    }))
+                r = await execute_with_retry(cmd, context="execute_command", emit_status=_status_cb)
+                output_text = r.get("output", "") if isinstance(r, dict) else (str(r) if r else "")
                 loop.create_task(self.sio.emit("command_output", {
                     "command": cmd,
                     "output": output_text,
-                    "success": True,
+                    "success": r.get("success", False),
+                    "attempts": r.get("attempts", []),
+                    "total_attempts": r.get("total_attempts", 1),
                 }))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         elif name == "terminal_execute":
             cmd = args.get("command", "")
             timeout = args.get("timeout", 30)
-            r = await system_app.run_terminal_command(cmd, timeout)
-            output_text = r.get("output", "") if isinstance(r, dict) else (str(r) if r else "")
             if self.sio:
                 loop = asyncio.get_event_loop()
+                from background_cmd import execute_with_retry
+                async def _status_cb(status):
+                    loop.create_task(self.sio.emit("background_cmd_status", {
+                        **status, "tool": name, "command": cmd,
+                    }))
+                r = await execute_with_retry(cmd, context="terminal_execute", timeout=timeout, emit_status=_status_cb)
+                output_text = r.get("output", "") if isinstance(r, dict) else (str(r) if r else "")
                 loop.create_task(self.sio.emit("command_output", {
                     "command": cmd,
                     "output": output_text,
-                    "success": True,
+                    "success": r.get("success", False),
+                    "attempts": r.get("attempts", []),
+                    "total_attempts": r.get("total_attempts", 1),
                 }))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
@@ -3316,6 +3429,71 @@ TEXT: {text}"""
         elif name == "take_photo":
             await self._capture_and_send()
             return types.FunctionResponse(id=fc.id, name=name, response={"result": "Photo captured and sent to your view."})
+
+        # ── Email Tools ─────────────────────────────────────────────
+        elif name == "email_config":
+            from email_reader import set_email_config
+            address = args.get("address", "")
+            password = args.get("password", "")
+            if not address or not password:
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"success": False, "error": "Both address and password are required"}
+                )
+            password_clean = password.replace(" ", "")
+            set_email_config(address, password_clean)
+            log.info(f"[EMAIL] Configured for {address}")
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"success": True, "message": f"Email configured for {address}"}
+            )
+
+        elif name == "read_emails":
+            from email_reader import read_emails, email_configured, get_setup_instructions
+            if not email_configured():
+                instructions = get_setup_instructions()
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={
+                        "success": False,
+                        "error": "Email not configured. I need your Gmail address and an App Password.",
+                        "setup_instructions": instructions,
+                    }
+                )
+            query = args.get("query", "UNSEEN")
+            max_results = min(args.get("max_results", 10), 50)
+            r = await read_emails(query, max_results)
+            if self.sio and r.get("success") and r.get("emails"):
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("email_data", {
+                    "emails": r["emails"],
+                    "total": r["total"],
+                    "query": query,
+                }))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "send_email":
+            from email_reader import send_email, email_configured, get_setup_instructions
+            if not email_configured():
+                instructions = get_setup_instructions()
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={
+                        "success": False,
+                        "error": "Email not configured.",
+                        "setup_instructions": instructions,
+                    }
+                )
+            to = args.get("to", "")
+            subject = args.get("subject", "")
+            body = args.get("body", "")
+            if not to or not subject or not body:
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"success": False, "error": "Recipient, subject, and body are required"}
+                )
+            r = await send_email(to, subject, body)
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         log.warning(f"Unknown tool: {name}")
         return types.FunctionResponse(

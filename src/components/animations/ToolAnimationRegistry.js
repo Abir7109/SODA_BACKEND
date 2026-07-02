@@ -29,8 +29,8 @@ export const TOOL_ANIMATIONS = {
   // ── System ───────────────────────────────────────────────────
   control_system:    { component: 'SystemAnimation', variant: 'control' },
   open_app:          { component: 'AppLaunchAnim',   variant: 'launch' },
-  terminal_execute:  { component: 'AiTerminalCompiler', variant: 'default' },
-  execute_command:   { component: 'TerminalAnim',    variant: 'exec' },
+  terminal_execute:  { component: 'BackgroundCommandAnim', variant: 'exec' },
+  execute_command:   { component: 'BackgroundCommandAnim', variant: 'exec' },
   close_window:      { component: 'CloseAnim',       variant: 'window' },
   close_panel:       { component: 'CloseAnim',       variant: 'panel' },
 
@@ -120,6 +120,11 @@ export const TOOL_ANIMATIONS = {
   netlify_deploy:       { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
   netlify_create_site:  { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
   netlify_list_deploys: { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
+
+  // ── Email ─────────────────────────────────────────────────────
+  read_emails:  { component: 'DataAnim', variant: 'email', panel: 'EmailPanel', panelDir: 'right' },
+  send_email:   { component: 'MessageAnimation', variant: 'email' },
+  email_config: { component: 'DefaultAnimation', variant: 'default' },
 }
 
 /**

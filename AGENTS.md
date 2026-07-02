@@ -21,6 +21,8 @@
 - `stop_audio` (stop current audio playback — no payload)
 - `web_builder_status` (website builder status update — payload `{phase, message, timestamp, builder?, prompt_preview?, elapsed?}`)
 - `web_builder_progress` (website builder build progress — payload `{progress, message, phase, timestamp}`)
+- `email_data` (after `read_emails` runs — payload `{emails: [{id, subject, from, date, body, preview}], total, query}`)
+- `background_cmd_status` (during `execute_command`/`terminal_execute` retry phases — payload `{phase, tool, command, attempt, total, output, error, success}`)
 
 ### Socket.IO Events (Frontend -> Backend)
 - `webview_action_result` (result from a webview action — payload `{id, action, result}`)
@@ -29,6 +31,9 @@
 
 ### Tools (Backend -> Gemini Function Declarations)
 - `get_pagespeed_insights` — calls Google PageSpeed Insights API (free), returns Lighthouse SEO/performance/accessibility scores, Core Web Vitals, and ranked optimization opportunities. Registered in `backend/tools.py` as function declaration, dispatched in `backend/soda.py:_dispatch_tool`. Panel: `PageSpeedPanel` (slide-right).
+- `read_emails` — reads Gmail inbox via IMAP (Python stdlib `imaplib`), returns subject/sender/date/body. Emits `email_data` to frontend. Panel: `EmailPanel` (slide-right). Configured via `GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD` env vars or `email_config` tool.
+- `send_email` — sends email via Gmail SMTP (Python stdlib `smtplib`). Gemini must ask user confirmation before calling.
+- `email_config` — stores Gmail address and app password in memory for the session. Guides user through App Password setup.
 
 ### Webview Action Service (`src/services/WebviewActionService.js`)
 Singleton managing webview instances. Actions:

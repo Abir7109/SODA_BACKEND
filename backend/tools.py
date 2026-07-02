@@ -90,7 +90,7 @@ open_file_tool = {
 
 execute_command_tool = {
     "name": "execute_command",
-    "description": "Executes a system command or opens an application. Use this when the user asks to run programs, open applications, execute system commands, or perform any system operations.",
+    "description": "Executes a system command in the background (no popup windows). Use when the user asks to run programs, execute system commands, or perform any system operations. The command runs hidden and returns the output directly.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
@@ -106,9 +106,12 @@ execute_command_tool = {
 terminal_execute_tool = {
     "name": "terminal_execute",
     "description": (
-        "Run a terminal/shell command on the user's system and return the output. "
+        "Run a terminal/shell command on the user's system in the BACKGROUND "
+        "(no console window pops up) and return the output. "
         "Use this to run scripts, check git status, install packages, list files, etc. "
-        "Output is shown to the user in the HUD terminal. "
+        "Output is captured and returned cleanly — NEVER show empty results. "
+        "If a command fails, the system automatically retries with alternative approaches "
+        "up to 5 times. The frontend shows a thinking animation during retries. "
         "NEVER use for destructive commands without asking first."
     ),
     "parameters": {
@@ -1199,7 +1202,7 @@ browser_command_tool = {
         "'search for [query] in Chrome', 'open [url] in Chrome', 'browse to [url]'. "
         "Only use this when the user explicitly wants to use the system browser — "
         "for internal SODA webview, use open_browser instead. "
-        "Do NOT use this for checking Gmail/email — use browser_automate with a read step instead. "
+        "Do NOT use this for checking Gmail/email — use the read_emails tool instead (IMAP-based). "
         "Examples: browser_command(action='search', query='cat pictures'), "
         "browser_command(action='open', url='https://youtube.com')"
     ),
@@ -1368,7 +1371,9 @@ browser_automate_tool = {
         "Especially useful for sites without APIs (messaging platforms, social media, internal tools). "
         "ALWAYS auto-inject saved credentials from credential_get when doing login workflows. "
         "CRITICAL: When the user asks to log into a service, FIRST call credential_get(service=...) "
-        "to retrieve saved credentials, then inject them at the right step."
+        "to retrieve saved credentials, then inject them at the right step. "
+        "DO NOT use this tool for reading or checking emails. Use read_emails tool instead — "
+        "browser automation does NOT work for Gmail (Google blocks automated login)."
     ),
     "parameters": {
         "type": "OBJECT",
@@ -1692,6 +1697,68 @@ pentest_browser_target_tool = {
     }
 }
 
+read_emails_tool = {
+    "name": "read_emails",
+    "description": (
+        "CRITICAL: This is the ONLY tool for reading emails. NEVER use open_browser or browser_automate "
+        "for email — those tools do NOT work for Gmail (login blocks automation). "
+        "Read emails from the user's Gmail inbox via IMAP. Returns subject, sender, date, and body preview. "
+        "Use when the user asks to 'check my email', 'read my inbox', 'show unread emails', "
+        "'any new emails', 'read my messages', or 'check gmail'. "
+        "If email is not configured, guide the user through setting up an App Password. "
+        "MANDATORY: Call this tool for ANY email-related request. Do NOT open Gmail in the browser."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "query": {
+                "type": "STRING",
+                "description": "IMAP search query: 'UNSEEN' (default), 'ALL', 'FROM someone@example.com', 'SUBJECT meeting', 'SINCE 01-Jan-2025'"
+            },
+            "max_results": {
+                "type": "INTEGER",
+                "description": "Maximum emails to return (default 10, max 50)"
+            }
+        },
+        "required": []
+    }
+}
+
+send_email_tool = {
+    "name": "send_email",
+    "description": (
+        "Send an email via Gmail SMTP. Use ONLY after asking the user to confirm the reply content "
+        "and getting explicit confirmation. Always show the user what will be sent before sending. "
+        "Parameters: recipient address, subject line, and body text."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "to": {"type": "STRING", "description": "Recipient email address"},
+            "subject": {"type": "STRING", "description": "Email subject line"},
+            "body": {"type": "STRING", "description": "Email body text (plain text)"}
+        },
+        "required": ["to", "subject", "body"]
+    }
+}
+
+email_config_tool = {
+    "name": "email_config",
+    "description": (
+        "Configure Gmail IMAP/SMTP credentials. Call this when the user provides their "
+        "email address and app password. Store them for the session. "
+        "Guide them to https://myaccount.google.com/apppasswords if they don't have an app password."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "address": {"type": "STRING", "description": "Full Gmail address (e.g., user@gmail.com)"},
+            "password": {"type": "STRING", "description": "16-character Gmail App Password"}
+        },
+        "required": ["address", "password"]
+    }
+}
+
 tools_list = [{"function_declarations": [
     write_file_tool,
     read_file_tool,
@@ -1830,5 +1897,8 @@ tools_list = [{"function_declarations": [
     credential_list_tool,
     credential_delete_tool,
     browser_automate_tool,
+    read_emails_tool,
+    send_email_tool,
+    email_config_tool,
 ]}]
 

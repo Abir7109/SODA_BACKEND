@@ -23,6 +23,7 @@ import PentestProgressIndicator from './components/PentestProgressIndicator'
 import GitHubPanel from './components/panels/GitHubPanel'
 import DeployPanel from './components/panels/DeployPanel'
 import PageSpeedPanel from './components/panels/PageSpeedPanel'
+import EmailPanel from './components/panels/EmailPanel'
 import IELTSDashboardPanel from './components/panels/IELTSDashboardPanel'
 import IELTSWritingPanel from './components/panels/IELTSWritingPanel'
 import IELTSSpeakingPanel from './components/panels/IELTSSpeakingPanel'
@@ -165,7 +166,7 @@ function AnimationStage({ category, status, toolName, data }) {
   )
 }
 
-function TerminalPanel({ visible, command, output, success, onClose }) {
+function TerminalPanel({ visible, command, output, success, onClose, attempts, total_attempts }) {
   const scrollRef = useRef(null)
   const [pos, setPos] = useState({ x: 12, y: 12 })
   const dragRef = useRef(null)
@@ -228,6 +229,9 @@ function TerminalPanel({ visible, command, output, success, onClose }) {
           <span className="terminal-dot" style={{ background: '#28c840' }} />
         </div>
         <span className="terminal-title">TERMINAL</span>
+        {total_attempts > 1 && (
+          <span className="text-[9px] font-mono opacity-50 ml-2">{total_attempts} attempt{total_attempts > 1 ? 's' : ''}</span>
+        )}
         <button className="terminal-close" onClick={onClose}>✕</button>
       </div>
 
@@ -481,13 +485,14 @@ export default function App() {
   if (isWidgetMode) return <WidgetApp />
 
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
+  const [agentState, setAgentState] = useState(null)
   const [task, setTask] = useState(null)
   const [taskData, setTaskData] = useState(null)
   const pendingIdRef = useRef(null)
   const clearTimerRef = useRef(null)
 
   // Terminal panel state (left)
-  const [terminal, setTerminal] = useState({ visible: false, command: '', output: '', success: null })
+  const [terminal, setTerminal] = useState({ visible: false, command: '', output: '', success: null, attempts: [], total_attempts: 1 })
   const terminalTimerRef = useRef(null)
 
   // Search results panel state (right)
@@ -541,6 +546,7 @@ export default function App() {
   const [gitHubPanel, setGitHubPanel] = useState({ visible: false, data: null })
   const [deployPanel, setDeployPanel] = useState({ visible: false, data: null })
   const [pageSpeedPanel, setPageSpeedPanel] = useState({ visible: false, data: null })
+  const [emailPanel, setEmailPanel] = useState({ visible: false, data: null })
   const [ieltsDashboard, setIeltsDashboard] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsWriting, setIeltsWriting] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsSpeaking, setIeltsSpeaking] = useState({ visible: false, data: null, direction: 'right' })
@@ -689,7 +695,9 @@ export default function App() {
           visible: true,
           command: data.args?.command || '',
           output: '',
-          success: null
+          success: null,
+          attempts: [],
+          total_attempts: 1,
         })
       }
 
@@ -728,20 +736,28 @@ export default function App() {
 
     const onCommandOutput = (data) => {
       markDone()
-      setTaskData(data)
+      setTaskData({
+        ...data,
+        phase: 'done',
+        total_attempts: data.total_attempts || 1,
+        attempt: data.total_attempts || 1,
+      })
 
       setTerminal((prev) => ({
         ...prev,
         visible: true,
         command: data.command || prev.command,
         output: data.output || 'Command completed with no output.',
-        success: data.success
+        success: data.success,
+        attempts: data.attempts || [],
+        total_attempts: data.total_attempts || 1,
       }))
 
       if (terminalTimerRef.current) clearTimeout(terminalTimerRef.current)
+      const dismissMs = data.total_attempts > 1 ? 8000 : (data.success !== false ? 4000 : 10000)
       terminalTimerRef.current = setTimeout(() => {
         setTerminal((prev) => ({ ...prev, visible: false }))
-      }, 3000)
+      }, dismissMs)
     }
 
     const onToolShowcase = (data) => {
@@ -827,8 +843,14 @@ export default function App() {
       }
       setTaskData(data.result || data)
 
-      const toolName = data.tool
+      // Detect agent errors — update agentState + show persistent indicator
       const result = data.result || {}
+      const resultStr = JSON.stringify(result).toLowerCase()
+      if (resultStr.includes('local agent') || resultStr.includes('agent did not respond') || resultStr.includes('agent is not connected')) {
+        setAgentState({ connected: false, error: true, machine_id: null, tools_count: 0, reason: 'timeout_or_not_connected' })
+      }
+
+      const toolName = data.tool
 
       // Check for specialized panel first
       const specializedPanel = getSpecializedPanel(toolName)
@@ -860,6 +882,9 @@ export default function App() {
             return
           case 'PageSpeedPanel':
             setPageSpeedPanel({ visible: true, data: result })
+            return
+          case 'EmailPanel':
+            setEmailPanel({ visible: true, data: result.result || result })
             return
         }
       }
@@ -1021,6 +1046,7 @@ export default function App() {
           setGitHubPanel(prev => ({ ...prev, visible: false }))
           setDeployPanel(prev => ({ ...prev, visible: false }))
           setPageSpeedPanel(prev => ({ ...prev, visible: false }))
+          setEmailPanel(prev => ({ ...prev, visible: false }))
           setIeltsDashboard(prev => ({ ...prev, visible: false }))
           setIeltsWriting(prev => ({ ...prev, visible: false }))
           setIeltsSpeaking(prev => ({ ...prev, visible: false }))
@@ -1056,8 +1082,41 @@ export default function App() {
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
     socket.on('connect_error', onConnectError)
+    socket.on('agent_connection_status', (data) => setAgentState(data))
     socket.on('tool_confirmation_request', onConfirm)
     socket.on('command_output', onCommandOutput)
+    const onBackgroundCmdStatus = (data) => {
+      if (!data) return
+      // Update task and taskData so the retry animation shows proper phase
+      setTask(prev => {
+        if (!prev || (prev.status !== 'running' && prev.status !== 'pending')) return prev
+        return { ...prev, status: 'running' }
+      })
+      setTaskData({
+        command: data.command || '',
+        output: data.output || '',
+        attempt: data.attempt || 0,
+        total_attempts: data.total || 1,
+        phase: data.phase || 'running',
+        success: data.success,
+        error: data.error || '',
+      })
+      // Show terminal output for completed phases
+      if (data.phase === 'done' || data.phase === 'failed') {
+        setTerminal((prev) => ({
+          ...prev,
+          visible: true,
+          command: data.command || prev.command,
+          output: data.output || (data.success ? 'Command completed.' : 'Command failed.'),
+          success: data.success
+        }))
+        if (terminalTimerRef.current) clearTimeout(terminalTimerRef.current)
+        terminalTimerRef.current = setTimeout(() => {
+          setTerminal((prev) => ({ ...prev, visible: false }))
+        }, data.phase === 'failed' ? 10000 : 5000)
+      }
+    }
+    socket.on('background_cmd_status', onBackgroundCmdStatus)
     const onAudioData = (data) => {
       if (data && data.data) playPcmBytes(data.data)
     }
@@ -1098,6 +1157,10 @@ export default function App() {
       }
     }
     socket.on('pentest_output', onPentestOutput)
+    const onEmailData = (data) => {
+      if (data) setEmailPanel({ visible: true, data })
+    }
+    socket.on('email_data', onEmailData)
     const onOpenUrl = (data) => {
       if (data && data.url) openUrlInFloatingWindow(data.url, data.webview_id)
     }
@@ -1293,8 +1356,10 @@ export default function App() {
       socket.off('connect', onConnect)
       socket.off('disconnect', onDisconnect)
       socket.off('connect_error', onConnectError)
+      socket.off('agent_connection_status')
       socket.off('tool_confirmation_request', onConfirm)
       socket.off('command_output', onCommandOutput)
+      socket.off('background_cmd_status')
       socket.off('audio_data', onAudioData)
       socket.off('mic_level', onMicLevel)
       socket.off('tool_showcase', onToolShowcase)
@@ -1327,6 +1392,7 @@ export default function App() {
       socket.off('workflow_start', onWorkflowStart)
       socket.off('pentest_scan_progress', onPentestProgress)
       socket.off('pentest_output', onPentestOutput)
+      socket.off('email_data', onEmailData)
       socket.off('transcription', onUserTranscription)
       socket.off('news_briefing_control', onNewsBriefingControl)
       if (clearTaskTimeoutRef.current) clearTimeout(clearTaskTimeoutRef.current)
@@ -1536,6 +1602,8 @@ export default function App() {
         command={terminal.command}
         output={terminal.output}
         success={terminal.success}
+        attempts={terminal.attempts}
+        total_attempts={terminal.total_attempts}
         onClose={closeTerminal}
       />
 
@@ -1641,6 +1709,8 @@ export default function App() {
         onClose={() => setDeployPanel(prev => ({ ...prev, visible: false }))} />
       <PageSpeedPanel visible={pageSpeedPanel.visible} data={pageSpeedPanel.data}
         onClose={() => setPageSpeedPanel(prev => ({ ...prev, visible: false }))} />
+      <EmailPanel visible={emailPanel.visible} data={emailPanel.data}
+        onClose={() => setEmailPanel(prev => ({ ...prev, visible: false }))} />
 
       {/* ── IELTS Panels ── */}
       <SlidePanel visible={ieltsDashboard.visible} direction={ieltsDashboard.direction}
@@ -1786,6 +1856,23 @@ export default function App() {
             >
               {idleMode ? 'idle' : (connectionStatus === 'connected' ? 'ready' : 'connecting...')}
             </span>
+            {agentState !== null && (
+              <span
+                className="text-[9px] font-medium tracking-wider"
+                style={{ color: agentState.connected ? 'rgba(0,255,136,0.6)' : 'rgba(255,51,85,0.6)' }}
+              >
+                AGENT {agentState.connected ? 'ONLINE' : 'OFFLINE'}
+              </span>
+            )}
+            {agentState?.error && !agentState.connected && (
+              <div className="mt-2 px-2 py-1 border text-[9px] leading-relaxed cursor-pointer"
+                style={{ borderColor: 'rgba(255,51,85,0.3)', backgroundColor: 'rgba(255,51,85,0.08)', color: '#ff4466' }}
+                onClick={() => setAgentState(prev => ({ ...prev, error: false }))}>
+                Local agent offline. Desktop commands require{' '}
+                <code className="font-bold" style={{ color: '#ff6688' }}>py -3.11 backend\local_agent.py</code>
+                <span className="block mt-0.5 opacity-60">Click to dismiss</span>
+              </div>
+            )}
           </div>
         )}
       </div>

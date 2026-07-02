@@ -632,7 +632,8 @@ open_browser_tool = {
         "Set external=true ONLY if the user explicitly says 'open in Chrome', "
         "'open externally', or names a specific browser. "
         "When external=true, SODA also goes to background mode automatically. "
-        "For text-only content extraction, use browse_webpage instead."
+        "For text-only content extraction, use browse_webpage instead. "
+        "DO NOT use this tool for checking or reading emails. Use read_emails tool instead."
     ),
     "parameters": {
         "type": "OBJECT",
