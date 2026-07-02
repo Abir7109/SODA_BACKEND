@@ -8,20 +8,6 @@ export default function CameraWidget({ socket }) {
   const frameTimerRef = useRef(null)
   const canvasRef = useRef(null)
 
-  const startCamera = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: 'user' }
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-      }
-    } catch (err) {
-      console.error('[CAMERA] getUserMedia failed:', err)
-    }
-  }, [])
-
   const captureFrame = useCallback(() => {
     const video = videoRef.current
     const canvas = canvasRef.current
@@ -40,6 +26,20 @@ export default function CameraWidget({ socket }) {
       reader.readAsDataURL(blob)
     }, 'image/jpeg', 0.5)
   }, [socket])
+
+  const startCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: 'user' }
+      })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+      }
+    } catch (err) {
+      console.error('[CAMERA] getUserMedia failed:', err)
+    }
+  }, [])
 
   const switchCamera = useCallback(() => {
     const video = videoRef.current
@@ -72,8 +72,12 @@ export default function CameraWidget({ socket }) {
 
   useEffect(() => {
     startCamera()
+    const firstFrameTimer = setTimeout(() => captureFrame(), 500)
     frameTimerRef.current = setInterval(captureFrame, FRAME_INTERVAL)
-    return stopCamera
+    return () => {
+      clearTimeout(firstFrameTimer)
+      stopCamera()
+    }
   }, [startCamera, captureFrame, stopCamera])
 
   useEffect(() => {

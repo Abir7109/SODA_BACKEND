@@ -3531,22 +3531,31 @@ TEXT: {text}"""
         elif name == "camera_control":
             action = args.get("action", "")
             frame = getattr(self, '_latest_camera_frame', None)
+
+            async def _send_frame():
+                if frame:
+                    raw = base64.b64decode(frame["data"])
+                    await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type=frame["mime_type"]))
+                    if self.video_queue:
+                        await self.video_queue.put(frame)
+                    return True
+                return False
+
             if action == "snapshot":
-                if frame:
-                    raw = base64.b64decode(frame["data"])
-                    await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type=frame["mime_type"]))
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Snapshot taken."})
+                sent = await _send_frame()
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Snapshot {'taken and sent' if sent else 'failed — no frame available'}."})
             elif action == "analyze":
-                if frame:
-                    raw = base64.b64decode(frame["data"])
-                    await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type=frame["mime_type"]))
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera frame sent. Analyze what's in the frame and describe it to the user naturally."})
+                sent = await _send_frame()
+                if sent:
+                    return types.FunctionResponse(id=fc.id, name=name, response={"result": "Frame sent via real-time video. Describe what you see in detail to the user now."})
+                else:
+                    await self._capture_and_send()
+                    return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera snapshot taken via server camera. Describe what you see in detail to the user now."})
             elif action == "save":
                 import camera_capture
                 desc = args.get("description", "Camera photo")
-                if frame:
-                    raw = base64.b64decode(frame["data"])
-                    await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type=frame["mime_type"]))
+                sent = await _send_frame()
+                if sent:
                     result = camera_capture.save_photo(frame["data"], desc)
                 else:
                     result = camera_capture.save_photo("", desc)
