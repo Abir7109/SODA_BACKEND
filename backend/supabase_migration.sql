@@ -1,4 +1,4 @@
--- Migration: Add custom_schemas and custom_entries tables
+-- Migration: Add custom_schemas, custom_entries, and camera_photos tables
 -- Run this in Supabase SQL Editor to complete the Supabase setup
 
 -- Custom memory schemas (created by Gemini at runtime)
@@ -32,3 +32,17 @@ CREATE POLICY "anon_update_custom_schemas" ON custom_schemas FOR UPDATE USING (t
 CREATE POLICY "anon_read_custom_entries" ON custom_entries FOR SELECT USING (true);
 CREATE POLICY "anon_insert_custom_entries" ON custom_entries FOR INSERT WITH CHECK (true);
 CREATE POLICY "anon_delete_custom_entries" ON custom_entries FOR DELETE USING (true);
+
+-- Camera photos table (saved via camera_control save action)
+CREATE TABLE IF NOT EXISTS camera_photos (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    ts TIMESTAMPTZ DEFAULT NOW(),
+    description TEXT DEFAULT '',
+    file_path TEXT NOT NULL,
+    facing TEXT DEFAULT 'user'
+);
+
+ALTER TABLE camera_photos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_read_camera_photos" ON camera_photos FOR SELECT USING (true);
+CREATE POLICY "anon_insert_camera_photos" ON camera_photos FOR INSERT WITH CHECK (true);
+CREATE POLICY "anon_delete_camera_photos" ON camera_photos FOR DELETE USING (true);

@@ -40,6 +40,7 @@ import WorkflowOverlay from './components/workflows/WorkflowOverlay'
 import Notepad from './components/Notepad'
 import BackgroundWidget from './components/BackgroundWidget'
 import PasteBox from './components/pastebox/PasteBox'
+import CameraWidget from './components/CameraWidget'
 import useBrowserMic, { resumeMicAudio } from './services/useBrowserMic'
 // --- Frontend Error Logging ---
 if (typeof socket !== 'undefined') {
@@ -430,6 +431,9 @@ function FloatingContent({ content }) {
 
     case 'pastebox':
       return <PasteBox id={content.id} />
+
+    case 'camera':
+      return <CameraWidget socket={socket} />
 
     default:
       return (
@@ -1183,6 +1187,11 @@ export default function App() {
     }
     socket.on('open_pastebox', onOpenPastebox)
 
+    const onCameraOpen = () => {
+      openFloatingWindow('camera_window', 'CAMERA', { type: 'camera' }, 40, 60, 320, 280)
+    }
+    socket.on('camera_open', onCameraOpen)
+
     const onViewFile = (data) => {
       if (!data || !data.payload) return
       const { payload } = data
@@ -1377,6 +1386,7 @@ export default function App() {
       socket.off('open_url', onOpenUrl)
       socket.off('open_schedule', onOpenSchedule)
       socket.off('open_notepad', onOpenNotepad)
+      socket.off('camera_open', onCameraOpen)
       socket.off('view_file_content', onViewFile)
       socket.off('telegram_message', onTelegramMessage)
       socket.off('webview_action', onWebviewAction)

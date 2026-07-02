@@ -1620,6 +1620,49 @@ take_photo_tool = {
     }
 }
 
+open_camera_tool = {
+    "name": "open_camera",
+    "description": "Open a live camera viewfinder window on the user's screen. "
+                   "Call this when the user says 'open the camera', 'show me the camera', "
+                   "'turn on the camera', or wants to take a photo or see themselves. "
+                   "The window is small, draggable, and mobile-friendly. "
+                   "After opening, use camera_control to capture, analyze, save, switch, or close.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {}
+    }
+}
+
+camera_control_tool = {
+    "name": "camera_control",
+    "description": "Control the live camera window after it is open. "
+                   "snapshot = capture current frame silently for you to see. "
+                   "analyze = capture current frame and describe what you see to the user. "
+                   "save = capture current frame and store it in the database with a description. "
+                   "switch = toggle between front and back camera. "
+                   "close = close the camera window. "
+                   "Use analyze when the user asks 'what do you see', 'what's in front of me', "
+                   "or anything requiring visual description. "
+                   "Use snapshot for silent capture without commentary. "
+                   "Use save when the user says 'save this photo' or 'remember this image'. "
+                   "Use switch when the user says 'switch camera', 'back camera', 'selfie'. "
+                   "Do NOT ask for permission — just call the appropriate action.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "Action to perform. One of: snapshot, analyze, save, switch, close"
+            },
+            "description": {
+                "type": "STRING",
+                "description": "Description of the photo (required when action is save)"
+            }
+        },
+        "required": ["action"]
+    }
+}
+
 start_workflow_tool = {
     "name": "start_workflow",
     "description": (
@@ -1962,6 +2005,8 @@ tools_list = [{"function_declarations": [
     list_installed_apps_tool,
     webview_action_tool,
     take_photo_tool,
+    open_camera_tool,
+    camera_control_tool,
     welcome_home_tool,
     control_system_tool,
     *FEELINGS_TOOLS_SCHEMA,

@@ -1046,6 +1046,12 @@ async def video_frame(sid, data):
         print(f"[SERVER] video_frame: audio_loop is None, frame dropped")
 
 @sio.event
+async def camera_frame(sid, data):
+    image_data = data.get('image')
+    if image_data and audio_loop:
+        audio_loop._latest_camera_frame = {"mime_type": "image/jpeg", "data": image_data}
+
+@sio.event
 async def speaking_timer_expired(sid, data):
     part = data.get('part')
     topic = data.get('topic', '')

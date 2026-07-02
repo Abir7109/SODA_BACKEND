@@ -547,7 +547,24 @@ def _build_system_prompt():
         "- When narrating the memory database, speak as if you're walking them through your files. Start with 'Accessing memory database, sir...' then describe each section one by one. Pause briefly between sections so the animation can keep pace."
         "- Your conversation history is automatically summarized every 20 turns and stored. "
         "On reconnect, summaries are injected so you remember past sessions naturally."
-"\n\nNEWS — Only call get_news if the user EXPLICITLY asks for news or current events. "
+
+        "\n\nCAMERA — You have a live camera viewfinder tool (open_camera) and a control tool (camera_control).\n"
+        "- When the user says 'open the camera', 'show me the camera', 'turn on the camera', or wants to take a photo, call open_camera immediately. This opens a small draggable window on their screen with live video.\n"
+        "- After the camera is open, use camera_control for everything:\n"
+        "  • snapshot = silent capture (you see the frame, keep talking)\n"
+        "  • analyze = capture and describe what you see out loud to the user\n"
+        "  • save = capture and store in database with a description\n"
+        "  • switch = toggle front/back camera\n"
+        "  • close = dismiss the camera window\n"
+        "- When the user asks 'what do you see', 'what's in front of me', or anything about their surroundings with the camera open, call camera_control(action='analyze'). You will receive the frame and can describe it.\n"
+        "- When the user says 'take a picture' or 'capture this', call camera_control(action='snapshot').\n"
+        "- When the user says 'save this photo' or 'remember this image', call camera_control(action='save', description='...').\n"
+        "- When the user says 'switch camera', 'back camera', 'front camera', 'selfie', call camera_control(action='switch').\n"
+        "- When the user says 'close the camera' or 'stop camera', call camera_control(action='close').\n"
+        "- Do NOT ask for permission — just call the appropriate action.\n"
+        "- Cost: live video on screen costs 0 API calls. Frame capture costs 1 call. Photo saves cost 1 call + database write."
+
+        "\n\nNEWS — Only call get_news if the user EXPLICITLY asks for news or current events. "
 "Do NOT call it proactively during greetings or general conversation. "
 "When called, it fetches latest stories AND opens the newsroom HUD. "
 "The tool response includes the articles — read their titles and summaries to the user as the news wall appears. "
@@ -3500,6 +3517,44 @@ TEXT: {text}"""
         elif name == "take_photo":
             await self._capture_and_send()
             return types.FunctionResponse(id=fc.id, name=name, response={"result": "Photo captured and sent to your view."})
+
+        elif name == "open_camera":
+            await self.sio.emit("camera_open", {})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera opened on your screen, sir."})
+
+        elif name == "camera_control":
+            action = args.get("action", "")
+            frame = getattr(self, '_latest_camera_frame', None)
+            if action == "snapshot":
+                if frame:
+                    await self.video_queue.put(frame)
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Snapshot taken."})
+            elif action == "analyze":
+                if frame:
+                    await self.video_queue.put(frame)
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Frame sent for analysis."})
+            elif action == "save":
+                import camera_capture
+                desc = args.get("description", "Camera photo")
+                if frame:
+                    await self.video_queue.put(frame)
+                    result = camera_capture.save_photo(frame["data"], desc)
+                else:
+                    result = camera_capture.save_photo("", desc)
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Photo saved. {result.get('record', {})}"})
+            elif action == "switch":
+                await self.sio.emit("camera_switch", {})
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera switched."})
+            elif action == "query":
+                import camera_capture
+                limit = args.get("limit", 10)
+                photos = camera_capture.query_photos(limit)
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": json.dumps(photos)})
+            elif action == "close":
+                self._latest_camera_frame = None
+                await self.sio.emit("camera_close", {})
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera closed."})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Unknown action: {action}"})
 
         # ── Email Tools ─────────────────────────────────────────────
         elif name == "email_config":
