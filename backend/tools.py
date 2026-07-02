@@ -1809,17 +1809,16 @@ store_custom_memory_tool = {
     "description": (
         "Store a structured data entry in a custom memory schema. "
         "Use after creating a schema with create_memory_schema. "
-        "The data dict must match the schema's column definitions. "
-        "Example: store_custom_memory(schema_name='books', data={title='1984', author='George Orwell', status='want to read'})"
+        "Pass data as a JSON string matching the schema's column definitions. "
+        "Example: store_custom_memory(schema_name='books', data='{\"title\":\"1984\",\"author\":\"George Orwell\",\"status\":\"want to read\"}')"
     ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
             "schema_name": {"type": "STRING", "description": "Name of the schema to store data in"},
             "data": {
-                "type": "OBJECT",
-                "description": "Key-value pairs matching the schema's column definitions",
-                "additionalProperties": True
+                "type": "STRING",
+                "description": "JSON string of key-value pairs matching the schema's column definitions. Example: '{\"title\":\"1984\",\"author\":\"George Orwell\"}'"
             }
         },
         "required": ["schema_name", "data"]

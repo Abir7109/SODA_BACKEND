@@ -3583,9 +3583,13 @@ TEXT: {text}"""
 
         elif name == "store_custom_memory":
             import custom_memory
+            try:
+                data = json.loads(args.get("data", "{}"))
+            except (json.JSONDecodeError, TypeError):
+                data = {}
             r = custom_memory.store_custom_memory(
                 schema_name=args.get("schema_name", ""),
-                data=args.get("data", {}),
+                data=data,
             )
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
