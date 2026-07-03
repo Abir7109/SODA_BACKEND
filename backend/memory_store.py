@@ -196,17 +196,18 @@ def list_people(limit=20):
     if db:
         try:
             r = db.table("people").select("*").order("created_at", desc=True).limit(limit).execute()
-            entries = []
-            for row in reversed(r.data or []):
-                entries.append({
-                    "name": row.get("name", ""),
-                    "relationship": row.get("relationship", ""),
-                    "traits": row.get("traits", ""),
-                    "preferences": row.get("preferences", ""),
-                    "notes": row.get("notes", ""),
-                    "ts": row.get("created_at", ""),
-                })
-            return entries
+            if r.data:
+                entries = []
+                for row in reversed(r.data):
+                    entries.append({
+                        "name": row.get("name", ""),
+                        "relationship": row.get("relationship", ""),
+                        "traits": row.get("traits", ""),
+                        "preferences": row.get("preferences", ""),
+                        "notes": row.get("notes", ""),
+                        "ts": row.get("created_at", ""),
+                    })
+                return entries
         except Exception:
             pass
     if not PEOPLE_PATH.exists():
@@ -245,7 +246,7 @@ def remember_lesson(situation, correction):
                 "situation": situation,
                 "correction": correction,
                 "count": 1,
-                "ts": now,
+                "created_at": now,
             }
             if existing.data and len(existing.data) > 0:
                 row = existing.data[0]
@@ -300,18 +301,19 @@ def recall_lessons(query="", limit=5):
             r = (db.table("lessons").select("*")
                  .order("created_at", desc=True)
                  .limit(limit).execute())
-            entries = []
-            for row in reversed(r.data or []):
-                situation = row.get("situation", "")
-                correction = row.get("correction", "")
-                if not q or q in f"{situation} {correction}".lower():
-                    entries.append({
-                        "situation": situation,
-                        "correction": correction,
-                        "count": row.get("count", 1),
-                        "ts": row.get("created_at", ""),
-                    })
-            return entries
+            if r.data:
+                entries = []
+                for row in reversed(r.data):
+                    situation = row.get("situation", "")
+                    correction = row.get("correction", "")
+                    if not q or q in f"{situation} {correction}".lower():
+                        entries.append({
+                            "situation": situation,
+                            "correction": correction,
+                            "count": row.get("count", 1),
+                            "ts": row.get("created_at", ""),
+                        })
+                return entries
         except Exception:
             pass
     if not LESSONS_PATH.exists():
@@ -436,22 +438,23 @@ def get_recent_summaries(limit=3):
             r = (db.table("conversation_summaries").select("*")
                  .order("created_at", desc=True)
                  .limit(limit).execute())
-            entries = []
-            for row in reversed(r.data or []):
-                summary_data = row.get("summary", {})
-                if isinstance(summary_data, str):
-                    try:
-                        summary_data = json.loads(summary_data)
-                    except Exception:
-                        summary_data = {}
-                entries.append({
-                    "session_id": row.get("session_id", ""),
-                    "topics": row.get("topics", []),
-                    "key_decisions": summary_data.get("key_decisions", []),
-                    "last_exchanges": summary_data.get("last_exchanges", []),
-                    "ts": row.get("created_at", ""),
-                })
-            return entries
+            if r.data:
+                entries = []
+                for row in reversed(r.data):
+                    summary_data = row.get("summary", {})
+                    if isinstance(summary_data, str):
+                        try:
+                            summary_data = json.loads(summary_data)
+                        except Exception:
+                            summary_data = {}
+                    entries.append({
+                        "session_id": row.get("session_id", ""),
+                        "topics": row.get("topics", []),
+                        "key_decisions": summary_data.get("key_decisions", []),
+                        "last_exchanges": summary_data.get("last_exchanges", []),
+                        "ts": row.get("created_at", ""),
+                    })
+                return entries
         except Exception:
             pass
     if not SUMMARIES_PATH.exists():

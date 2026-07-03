@@ -84,13 +84,13 @@ def _save_profile(profile: dict) -> None:
                 "nationality": profile.get("nationality", ""),
                 "language": profile.get("language", "en"),
                 "preferences": profile.get("preferences", {}),
-                "updated": now_iso,
+                "updated_at": now_iso,
             }
             if existing.data and len(existing.data) > 0:
                 row_id = existing.data[0]["id"]
                 db.table("profiles").update(payload).eq("id", row_id).execute()
             else:
-                payload["created"] = now_iso
+                payload["created_at"] = now_iso
                 db.table("profiles").insert(payload).execute()
         except Exception:
             pass
@@ -186,14 +186,15 @@ def list_facts(limit: int = 50) -> dict:
     if db:
         try:
             r = db.table("facts").select("*").order("created_at", desc=True).limit(limit).execute()
-            facts = []
-            for row in reversed(r.data or []):
-                facts.append({
-                    "key": row.get("key", ""),
-                    "value": row.get("value", ""),
-                    "ts": row.get("created_at", ""),
-                })
-            return {"success": True, "count": len(facts), "facts": facts}
+            if r.data:
+                facts = []
+                for row in reversed(r.data):
+                    facts.append({
+                        "key": row.get("key", ""),
+                        "value": row.get("value", ""),
+                        "ts": row.get("created_at", ""),
+                    })
+                return {"success": True, "count": len(facts), "facts": facts}
         except Exception:
             pass
     if not FACTS_PATH.exists():
