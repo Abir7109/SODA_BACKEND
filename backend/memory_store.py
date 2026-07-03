@@ -502,6 +502,65 @@ def list_memory(type="all", limit=10):
 
 # ── Context Block Builder ──
 
+CHECKPOINT_ID = "__recent__"
+
+
+def checkpoint_exchanges(exchanges):
+    """Save last N raw exchanges to Supabase for crash survival. Upserts on session_id."""
+    if not exchanges:
+        return
+    db = _db()
+    if db:
+        try:
+            existing = db.table("conversation_summaries").select("id").eq("session_id", CHECKPOINT_ID).limit(1).execute()
+            payload = {
+                "session_id": CHECKPOINT_ID,
+                "summary": {"raw_exchanges": exchanges},
+                "topics": [],
+            }
+            if existing.data and len(existing.data) > 0:
+                db.table("conversation_summaries").update(payload).eq("session_id", CHECKPOINT_ID).execute()
+            else:
+                db.table("conversation_summaries").insert(payload).execute()
+        except Exception:
+            pass
+    CHK_PATH = MEM_DIR / "checkpoint.json"
+    try:
+        CHK_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(CHK_PATH, "w", encoding="utf-8") as f:
+            json.dump(exchanges, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def load_recent_exchanges():
+    """Load the last checkpointed raw exchanges from Supabase or file fallback."""
+    db = _db()
+    if db:
+        try:
+            r = db.table("conversation_summaries").select("summary").eq("session_id", CHECKPOINT_ID).limit(1).execute()
+            if r.data and len(r.data) > 0:
+                summary_data = r.data[0].get("summary", {})
+                if isinstance(summary_data, str):
+                    try:
+                        summary_data = json.loads(summary_data)
+                    except Exception:
+                        summary_data = {}
+                raw = summary_data.get("raw_exchanges", [])
+                if raw:
+                    return raw
+        except Exception:
+            pass
+    CHK_PATH = MEM_DIR / "checkpoint.json"
+    try:
+        if CHK_PATH.exists():
+            with open(CHK_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return []
+
+
 def build_context_block():
     """Build a memory-restoration context block for session start injection."""
     from user_memory import memory_summary, list_facts
@@ -541,6 +600,15 @@ def build_context_block():
         topics = s.get("topics", [])
         if topics:
             parts.append(f"LAST SESSION TOPICS: {', '.join(topics[:3])}")
+
+    recent_exchanges = load_recent_exchanges()
+    if recent_exchanges:
+        parts.append("RECENT CONVERSATION:")
+        for exc in recent_exchanges[-5:]:
+            if exc.get("user"):
+                parts.append(f"  You said: {exc['user'][:200]}")
+            if exc.get("model"):
+                parts.append(f"  S.O.D.A. replied: {exc['model'][:200]}")
 
     try:
         from feelings_memory import FeelingsMemory

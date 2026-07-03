@@ -889,7 +889,7 @@ class AudioLoop:
         self._turn_count = 0
         self._context_refresh_interval = 999
         self._last_refresh_turn = 0
-        self._summary_interval = 20
+        self._summary_interval = 5
         self._last_summary_turn = 0
         self._session_id = str(uuid.uuid4())[:8]
         self._exchange_history = []
@@ -1113,11 +1113,22 @@ class AudioLoop:
                     topics=summary.get("topics", []),
                     key_decisions=summary.get("key_points", []),
                     last_exchanges=[{k: v for k, v in e.items() if k in ("user", "model")}
-                                    for e in recent[-3:]],
+                                    for e in recent[-10:]],
                 )
                 log.info(f"[Summary] Saved at turn {self._turn_count}: {summary.get('topics', [])}")
         except Exception as e:
             log.warning(f"[Summary] Failed: {e}")
+
+    async def _checkpoint_exchanges(self):
+        """Fire-and-forget: save last 5 raw exchanges to Supabase for crash survival."""
+        try:
+            recent = self._exchange_history[-5:]
+            if recent:
+                memory_store.checkpoint_exchanges(
+                    [{k: v for k, v in e.items() if k in ("user", "model")} for e in recent]
+                )
+        except Exception:
+            pass
 
     async def _inject_context_refresh(self, include_summaries=True):
         if not self.session:
@@ -1652,6 +1663,8 @@ class AudioLoop:
                         if len(self._exchange_history) > 30:
                             self._exchange_history = self._exchange_history[-30:]
                         self._save_context_history()
+                        if self._turn_count % 3 == 0:
+                            asyncio.create_task(self._checkpoint_exchanges())
                 if self._turn_count - self._last_refresh_turn >= self._context_refresh_interval:
                     if self._exchange_history and self.session:
                         await self._inject_context_refresh()
