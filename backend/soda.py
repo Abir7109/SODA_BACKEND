@@ -1144,17 +1144,6 @@ class AudioLoop:
         except Exception as e:
             log.warning(f"[Summary] Failed: {e}")
 
-    async def _checkpoint_exchanges(self):
-        """Fire-and-forget: save last 5 raw exchanges to Supabase for crash survival."""
-        try:
-            recent = self._exchange_history[-5:]
-            if recent:
-                memory_store.checkpoint_exchanges(
-                    [{k: v for k, v in e.items() if k in ("user", "model")} for e in recent]
-                )
-        except Exception:
-            pass
-
     async def _inject_context_refresh(self, include_summaries=True):
         if not self.session:
             return
@@ -1688,8 +1677,6 @@ class AudioLoop:
                         if len(self._exchange_history) > 30:
                             self._exchange_history = self._exchange_history[-30:]
                         self._save_context_history()
-                        if self._turn_count % 3 == 0:
-                            asyncio.create_task(self._checkpoint_exchanges())
                 if self._turn_count - self._last_refresh_turn >= self._context_refresh_interval:
                     if self._exchange_history and self.session:
                         await self._inject_context_refresh()
