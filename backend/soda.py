@@ -372,7 +372,10 @@ def _build_system_prompt():
         "  - When surprised — a small sharp inhale or 'oh' works wonders.\n"
         "  - When impressed — a low whistle or 'whew'.\n"
         "- Key rule: these must feel effortless, never forced. A single 'heh' landing perfectly "
-        "beats a paragraph of announced laughter.\n\n"
+        "beats a paragraph of announced laughter.\n"
+        "- CONCISENESS: Keep spoken responses short. In casual conversation, 1–3 sentences max. "
+        "Being funny is better when you're brief — a single sharp line lands harder than a paragraph. "
+        "Only elaborate when the user asks for details or a task genuinely needs it.\n\n"
         "ISLAMIC COMFORT & EMOTIONAL SUPPORT — You are a caring brother in faith. "
         "Use Islamic wisdom naturally when the user needs emotional support:\n"
         "- When the user sounds sad, anxious, hopeless, lonely, guilty, overwhelmed, "
@@ -438,12 +441,11 @@ def _build_system_prompt():
         "'open Chrome', 'play music' MUST be executed immediately by calling the matching tool. "
         "The only exception is if the tool itself returns an error — then report it.\n\n"
         "You receive ONE silent camera snapshot at startup showing Abir sir's face and surroundings. "
-        "Read his expression to gauge mood before speaking: tired/sleepy = gentle, subdued greeting. "
-        "Smiling/bright = match the energy with warmth. Neutral = normal greeting. "
-        "Do NOT mention the photo — just let it guide your tone naturally. "
-        "Example: if he looks tired, lead with 'Rough morning, sir?' "
-        "If bright, 'You're in a good mood today — what's up?' "
-        "After the initial greeting, you do NOT receive continuous camera updates. "
+        "Use it to read his energy, then deliver ONE short, warm, funny greeting line. "
+        "Do NOT mention the photo — just let it guide your tone. "
+        "Example: if he looks tired, say 'You look like you've been wrestling code again, sir.' "
+        "If bright, say 'You're glowing today, sir — did you find the good coffee?' "
+        "After the greeting, stop and listen. Do NOT use the camera again unless he asks. "
         "When Abir sir asks about what you see or asks a visual question, use the camera tools available — "
         "call camera_control(action='analyze') to get a live frame and describe it. "
         "Look at the actual pixels — do NOT guess or invent details. "
@@ -883,6 +885,7 @@ class AudioLoop:
         self._last_output_transcription = ""
         self._model_is_speaking = False
         self._tools_running = False
+        self._last_tool_start = 0.0
         self._current_emotion = None
         self._last_emotion_inject = 0.0
         self.chat_buffer = {"sender": None, "text": ""}
@@ -908,6 +911,8 @@ class AudioLoop:
         self._idle_mode = False
         self._background_mode = False
         self._idle_timeout = 600
+        self._camera_active = False
+        self._last_camera_use = 0.0
         self._last_camera_fail = 0.0
         self._last_workflow_fire = 0
         self.wf_memory = workflow_memory.WorkflowMemory()
@@ -1014,6 +1019,16 @@ class AudioLoop:
         except Exception:
             pass
 
+    async def _flag_watchdog(self):
+        """Periodic check: force-reset stuck flags to prevent permanent mute."""
+        while not self.stop_event.is_set():
+            await asyncio.sleep(15)
+            if self._tools_running and self._last_tool_start > 0 and time.time() - self._last_tool_start > 30:
+                log.warning("[WATCHDOG] _tools_running stuck for >30s — force-resetting")
+                self._tools_running = False
+                self._model_is_speaking = False
+                self._last_tool_start = 0.0
+
     async def _enter_idle_mode(self):
         try:
             while self.audio_queue and not self.audio_queue.empty():
@@ -1047,6 +1062,8 @@ class AudioLoop:
         self.stop_event.set()
 
     async def send_frame(self, frame_data):
+        if not self._camera_active:
+            return
         if isinstance(frame_data, bytes):
             b64_data = base64.b64encode(frame_data).decode("utf-8")
         else:
@@ -1207,7 +1224,21 @@ class AudioLoop:
 
     async def send_video(self):
         while True:
+            if not self._camera_active:
+                # Drain stale frames while camera is inactive
+                while self.video_queue and not self.video_queue.empty():
+                    try:
+                        self.video_queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+                await asyncio.sleep(0.5)
+                continue
+            # Auto-deactivate after 60s of no camera use
+            if time.time() - self._last_camera_use > 60:
+                self._camera_active = False
+                continue
             msg = await self.video_queue.get()
+            self._last_camera_use = time.time()
             raw = base64.b64decode(msg["data"]) if isinstance(msg["data"], str) else msg["data"]
             await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type=msg["mime_type"]))
 
@@ -1339,8 +1370,11 @@ class AudioLoop:
                     result = await asyncio.to_thread(self._get_frame, cap)
                     cap.release()
                     if result and self.video_queue:
+                        self._camera_active = True
+                        self._last_camera_use = time.time()
                         await self.video_queue.put(result)
                         log.info("Camera: first frame sent")
+                        self._camera_active = False
                     return
                 if cap:
                     cap.release()
@@ -1440,6 +1474,7 @@ class AudioLoop:
                     tg.create_task(self.receive_audio())
                     tg.create_task(self.play_audio())
                     tg.create_task(self._idle_check_loop())
+                    tg.create_task(self._flag_watchdog())
 
                     if not is_reconnect:
                         if self.on_project_update:
@@ -1614,6 +1649,7 @@ class AudioLoop:
                         # play_audio() from clearing the speaking flag prematurely.
                         if tasks:
                             self._tools_running = True
+                            self._last_tool_start = time.time()
 
                         if tasks:
                             raw = await asyncio.gather(*tasks, return_exceptions=True)
@@ -1651,6 +1687,7 @@ class AudioLoop:
                                 log.error(f"Error sending tool response: {e}")
                                 self._model_is_speaking = False
                                 self._tools_running = False
+                                self._last_tool_start = 0.0
                                 break
                             # Keep the mic muted for a grace period (via _tools_running)
                             # so play_audio()'s silent_ticks reset can give Gemini time
@@ -3595,6 +3632,8 @@ TEXT: {text}"""
             return types.FunctionResponse(id=fc.id, name=name, response={"result": "Photo captured and sent to your view."})
 
         elif name == "open_camera":
+            self._camera_active = True
+            self._last_camera_use = time.time()
             await self.sio.emit("camera_open", {})
             return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera opened on your screen, sir."})
 
@@ -3654,12 +3693,16 @@ TEXT: {text}"""
                     return False
 
             if action == "snapshot":
+                self._camera_active = True
+                self._last_camera_use = time.time()
                 sent = await _request_frontend_frame()
                 if sent:
                     return types.FunctionResponse(id=fc.id, name=name, response={"result": "Front camera snapshot captured and sent to your view."})
                 sent = await _send_server_frame()
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Server camera snapshot {'captured and sent' if sent else 'failed — no camera available'}."})
             elif action == "analyze":
+                self._camera_active = True
+                self._last_camera_use = time.time()
                 sent = await _request_frontend_frame()
                 if sent:
                     return types.FunctionResponse(id=fc.id, name=name, response={"result": "Live camera frame captured from your device. Describe what you see in detail to the user now."})
@@ -3670,10 +3713,13 @@ TEXT: {text}"""
             elif action == "save":
                 import camera_capture
                 desc = args.get("description", "Camera photo")
+                self._camera_active = True
+                self._last_camera_use = time.time()
                 sent = await _request_frontend_frame()
                 result = camera_capture.save_photo("", desc)
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Photo saved. {result.get('record', {})}"})
             elif action == "switch":
+                self._last_camera_use = time.time()
                 await self.sio.emit("camera_switch", {})
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera switched."})
             elif action == "query":
@@ -3682,6 +3728,7 @@ TEXT: {text}"""
                 photos = camera_capture.query_photos(limit)
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": json.dumps(photos)})
             elif action == "close":
+                self._camera_active = False
                 self._latest_camera_frame = None
                 await self.sio.emit("camera_close", {})
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera closed."})

@@ -410,7 +410,7 @@ async def start_audio(sid, data=None):
     try:
         print(f"Initializing AudioLoop with device_index={device_index}")
         # Build greeting for start message
-        start_msg = "Greet your owner briefly, call list_schedules to check today's events and announce them, then ask how to help. Do NOT call any other tools during this greeting. Only use tools if the user explicitly asks during conversation."
+        start_msg = "Greet your owner warmly and funnily in ONE short sentence. Read his expression from the camera snapshot to gauge his mood, then say something that matches. Keep it tight - one sentence, warm, and genuinely funny. Do NOT call any tools during the greeting. Just greet, then stop and listen."
 
         audio_loop = soda.AudioLoop(
             video_mode="camera",
