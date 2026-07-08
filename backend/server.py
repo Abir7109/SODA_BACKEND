@@ -271,8 +271,13 @@ async def disconnect(sid):
         machine_id = agent.get('machine_id', sid)
         connected_at = agent.get('connected_at', '?')
         tools_count = len(agent.get('tools', []))
-        print(f"[AGENT] Agent disconnected: {machine_id} ({tools_count} tools, connected since {connected_at})")
+        agent_type = agent.get('agent_type', 'desktop')
+        print(f"[AGENT] Agent disconnected: {machine_id} (type={agent_type}, {tools_count} tools, connected since {connected_at})")
         print(f"[AGENT] Active agents remaining: {len(_connected_agents)}")
+        if agent_type == 'android':
+            for loop in list(_active_loops.values()):
+                if hasattr(loop, '_android_agent_sid') and loop._android_agent_sid == sid:
+                    loop._android_agent_sid = None
         await sio.emit('agent_connection_status', {
             'connected': False,
             'machine_id': machine_id,
@@ -283,12 +288,36 @@ async def disconnect(sid):
 # ── Local Agent Events ──
 @sio.event
 async def agent_register(sid, data):
-    """Register a local desktop agent for Windows-local tool execution."""
+    """Register a local desktop agent or Android agent for remote tool execution."""
+    agent_type = data.get('agent_type', 'desktop')
     machine_id = data.get('machine_id', sid)
     platform = data.get('platform', 'unknown')
     tools = data.get('tools', [])
     app_registry = data.get('app_registry', {})
     app_count = app_registry.get('count', 0)
+
+    if agent_type == 'android':
+        print(f"[ANDROID] Registering Android agent: {machine_id} — {len(tools)} tools")
+        _connected_agents[sid] = {
+            'agent_type': 'android',
+            'machine_id': machine_id,
+            'platform': platform,
+            'tools': tools,
+            'connected_at': datetime.now().isoformat(),
+            'sid': sid,
+        }
+        # Notify any active AudioLoop
+        for loop in list(_active_loops.values()):
+            if hasattr(loop, '_android_agent_sid'):
+                loop._android_agent_sid = sid
+        await sio.emit('agent_connection_status', {
+            'connected': True,
+            'machine_id': machine_id,
+            'platform': 'android',
+            'tools_count': len(tools),
+        })
+        return
+
     # Remove stale agent entries with the same machine_id BUT fewer tools (zombie detection)
     for old_sid in list(_connected_agents.keys()):
         if old_sid == sid:
@@ -301,6 +330,7 @@ async def agent_register(sid, data):
                 if stale:
                     print(f"[AGENT] Replaced stale agent: {machine_id} ({old_tools}→{new_tools} tools, old SID: {old_sid})")
     _connected_agents[sid] = {
+        'agent_type': 'desktop',
         'machine_id': machine_id,
         'platform': platform,
         'tools': tools,
@@ -323,7 +353,12 @@ async def agent_disconnect(sid, data=None):
     agent = _connected_agents.pop(sid, None)
     if agent:
         machine_id = agent.get('machine_id', sid)
-        print(f"[AGENT] Agent disconnected (explicit): {machine_id}")
+        agent_type = agent.get('agent_type', 'desktop')
+        print(f"[AGENT] Agent disconnected (explicit): {machine_id} (type={agent_type})")
+        if agent_type == 'android':
+            for loop in list(_active_loops.values()):
+                if hasattr(loop, '_android_agent_sid') and loop._android_agent_sid == sid:
+                    loop._android_agent_sid = None
         await sio.emit('agent_connection_status', {
             'connected': False,
             'machine_id': machine_id,

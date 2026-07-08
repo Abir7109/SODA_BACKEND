@@ -1895,6 +1895,268 @@ query_custom_memory_tool = {
     }
 }
 
+# ── Android Agent Tool Definitions ──
+
+android_volume_set_tool = {
+    "name": "android_volume_set",
+    "description": "Set the Android device volume for a specific audio stream. "
+                   "Use when the user says 'turn down the volume', 'set volume to 50%', 'make it louder'. "
+                   "Only works when an Android device is connected.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "level": {
+                "type": "NUMBER",
+                "description": "Volume level from 0 to 100"
+            },
+            "stream": {
+                "type": "STRING",
+                "description": "Audio stream. One of: media (default), ring, alarm, notification",
+                "enum": ["media", "ring", "alarm", "notification"]
+            }
+        },
+        "required": ["level"]
+    }
+}
+
+android_volume_get_tool = {
+    "name": "android_volume_get",
+    "description": "Get current volume levels for all audio streams on the Android device. "
+                   "Use when the user asks 'what's my volume at?' or 'check the volume'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {}
+    }
+}
+
+android_app_open_tool = {
+    "name": "android_app_open",
+    "description": "Open an app on the Android device by package name or app name. "
+                   "Use when the user says 'open YouTube', 'launch Chrome', 'start Instagram'. "
+                   "Only works when an Android device is connected.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "package_name": {
+                "type": "STRING",
+                "description": "Android package name or app display name (e.g. 'com.google.android.youtube' or 'YouTube')"
+            }
+        },
+        "required": ["package_name"]
+    }
+}
+
+android_app_close_tool = {
+    "name": "android_app_close",
+    "description": "Force-close a running app on the Android device by package name. "
+                   "Use when the user says 'close YouTube', 'kill Chrome', 'stop Instagram'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "package_name": {
+                "type": "STRING",
+                "description": "Android package name of the app to close (e.g. 'com.google.android.youtube')"
+            }
+        },
+        "required": ["package_name"]
+    }
+}
+
+android_app_list_tool = {
+    "name": "android_app_list",
+    "description": "List installed apps on the Android device, optionally filtered by a search query. "
+                   "Use when the user says 'what apps do I have?', 'show me my apps', or 'find an app'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "query": {
+                "type": "STRING",
+                "description": "Optional search term to filter apps by name or package"
+            }
+        }
+    }
+}
+
+android_send_sms_tool = {
+    "name": "android_send_sms",
+    "description": "Send an SMS text message from the Android device to a phone number. "
+                   "Use when the user says 'send a text to...', 'message [name] saying...'. "
+                   "Only works when an Android device is connected.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "phone": {
+                "type": "STRING",
+                "description": "Phone number to send the SMS to (with country code)"
+            },
+            "message": {
+                "type": "STRING",
+                "description": "Text message content to send"
+            }
+        },
+        "required": ["phone", "message"]
+    }
+}
+
+android_wifi_control_tool = {
+    "name": "android_wifi_control",
+    "description": "Control WiFi on the Android device: turn on, turn off, or toggle. "
+                   "Use when the user says 'turn on WiFi', 'turn off WiFi', 'toggle WiFi'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "Action: 'on', 'off', or 'toggle'",
+                "enum": ["on", "off", "toggle"]
+            }
+        },
+        "required": ["action"]
+    }
+}
+
+android_bluetooth_control_tool = {
+    "name": "android_bluetooth_control",
+    "description": "Control Bluetooth on the Android device: turn on, turn off, or toggle. "
+                   "Use when the user says 'turn on Bluetooth', 'turn off Bluetooth', 'toggle Bluetooth'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "Action: 'on', 'off', or 'toggle'",
+                "enum": ["on", "off", "toggle"]
+            }
+        },
+        "required": ["action"]
+    }
+}
+
+android_brightness_set_tool = {
+    "name": "android_brightness_set",
+    "description": "Set the Android screen brightness level. "
+                   "Use when the user says 'brighten the screen', 'dim the screen', 'set brightness to 50%'. "
+                   "Level is 0 (darkest) to 255 (brightest).",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "level": {
+                "type": "NUMBER",
+                "description": "Brightness level from 0 (darkest) to 255 (brightest)"
+            }
+        },
+        "required": ["level"]
+    }
+}
+
+android_brightness_get_tool = {
+    "name": "android_brightness_get",
+    "description": "Get the current Android screen brightness level. "
+                   "Use when the user asks 'how bright is my screen?'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {}
+    }
+}
+
+android_flashlight_tool = {
+    "name": "android_flashlight",
+    "description": "Control the Android device's flashlight (camera LED flash). "
+                   "Use when the user says 'turn on the flashlight', 'turn off the flashlight', 'flashlight'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "Action: 'on', 'off', or 'toggle'",
+                "enum": ["on", "off", "toggle"]
+            }
+        },
+        "required": ["action"]
+    }
+}
+
+android_make_call_tool = {
+    "name": "android_make_call",
+    "description": "Initiate a phone call from the Android device to a phone number. "
+                   "Use when the user says 'call [name/number]', 'phone [name]'. "
+                   "WARNING: This will actually place a call. Confirm with the user first. "
+                   "Only works when an Android device is connected.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "phone": {
+                "type": "STRING",
+                "description": "Phone number to call (with country code)"
+            }
+        },
+        "required": ["phone"]
+    }
+}
+
+android_location_get_tool = {
+    "name": "android_location_get",
+    "description": "Get the current GPS location of the Android device (latitude and longitude). "
+                   "Use when the user asks 'where am I?', 'what's my location?', 'find my phone'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {}
+    }
+}
+
+android_read_notifications_tool = {
+    "name": "android_read_notifications",
+    "description": "Read recent notifications from the Android device. "
+                   "Use when the user asks 'check my notifications', 'what notifications do I have?', "
+                   "'did I get any messages?'. Returns app name, title, and text of recent notifications.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "limit": {
+                "type": "NUMBER",
+                "description": "Maximum number of notifications to return (default 10)"
+            }
+        }
+    }
+}
+
+android_whatsapp_send_tool = {
+    "name": "android_whatsapp_send",
+    "description": "Send a WhatsApp message from the Android device. Opens WhatsApp with the message pre-filled. "
+                   "Use when the user says 'WhatsApp [name] saying...', 'message [name] on WhatsApp'. "
+                   "Only works when an Android device is connected.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "contact": {
+                "type": "STRING",
+                "description": "Contact name or phone number to send the WhatsApp message to"
+            },
+            "message": {
+                "type": "STRING",
+                "description": "Message text to send via WhatsApp"
+            }
+        },
+        "required": ["contact", "message"]
+    }
+}
+
+android_whatsapp_read_tool = {
+    "name": "android_whatsapp_read",
+    "description": "Read recent WhatsApp notifications/messages from the Android device. "
+                   "Use when the user asks 'check my WhatsApp', 'any WhatsApp messages?', 'read my WhatsApp'. "
+                   "Returns recent WhatsApp notifications captured from the notification listener.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "limit": {
+                "type": "NUMBER",
+                "description": "Maximum number of messages to return (default 10)"
+            }
+        }
+    }
+}
+
 tools_list = [{"function_declarations": [
     write_file_tool,
     read_file_tool,
@@ -2045,5 +2307,23 @@ tools_list = [{"function_declarations": [
     list_custom_schemas_tool,
     store_custom_memory_tool,
     query_custom_memory_tool,
+
+    # ── Android Agent Tools ──
+    android_volume_set_tool,
+    android_volume_get_tool,
+    android_app_open_tool,
+    android_app_close_tool,
+    android_app_list_tool,
+    android_send_sms_tool,
+    android_wifi_control_tool,
+    android_bluetooth_control_tool,
+    android_brightness_set_tool,
+    android_brightness_get_tool,
+    android_flashlight_tool,
+    android_make_call_tool,
+    android_location_get_tool,
+    android_read_notifications_tool,
+    android_whatsapp_send_tool,
+    android_whatsapp_read_tool,
 ]}]
 
