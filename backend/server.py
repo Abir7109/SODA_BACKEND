@@ -1,5 +1,6 @@
 import sys
 import asyncio
+import base64
 
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -274,10 +275,8 @@ async def disconnect(sid):
         agent_type = agent.get('agent_type', 'desktop')
         print(f"[AGENT] Agent disconnected: {machine_id} (type={agent_type}, {tools_count} tools, connected since {connected_at})")
         print(f"[AGENT] Active agents remaining: {len(_connected_agents)}")
-        if agent_type == 'android':
-            for loop in list(_active_loops.values()):
-                if hasattr(loop, '_android_agent_sid') and loop._android_agent_sid == sid:
-                    loop._android_agent_sid = None
+        if agent_type == 'android' and audio_loop and hasattr(audio_loop, '_android_agent_sid') and audio_loop._android_agent_sid == sid:
+            audio_loop._android_agent_sid = None
         await sio.emit('agent_connection_status', {
             'connected': False,
             'machine_id': machine_id,
@@ -307,9 +306,8 @@ async def agent_register(sid, data):
             'sid': sid,
         }
         # Notify any active AudioLoop
-        for loop in list(_active_loops.values()):
-            if hasattr(loop, '_android_agent_sid'):
-                loop._android_agent_sid = sid
+        if audio_loop and hasattr(audio_loop, '_android_agent_sid'):
+            audio_loop._android_agent_sid = sid
         await sio.emit('agent_connection_status', {
             'connected': True,
             'machine_id': machine_id,
@@ -355,10 +353,8 @@ async def agent_disconnect(sid, data=None):
         machine_id = agent.get('machine_id', sid)
         agent_type = agent.get('agent_type', 'desktop')
         print(f"[AGENT] Agent disconnected (explicit): {machine_id} (type={agent_type})")
-        if agent_type == 'android':
-            for loop in list(_active_loops.values()):
-                if hasattr(loop, '_android_agent_sid') and loop._android_agent_sid == sid:
-                    loop._android_agent_sid = None
+        if agent_type == 'android' and audio_loop and hasattr(audio_loop, '_android_agent_sid') and audio_loop._android_agent_sid == sid:
+            audio_loop._android_agent_sid = None
         await sio.emit('agent_connection_status', {
             'connected': False,
             'machine_id': machine_id,
@@ -1462,6 +1458,8 @@ async def browser_audio(sid, data):
         return
     if isinstance(raw, list):
         raw = bytes(raw)
+    elif isinstance(raw, str):
+        raw = base64.b64decode(raw)
     audio_loop.feed_browser_audio(raw)
 
 
