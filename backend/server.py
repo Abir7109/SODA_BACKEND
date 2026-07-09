@@ -388,16 +388,22 @@ async def start_audio(sid, data=None):
     global audio_loop, loop_task
     
     print("Starting Audio Loop...")
+
+    agent_type = (data or {}).get('agent_type', 'desktop')
     
     device_index = None
     device_name = None
+    mic_source = 'local'
     if data:
         if 'device_index' in data:
             device_index = data['device_index']
         if 'device_name' in data:
             device_name = data['device_name']
+        if agent_type == 'android':
+            mic_source = 'remote'
+            device_index = -1  # prevent local mic fallback
             
-    print(f"Using input device: Name='{device_name}', Index={device_index}")
+    print(f"Using input device: Name='{device_name}', Index={device_index}, mic_source={mic_source}")
     
     if audio_loop:
         if loop_task and (loop_task.done() or loop_task.cancelled()):
@@ -444,7 +450,7 @@ async def start_audio(sid, data=None):
         start_msg = "Greet your owner warmly and funnily in ONE short sentence. Read his expression from the camera snapshot to gauge his mood, then say something that matches. Keep it tight - one sentence, warm, and genuinely funny. Do NOT call any tools during the greeting. Just greet, then stop and listen."
 
         audio_loop = soda.AudioLoop(
-            video_mode="camera",
+            video_mode="none",
             sio=sio,
             on_audio_data=on_audio_data,
             on_transcription=on_transcription,
@@ -455,8 +461,11 @@ async def start_audio(sid, data=None):
             start_message=start_msg,
             input_device_index=device_index,
             input_device_name=device_name,
+            mic_source=mic_source,
         )
         audio_loop._owner_sid = sid
+        if agent_type == 'android':
+            audio_loop._android_agent_sid = sid
         print("AudioLoop initialized successfully.")
 
         global _audio_loop

@@ -869,7 +869,7 @@ class AudioLoop:
                  on_tool_confirmation=None, on_project_update=None,
                  on_error=None, on_mic_level=None, start_message=None,
                  input_device_index=None, input_device_name=None,
-                 output_device_index=None, mobile_bridge=None):
+                 output_device_index=None, mobile_bridge=None, mic_source='local'):
         self.video_mode = video_mode
         self.sio = sio
         self.on_audio_data = on_audio_data
@@ -883,6 +883,7 @@ class AudioLoop:
         self.input_device_name = input_device_name
         self.output_device_index = output_device_index
         self.mobile_bridge = mobile_bridge
+        self._mic_source = mic_source
 
         self.web_builder = None
         self._owner_sid = None
@@ -1478,7 +1479,8 @@ class AudioLoop:
 
                     tg.create_task(self.send_audio())
                     tg.create_task(self.send_video())
-                    tg.create_task(self.listen_audio())
+                    if self._mic_source != 'remote':
+                        tg.create_task(self.listen_audio())
 
                     if self.video_mode == "camera":
                         tg.create_task(self.get_frames())
