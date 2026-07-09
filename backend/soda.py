@@ -167,6 +167,7 @@ import scheduler_service as scheduler
 from pentest import PentestOrchestrator
 from external_apis import (
     get_weather, get_ip_info, get_exchange_rate, get_news_briefing,
+    get_bangladeshi_news,
     define_word, get_wikipedia_summary, web_search_live,
     fetch_webpage, list_files, open_file,
     get_system_status, close_window, create_folder,
@@ -230,18 +231,6 @@ LOCAL_AGENT_TOOLS = {
     "reconnect",
 }
 
-ANDROID_AGENT_TOOLS = {
-    "android_volume_set", "android_volume_get",
-    "android_app_open", "android_app_close", "android_app_list",
-    "android_send_sms",
-    "android_wifi_control", "android_bluetooth_control",
-    "android_brightness_set", "android_brightness_get",
-    "android_flashlight",
-    "android_make_call",
-    "android_location_get",
-    "android_read_notifications",
-    "android_whatsapp_send", "android_whatsapp_read",
-}
 
 SODA_WAKE_PATTERN = re.compile(
     r'(?<![a-zA-Z])soda(?![a-zA-Z])|'
@@ -871,7 +860,6 @@ class AudioLoop:
         self._model_is_speaking = False
         self._tools_running = False
         self._last_tool_start = 0.0
-        self._android_agent_sid = None
         self._current_emotion = None
         self._last_emotion_inject = 0.0
         self.chat_buffer = {"sender": None, "text": ""}
@@ -1986,39 +1974,9 @@ class AudioLoop:
                           "hint": "The local agent runs on your Windows PC and handles desktop tasks."}
             )
 
-        # ── Route to Android agent if applicable ──
-        if name in ANDROID_AGENT_TOOLS:
-            if self._android_agent_sid and _connected_agents.get(self._android_agent_sid):
-                import uuid as _uuid
-                callback_id = str(_uuid.uuid4())
-                future = asyncio.Future()
-                _pending_agent_results[callback_id] = future
-                log.info(f"[ANDROID] Routing {name} to Android agent (callback={callback_id})")
-                await self.sio.emit('agent_execute', {
-                    'callback_id': callback_id,
-                    'tool': name,
-                    'args': args,
-                }, to=self._android_agent_sid)
-                try:
-                    result = await asyncio.wait_for(future, timeout=15.0)
-                    _success = result.pop('_success', True)
-                    log.info(f"[ANDROID] {name} result: success={_success}")
-                except asyncio.TimeoutError:
-                    result = {"success": False, "error": f"Android agent did not respond within 15s"}
-                    log.warning(f"[ANDROID] {name} TIMEOUT")
-                finally:
-                    _pending_agent_results.pop(callback_id, None)
-                return types.FunctionResponse(id=fc.id, name=name, response=result)
-            else:
-                log.warning(f"[ANDROID] {name} requested but no Android agent connected")
-                return types.FunctionResponse(
-                    id=fc.id, name=name,
-                    response={"success": False, "error": "No Android device connected. Open the SODA Android app first."}
-                )
-
         if name == "get_weather":
             r = await get_weather(args.get("location", ""), args.get("units", "celsius"))
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+            return types.FunctionResponse(id=fc.id, name=name, response=r)
 
         elif name == "get_ip_info":
             r = await get_ip_info(args.get("ip", ""))
@@ -2056,6 +2014,10 @@ class AudioLoop:
             except Exception as e:
                 log.error(f"get_news failed: {e}")
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": {"articles": [], "error": str(e)}})
+
+        elif name == "get_bangladeshi_news":
+            r = await get_bangladeshi_news(category=args.get("category", "main"))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         elif name == "define_word":
             r = await define_word(args.get("word", ""))

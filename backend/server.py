@@ -279,8 +279,6 @@ async def disconnect(sid):
         agent_type = agent.get('agent_type', 'desktop')
         print(f"[AGENT] Agent disconnected: {machine_id} (type={agent_type}, {tools_count} tools, connected since {connected_at})")
         print(f"[AGENT] Active agents remaining: {len(_connected_agents)}")
-        if agent_type == 'android' and audio_loop and hasattr(audio_loop, '_android_agent_sid') and audio_loop._android_agent_sid == sid:
-            audio_loop._android_agent_sid = None
         await sio.emit('agent_connection_status', {
             'connected': False,
             'machine_id': machine_id,
@@ -298,27 +296,6 @@ async def agent_register(sid, data):
     tools = data.get('tools', [])
     app_registry = data.get('app_registry', {})
     app_count = app_registry.get('count', 0)
-
-    if agent_type == 'android':
-        print(f"[ANDROID] Registering Android agent: {machine_id} — {len(tools)} tools")
-        _connected_agents[sid] = {
-            'agent_type': 'android',
-            'machine_id': machine_id,
-            'platform': platform,
-            'tools': tools,
-            'connected_at': datetime.now().isoformat(),
-            'sid': sid,
-        }
-        # Notify any active AudioLoop
-        if audio_loop and hasattr(audio_loop, '_android_agent_sid'):
-            audio_loop._android_agent_sid = sid
-        await sio.emit('agent_connection_status', {
-            'connected': True,
-            'machine_id': machine_id,
-            'platform': 'android',
-            'tools_count': len(tools),
-        })
-        return
 
     # Remove stale agent entries with the same machine_id BUT fewer tools (zombie detection)
     for old_sid in list(_connected_agents.keys()):
@@ -357,8 +334,6 @@ async def agent_disconnect(sid, data=None):
         machine_id = agent.get('machine_id', sid)
         agent_type = agent.get('agent_type', 'desktop')
         print(f"[AGENT] Agent disconnected (explicit): {machine_id} (type={agent_type})")
-        if agent_type == 'android' and audio_loop and hasattr(audio_loop, '_android_agent_sid') and audio_loop._android_agent_sid == sid:
-            audio_loop._android_agent_sid = None
         await sio.emit('agent_connection_status', {
             'connected': False,
             'machine_id': machine_id,
@@ -403,10 +378,6 @@ async def start_audio(sid, data=None):
             device_index = data['device_index']
         if 'device_name' in data:
             device_name = data['device_name']
-        if agent_type == 'android':
-            mic_source = 'remote'
-            device_index = -1  # prevent local mic fallback
-            
     print(f"Using input device: Name='{device_name}', Index={device_index}, mic_source={mic_source}")
     
     if audio_loop:
@@ -468,8 +439,6 @@ async def start_audio(sid, data=None):
             mic_source=mic_source,
         )
         audio_loop._owner_sid = sid
-        if agent_type == 'android':
-            audio_loop._android_agent_sid = sid
         print("AudioLoop initialized successfully.")
 
         global _audio_loop

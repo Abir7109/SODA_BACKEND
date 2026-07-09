@@ -29,7 +29,7 @@ const CATEGORIES = [
   },
   {
     key: 'memory', label: 'Memory & Knowledge', icon: <Brain size={10} />, color: '#fff176',
-    tools: new Set(['remember_fact','recall_facts','forget_fact','list_memory','remember_person','recall_person','remember_lesson','get_user_profile','set_preference','show_memory'])
+    tools: new Set(['remember_fact','recall_facts','forget_fact','list_memory','remember_person','recall_person','remember_lesson','get_user_profile','set_preference','show_memory','create_memory_schema','list_custom_schemas','store_custom_memory','query_custom_memory'])
   },
   {
     key: 'schedule', label: 'Schedule & Reminders', icon: <Clock size={10} />, color: '#a1887f',

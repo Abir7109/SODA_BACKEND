@@ -77,7 +77,6 @@ import WebpageSummaryPanel from './components/panels/WebpageSummaryPanel'
 import FileBrowserPanel from './components/panels/FileBrowserPanel'
 import ToolShowcasePanel from './components/panels/ToolShowcasePanel'
 import WeatherPanel from './components/panels/WeatherPanel'
-import NewsPanel from './components/panels/NewsPanel'
 import SystemStatusPanel from './components/panels/SystemStatusPanel'
 import CurrencyPanel from './components/panels/CurrencyPanel'
 import FloatingWindow from './components/FloatingWindow'
@@ -209,13 +208,15 @@ const TOOLS_WITH_OUTPUT = new Set([
 ])
 
 const TOOLS_WITH_INFO_PANEL = new Set([
-  'get_news', 'get_ip_info',
+  'get_news', 'get_bangladeshi_news', 'get_ip_info',
   'get_exchange_rate', 'define_word', 'get_wikipedia_summary',
   'remember_fact', 'recall_facts',
   'get_user_profile', 'set_preference',
-  'forget_fact', 'list_memory',
+  'forget_fact', 'list_memory', 'show_memory',
   'remember_person', 'recall_person', 'remember_lesson',
   'list_reminders', 'cancel_reminder',
+  'create_memory_schema', 'list_custom_schemas',
+  'store_custom_memory', 'query_custom_memory',
 ])
 
 const AI_CARD_TOOLS = new Set([
@@ -604,7 +605,6 @@ export default function App() {
 
   // Specialized data panels
   const [weatherPanel, setWeatherPanel] = useState({ visible: false, data: null })
-  const [newsPanel, setNewsPanel] = useState({ visible: false, data: null })
   const [systemStatusPanel, setSystemStatusPanel] = useState({ visible: false, data: null })
   const [currencyPanel, setCurrencyPanel] = useState({ visible: false, data: null })
   const [processPanel, setProcessPanel] = useState({ visible: false, data: null })
@@ -896,11 +896,13 @@ export default function App() {
       if (data.tool === 'camera_control' || data.tool === 'open_camera') return
 
       const persistentAnims = new Set([
-        'get_system_status', 'get_weather', 'get_news', 'get_exchange_rate',
+        'get_system_status', 'get_weather', 'get_news', 'get_bangladeshi_news', 'get_exchange_rate',
         'list_files', 'show_tools', 'browse_webpage',
         'github_list_repos', 'github_get_repo', 'github_list_issues',
         'netlify_list_sites', 'vercel_list_projects',
-        'list_processes', 'get_ip_info', 'define_word', 'get_wikipedia_summary'
+        'list_processes', 'get_ip_info', 'define_word', 'get_wikipedia_summary',
+        'show_memory', 'create_memory_schema', 'list_custom_schemas',
+        'store_custom_memory', 'query_custom_memory',
       ])
       if (!persistentAnims.has(data.tool)) {
         markDone(data.tool === 'play_music')
@@ -946,9 +948,6 @@ export default function App() {
           case 'WeatherPanel':
             setWeatherPanel({ visible: true, data: result })
             return
-          case 'NewsPanel':
-            setNewsPanel({ visible: true, data: result })
-            return
           case 'SystemStatusPanel':
             setSystemStatusPanel({ visible: true, data: result })
             return
@@ -978,10 +977,10 @@ export default function App() {
 
       // Route to appropriate panel based on tool type
       if (TOOLS_WITH_INFO_PANEL.has(toolName)) {
-        // Weather, news, API results → top panel
         let infoType = 'info'
         if (toolName === 'get_weather') infoType = 'weather'
         else if (toolName === 'get_news') infoType = 'news'
+        else if (toolName === 'show_memory') infoType = 'memory'
 
         if (infoTimerRef.current) clearTimeout(infoTimerRef.current)
         setInfoPanel({ visible: true, type: infoType, data: result })
@@ -1115,7 +1114,6 @@ export default function App() {
           setFileBrowser(prev => ({ ...prev, visible: false }))
           setToolShowcase(prev => ({ ...prev, visible: false }))
           setWeatherPanel(prev => ({ ...prev, visible: false }))
-          setNewsPanel(prev => ({ ...prev, visible: false }))
           setSystemStatusPanel(prev => ({ ...prev, visible: false }))
           setCurrencyPanel(prev => ({ ...prev, visible: false }))
           setProcessPanel(prev => ({ ...prev, visible: false }))
@@ -1753,8 +1751,6 @@ export default function App() {
       {/* Specialized Data Panels */}
       <WeatherPanel visible={weatherPanel.visible} data={weatherPanel.data}
         onClose={() => setWeatherPanel(prev => ({ ...prev, visible: false }))} />
-      <NewsPanel visible={newsPanel.visible} data={newsPanel.data}
-        onClose={() => setNewsPanel(prev => ({ ...prev, visible: false }))} />
       <SystemStatusPanel visible={systemStatusPanel.visible} data={systemStatusPanel.data}
         onClose={() => setSystemStatusPanel(prev => ({ ...prev, visible: false }))} />
       <CurrencyPanel visible={currencyPanel.visible} data={currencyPanel.data}

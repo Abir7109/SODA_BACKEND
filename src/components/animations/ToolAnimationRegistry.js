@@ -62,6 +62,11 @@ export const TOOL_ANIMATIONS = {
   get_user_profile: { component: 'MemoryAnim', variant: 'profile' },
   set_preference:   { component: 'MemoryAnim', variant: 'settings' },
   forget_fact:      { component: 'MemoryAnim', variant: 'store' },
+  show_memory:      { component: 'MemoryAnim', variant: 'recall' },
+  create_memory_schema: { component: 'MemoryAnim', variant: 'store' },
+  list_custom_schemas:  { component: 'MemoryAnim', variant: 'recall' },
+  store_custom_memory:  { component: 'MemoryAnim', variant: 'store' },
+  query_custom_memory:  { component: 'MemoryAnim', variant: 'recall' },
   list_memory:      { component: 'MemoryAnim', variant: 'recall' },
   remember_person:  { component: 'MemoryAnim', variant: 'store' },
   recall_person:    { component: 'MemoryAnim', variant: 'recall' },
@@ -80,8 +85,9 @@ export const TOOL_ANIMATIONS = {
   remember_face:    { component: 'MemoryAnim', variant: 'store' },
 
   // ── Data Tools (rich panels) ─────────────────────────────────
-  get_weather:           { component: 'AiWeatherDiagnostics', variant: 'default' },
-  get_news:              { component: 'DataAnim', variant: 'news',     panel: 'NewsPanel',         panelDir: 'top' },
+  get_weather:           { component: 'AiWeatherDiagnostics', variant: 'default', panel: 'WeatherPanel', panelDir: 'top' },
+  get_news:              { component: 'DataAnim', variant: 'news' },
+  get_bangladeshi_news:  { component: 'DataAnim', variant: 'news' },
   get_exchange_rate:     { component: 'DataAnim', variant: 'currency', panel: 'CurrencyPanel',     panelDir: 'top' },
   get_system_status:     { component: 'AiSystemMonitor',   variant: 'default' },
   list_processes:        { component: 'DataAnim', variant: 'processes',panel: 'ProcessListPanel',  panelDir: 'right' },

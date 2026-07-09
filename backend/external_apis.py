@@ -358,6 +358,64 @@ news_control_tool = {
 }
 
 
+# 4b. Bangladeshi News - BBC Bengali (via news-api-fs)
+BANGLADESHI_NEWS_BASE = "https://news-api-fs.vercel.app/api"
+
+async def get_bangladeshi_news(category: str = "main"):
+    """
+    Fetch latest Bangladeshi news from BBC Bengali via news-api-fs.
+    Categories: main, politics, world, economics, health, sports, technology, bangladesh, india
+    """
+    try:
+        url = f"{BANGLADESHI_NEWS_BASE}/categories/{category}"
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, timeout=15.0)
+            if resp.status_code != 200:
+                return {"error": f"API returned {resp.status_code}", "articles": []}
+            data = resp.json()
+            if not data.get("success"):
+                return {"error": "API returned unsuccessful response", "articles": []}
+            return {
+                "category": data.get("categoryName", category),
+                "articles": [
+                    {
+                        "id": a.get("id", ""),
+                        "title": a.get("title", ""),
+                        "link": a.get("link", ""),
+                        "description": a.get("description", ""),
+                        "time": a.get("time", ""),
+                    }
+                    for a in data.get("articles", [])
+                ]
+            }
+    except Exception as e:
+        return {"error": str(e), "articles": []}
+
+get_bangladeshi_news_tool = {
+    "name": "get_bangladeshi_news",
+    "description": (
+        "Fetch latest Bangladeshi news from BBC Bengali. "
+        "Call this when the user asks about news from Bangladesh, "
+        "Bengali news, or any Bangladesh-specific topic. "
+        "Returns articles in Bengali language with titles, links, and timestamps.\n\n"
+        "Available categories: main (মূলপাতা), politics (রাজনীতি), world (বিশ্ব), "
+        "economics (অর্থনীতি), health (স্বাস্থ্য), sports (খেলা), technology (প্রযুক্তি), "
+        "bangladesh (বাংলাদেশ), india (ভারত).\n\n"
+        "Use 'main' or 'bangladesh' for general Bangladeshi news. "
+        "Use specific categories for focused topics."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "category": {
+                "type": "STRING",
+                "description": "Category ID: main, politics, world, economics, health, sports, technology, bangladesh, india. Default: main"
+            }
+        },
+        "required": []
+    }
+}
+
 # 5. Dictionary - Free Dictionary API
 async def define_word(word: str):
     """
