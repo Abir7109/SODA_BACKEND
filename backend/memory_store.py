@@ -203,7 +203,7 @@ def list_people(limit=20):
                         "traits": row.get("traits", ""),
                         "preferences": row.get("preferences", ""),
                         "notes": row.get("notes", ""),
-                        "ts": row.get("created_at", ""),
+                        "ts": row.get("created_at", "") or row.get("created", "") or "",
                     })
                 return entries
         except Exception as e:
@@ -308,7 +308,7 @@ def recall_lessons(query="", limit=5):
                             "situation": situation,
                             "correction": correction,
                             "count": row.get("count", 1),
-                            "ts": row.get("created_at", ""),
+                            "ts": row.get("created_at", "") or row.get("created", "") or "",
                         })
                 return entries
         except Exception as e:

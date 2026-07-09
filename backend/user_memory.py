@@ -153,7 +153,7 @@ def search_facts(query: str, limit: int = 5) -> dict:
                 matches.append({
                     "key": row.get("key", ""),
                     "value": row.get("value", ""),
-                    "ts": row.get("created_at", ""),
+                    "ts": row.get("created_at", "") or row.get("created", "") or "",
                 })
             return {"success": True, "query": query, "count": len(matches), "matches": matches}
         except Exception as e:
@@ -191,7 +191,7 @@ def list_facts(limit: int = 50) -> dict:
                     facts.append({
                         "key": row.get("key", ""),
                         "value": row.get("value", ""),
-                        "ts": row.get("created_at", ""),
+                        "ts": row.get("created_at", "") or row.get("created", "") or "",
                     })
                 return {"success": True, "count": len(facts), "facts": facts}
         except Exception as e:
