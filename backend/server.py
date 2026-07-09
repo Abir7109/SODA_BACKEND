@@ -43,6 +43,10 @@ _pending_agent_results: dict[str, asyncio.Future] = {}
 soda._connected_agents = _connected_agents
 soda._pending_agent_results = _pending_agent_results
 
+# Bump Engine.IO payload decode limit (default 16 is too low for reconnection bursts)
+import engineio.payload
+engineio.payload.Payload.max_decode_packets = 128
+
 # Create a Socket.IO server
 sio = socketio.AsyncServer(
     async_mode='asgi',
