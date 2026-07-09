@@ -954,7 +954,7 @@ export default function App() {
             setSystemStatusPanel({ visible: true, data: result })
             return
           case 'MemoryPanel':
-            setMemoryPanel({ visible: true, data: result })
+            setMemoryPanel({ visible: true, data: result.result || result })
             return
           case 'CurrencyPanel':
             setCurrencyPanel({ visible: true, data: result })
@@ -1097,6 +1097,9 @@ export default function App() {
         case 'file':
           if (fileTimerRef.current) clearTimeout(fileTimerRef.current)
           setFileOutput(prev => ({ ...prev, visible: false }))
+          break
+        case 'memory':
+          setMemoryPanel(prev => ({ ...prev, visible: false }))
           break
         case 'info':
           if (infoTimerRef.current) clearTimeout(infoTimerRef.current)
