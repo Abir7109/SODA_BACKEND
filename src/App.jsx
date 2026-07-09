@@ -913,6 +913,8 @@ export default function App() {
           if (!prev || prev.status === 'done' || prev.status === 'error' || prev.status === 'cancelled') return prev
           return { ...prev, status: 'done' }
         })
+        if (clearTaskTimeoutRef.current) clearTimeout(clearTaskTimeoutRef.current)
+        clearTaskTimeoutRef.current = setTimeout(clearTask, 2000)
       }
       setTaskData(data.result || data)
 

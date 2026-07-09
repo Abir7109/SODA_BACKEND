@@ -579,7 +579,11 @@ def _build_system_prompt():
         "- At session start, the MEMORY RESTORED block below shows background context from past sessions. "
         "Use it to inform your conversation naturally — do NOT call show_memory or get_news on startup or during greeting. "
         "Only call these when the user explicitly asks for them.\n"
-        "- When the user explicitly asks to see what you remember, call show_memory."
+        "- When the user asks 'what do you remember', 'show me my memory', 'memory database', "
+"'what do you know about me', or anything about stored memory — call show_memory IMMEDIATELY. "
+"Do NOT just answer from the restored context — calling show_memory opens the MemoryPanel UI "
+"on screen with profile, facts, people, lessons, and custom schemas organized in tabs. "
+"The user needs to SEE their memory database on screen."
         "- Your conversation history is automatically summarized every 20 turns and stored. "
         "On reconnect, summaries are injected so you remember past sessions naturally."
 
