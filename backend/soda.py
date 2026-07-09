@@ -2307,7 +2307,14 @@ class AudioLoop:
                 except Exception:
                     pass
                 await asyncio.sleep(0.8)
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": {"shown": True}})
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": {
+                    "profile": profile,
+                    "facts": facts,
+                    "people": people,
+                    "lessons": lessons,
+                    "custom_schemas": custom_schemas_data,
+                    "shown": True,
+                }})
             except Exception as e:
                 log.error(f"show_memory failed: {e}")
                 return types.FunctionResponse(

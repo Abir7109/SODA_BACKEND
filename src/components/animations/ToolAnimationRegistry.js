@@ -62,7 +62,7 @@ export const TOOL_ANIMATIONS = {
   get_user_profile: { component: 'MemoryAnim', variant: 'profile' },
   set_preference:   { component: 'MemoryAnim', variant: 'settings' },
   forget_fact:      { component: 'MemoryAnim', variant: 'store' },
-  show_memory:      { component: 'MemoryAnim', variant: 'recall' },
+  show_memory:      { component: 'MemoryAnim', variant: 'recall', panel: 'MemoryPanel', panelDir: 'bottom' },
   create_memory_schema: { component: 'MemoryAnim', variant: 'store' },
   list_custom_schemas:  { component: 'MemoryAnim', variant: 'recall' },
   store_custom_memory:  { component: 'MemoryAnim', variant: 'store' },

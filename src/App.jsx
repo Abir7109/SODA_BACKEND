@@ -91,6 +91,7 @@ import GitHubPanel from './components/panels/GitHubPanel'
 import DeployPanel from './components/panels/DeployPanel'
 import PageSpeedPanel from './components/panels/PageSpeedPanel'
 import EmailPanel from './components/panels/EmailPanel'
+import MemoryPanel from './components/panels/MemoryPanel'
 import IELTSDashboardPanel from './components/panels/IELTSDashboardPanel'
 import IELTSWritingPanel from './components/panels/IELTSWritingPanel'
 import IELTSSpeakingPanel from './components/panels/IELTSSpeakingPanel'
@@ -212,7 +213,7 @@ const TOOLS_WITH_INFO_PANEL = new Set([
   'get_exchange_rate', 'define_word', 'get_wikipedia_summary',
   'remember_fact', 'recall_facts',
   'get_user_profile', 'set_preference',
-  'forget_fact', 'list_memory', 'show_memory',
+  'forget_fact', 'list_memory',
   'remember_person', 'recall_person', 'remember_lesson',
   'list_reminders', 'cancel_reminder',
   'create_memory_schema', 'list_custom_schemas',
@@ -606,6 +607,7 @@ export default function App() {
   // Specialized data panels
   const [weatherPanel, setWeatherPanel] = useState({ visible: false, data: null })
   const [systemStatusPanel, setSystemStatusPanel] = useState({ visible: false, data: null })
+  const [memoryPanel, setMemoryPanel] = useState({ visible: false, data: null })
   const [currencyPanel, setCurrencyPanel] = useState({ visible: false, data: null })
   const [processPanel, setProcessPanel] = useState({ visible: false, data: null })
   const [networkPanel, setNetworkPanel] = useState({ visible: false, data: null })
@@ -951,6 +953,9 @@ export default function App() {
           case 'SystemStatusPanel':
             setSystemStatusPanel({ visible: true, data: result })
             return
+          case 'MemoryPanel':
+            setMemoryPanel({ visible: true, data: result })
+            return
           case 'CurrencyPanel':
             setCurrencyPanel({ visible: true, data: result })
             return
@@ -980,7 +985,6 @@ export default function App() {
         let infoType = 'info'
         if (toolName === 'get_weather') infoType = 'weather'
         else if (toolName === 'get_news') infoType = 'news'
-        else if (toolName === 'show_memory') infoType = 'memory'
 
         if (infoTimerRef.current) clearTimeout(infoTimerRef.current)
         setInfoPanel({ visible: true, type: infoType, data: result })
@@ -1115,6 +1119,7 @@ export default function App() {
           setToolShowcase(prev => ({ ...prev, visible: false }))
           setWeatherPanel(prev => ({ ...prev, visible: false }))
           setSystemStatusPanel(prev => ({ ...prev, visible: false }))
+          setMemoryPanel(prev => ({ ...prev, visible: false }))
           setCurrencyPanel(prev => ({ ...prev, visible: false }))
           setProcessPanel(prev => ({ ...prev, visible: false }))
           setNetworkPanel(prev => ({ ...prev, visible: false }))
@@ -1753,6 +1758,8 @@ export default function App() {
         onClose={() => setWeatherPanel(prev => ({ ...prev, visible: false }))} />
       <SystemStatusPanel visible={systemStatusPanel.visible} data={systemStatusPanel.data}
         onClose={() => setSystemStatusPanel(prev => ({ ...prev, visible: false }))} />
+      <MemoryPanel visible={memoryPanel.visible} data={memoryPanel.data}
+        onClose={() => setMemoryPanel(prev => ({ ...prev, visible: false }))} />
       <CurrencyPanel visible={currencyPanel.visible} data={currencyPanel.data}
         onClose={() => setCurrencyPanel(prev => ({ ...prev, visible: false }))} />
       <ProcessListPanel visible={processPanel.visible} data={processPanel.data}
