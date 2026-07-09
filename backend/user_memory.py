@@ -60,8 +60,8 @@ def _load_profile() -> dict:
                     "created": row.get("created", "") or row.get("created_at", ""),
                     "updated": row.get("updated", "") or row.get("updated_at", ""),
                 }
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] load_profile failed: {e}")
     if not PROFILE_PATH.exists():
         return dict(DEFAULT_PROFILE)
     try:
@@ -92,8 +92,8 @@ def _save_profile(profile: dict) -> None:
             else:
                 payload["created_at"] = now_iso
                 db.table("profiles").insert(payload).execute()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] _save_profile failed: {e}")
     with open(PROFILE_PATH, "w", encoding="utf-8") as f:
         json.dump(profile, f, indent=2, ensure_ascii=False)
 
@@ -134,9 +134,8 @@ def add_fact(key: str, value: str) -> dict:
                 "value": entry["value"],
                 "category": "general",
             }).execute()
-            return {"success": True, "key": entry["key"], "value": entry["value"], "ts": entry["ts"]}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] add_fact failed: {e}")
     FACTS_PATH.touch(exist_ok=True)
     with open(FACTS_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -157,8 +156,8 @@ def search_facts(query: str, limit: int = 5) -> dict:
                     "ts": row.get("created_at", ""),
                 })
             return {"success": True, "query": query, "count": len(matches), "matches": matches}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] search_facts failed: {e}")
     if not FACTS_PATH.exists():
         return {"success": True, "query": query, "matches": []}
     matches = []
@@ -195,8 +194,8 @@ def list_facts(limit: int = 50) -> dict:
                         "ts": row.get("created_at", ""),
                     })
                 return {"success": True, "count": len(facts), "facts": facts}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] list_facts failed: {e}")
     if not FACTS_PATH.exists():
         return {"success": True, "count": 0, "facts": []}
     facts = []
@@ -222,10 +221,8 @@ def delete_fact(key: str) -> dict:
     if db:
         try:
             r = db.table("facts").delete().eq("key", key).execute()
-            deleted = len(r.data) if r.data else 0
-            return {"success": True, "key": key, "deleted": deleted}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] delete_fact failed: {e}")
     if not FACTS_PATH.exists():
         return {"success": False, "error": "No facts stored"}
     kept = []
@@ -269,8 +266,8 @@ def add_history(role: str, text: str) -> None:
         if len(lines) > 200:
             with open(HISTORY_PATH, "w", encoding="utf-8") as f:
                 f.writelines(lines[-200:])
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Supabase] add_history truncation failed: {e}")
 
 
 def search_history(query: str, limit: int = 5) -> dict:

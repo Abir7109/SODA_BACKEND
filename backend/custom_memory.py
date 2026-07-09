@@ -49,7 +49,6 @@ def create_memory_schema(name, description="", columns=None):
                     "description": description,
                     "updated_at": now,
                 }).eq("id", existing.data[0]["id"]).execute()
-                return {"success": True, "action": "updated", "schema": {"name": name, "columns": columns, "description": description}}
             else:
                 db.table("custom_schemas").insert({
                     "name": name,
@@ -58,9 +57,8 @@ def create_memory_schema(name, description="", columns=None):
                     "created_at": now,
                     "updated_at": now,
                 }).execute()
-                return {"success": True, "action": "created", "schema": {"name": name, "columns": columns, "description": description}}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] create_memory_schema failed: {e}")
 
     SCHEMAS_PATH.touch(exist_ok=True)
     schemas = []
@@ -112,8 +110,8 @@ def list_custom_schemas():
                     "created_at": row.get("created_at", ""),
                 })
             return {"success": True, "count": len(schemas), "schemas": schemas}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] list_custom_schemas failed: {e}")
     if not SCHEMAS_PATH.exists():
         return {"success": True, "count": 0, "schemas": []}
     schemas = []
@@ -159,9 +157,8 @@ def store_custom_memory(schema_name, data):
                 "data": data,
                 "created_at": now,
             }).execute()
-            return {"success": True, "entry": {"id": entry_id, "schema_name": schema_name, "data": data, "created_at": now}}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] store_custom_memory failed: {e}")
 
     path = _get_entries_path(schema_name)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -206,8 +203,8 @@ def query_custom_memory(schema_name, query="", limit=20):
                     "created_at": row.get("created_at", ""),
                 })
             return {"success": True, "schema": schema_name, "count": len(entries), "entries": entries}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] query_custom_memory failed: {e}")
 
     path = _get_entries_path(schema_name)
     if not path.exists():

@@ -55,13 +55,11 @@ def remember_person(name, relationship="", traits="", preferences="", notes=""):
             }
             if existing.data and len(existing.data) > 0:
                 db.table("people").update(payload).eq("id", existing.data[0]["id"]).execute()
-                return {"success": True, "name": name, "action": "updated"}
             else:
                 payload["created_at"] = now
                 db.table("people").insert(payload).execute()
-                return {"success": True, "name": name, "action": "created"}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] remember_person failed: {e}")
 
     PEOPLE_PATH.touch(exist_ok=True)
     entries = []
@@ -121,8 +119,8 @@ def recall_person(query, limit=5):
                     "ts": row.get("ts", ""),
                 })
             return {"success": True, "query": query, "count": len(matches), "matches": matches}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] recall_person failed: {e}")
     if not PEOPLE_PATH.exists():
         return {"success": True, "query": query, "matches": []}
     matches = []
@@ -166,8 +164,8 @@ def recall_by_relationship(relationship, limit=5):
                     "ts": row.get("ts", ""),
                 })
             return {"success": True, "relationship": relationship, "count": len(matches), "matches": matches}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] recall_by_relationship failed: {e}")
     if not PEOPLE_PATH.exists():
         return {"success": True, "relationship": relationship, "matches": []}
     matches = []
@@ -208,8 +206,8 @@ def list_people(limit=20):
                         "ts": row.get("created_at", ""),
                     })
                 return entries
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] list_people failed: {e}")
     if not PEOPLE_PATH.exists():
         return []
     entries = []
@@ -254,9 +252,8 @@ def remember_lesson(situation, correction):
                 db.table("lessons").update(payload).eq("id", row["id"]).execute()
             else:
                 db.table("lessons").insert(payload).execute()
-            return {"success": True, "situation": situation, "action": "updated" if existing.data else "created"}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] remember_lesson failed: {e}")
 
     LESSONS_PATH.touch(exist_ok=True)
     entries = []
@@ -314,8 +311,8 @@ def recall_lessons(query="", limit=5):
                             "ts": row.get("created_at", ""),
                         })
                 return entries
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] recall_lessons failed: {e}")
     if not LESSONS_PATH.exists():
         return []
     entries = []
@@ -412,8 +409,8 @@ def save_summary(session_id, topics=None, key_decisions=None, last_exchanges=Non
                 },
                 "topics": topics or [],
             }).execute()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] save_summary failed: {e}")
 
     SUMMARIES_PATH.touch(exist_ok=True)
     entries = []
@@ -455,8 +452,8 @@ def get_recent_summaries(limit=3):
                         "ts": row.get("created_at", ""),
                     })
                 return entries
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Supabase] get_recent_summaries failed: {e}")
     if not SUMMARIES_PATH.exists():
         return []
     entries = []
