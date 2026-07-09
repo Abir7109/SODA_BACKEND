@@ -651,18 +651,14 @@ export default function App() {
 
   function stopAudio() {
     audioNextTime.current = 0
-    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-      audioCtxRef.current.close().catch(() => {})
-      audioCtxRef.current = null
-    }
   }
 
   function initAudioCtx() {
     if (!audioCtxRef.current) {
       const AC = window.AudioContext || window.webkitAudioContext
       if (!AC) return null
-      audioCtxRef.current = new AC()
-      console.log('[Audio] Created AudioContext')
+      audioCtxRef.current = new AC({ sampleRate: 24000 })
+      console.log('[Audio] Created AudioContext @ 24kHz')
     }
     if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume().catch(e => console.warn('[Audio] resume failed:', e))
@@ -670,7 +666,18 @@ export default function App() {
     return audioCtxRef.current
   }
 
-  function playPcmBytes(bytes) {
+  function playPcmBytes(data) {
+    if (!data) return
+    let bytes
+    if (typeof data === 'string') {
+      const bin = atob(data)
+      bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    } else if (Array.isArray(data) || data instanceof Uint8Array) {
+      bytes = data
+    } else {
+      return
+    }
     if (!bytes || !bytes.length) return
     const ctx = initAudioCtx()
     if (!ctx) {
