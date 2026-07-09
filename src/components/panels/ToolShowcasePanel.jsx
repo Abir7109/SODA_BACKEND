@@ -17,7 +17,7 @@ const CATEGORIES = [
   },
   {
     key: 'system', label: 'System', icon: <Monitor size={10} />, color: '#e57373',
-    tools: new Set(['control_system','get_system_status','list_processes','get_active_window','close_window','close_panel','shutdown_soda','shutdown_system','go_to_sleep','wake_up','go_background','come_back','start_workflow','welcome_home'])
+    tools: new Set(['control_system','get_system_status','list_processes','get_active_window','close_window','close_panel','shutdown_soda','shutdown_system','go_to_sleep','wake_up','go_background','come_back','welcome_home'])
   },
   {
     key: 'vision', label: 'Vision & Screen', icon: <Monitor size={10} />, color: '#ba68c8',

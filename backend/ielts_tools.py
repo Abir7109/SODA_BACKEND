@@ -329,8 +329,7 @@ IELTS_TOOLS = [
     {
         "name": "ielts_mock_test",
         "description": (
-            "Start a timed mock test for a specific IELTS module. "
-            "Triggers the full HUD workflow overlay."
+            "Start a timed mock test for a specific IELTS module."
         ),
         "parameters": {
             "type": "object",

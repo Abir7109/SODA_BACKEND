@@ -104,7 +104,6 @@ import WebviewActionService from './services/WebviewActionService'
 import SlidePanel from './components/SlidePanel'
 import CameraCapture from './components/CameraCapture'
 import HolographicOrb from './components/HolographicOrb'
-import WorkflowOverlay from './components/workflows/WorkflowOverlay'
 import Notepad from './components/Notepad'
 import BackgroundWidget from './components/BackgroundWidget'
 import PasteBox from './components/pastebox/PasteBox'
@@ -636,11 +635,6 @@ export default function App() {
   const [speakingState, setSpeakingState] = useState('idle')
   const personalityTimerRef = useRef(null)
 
-  // Workflow overlay
-  const [workflow, setWorkflow] = useState(null)
-  const workflowRef = useRef(null)
-  const workflowDismissRef = useRef(null)
-
   // ── Browser mic capture (web) ──
   const { micActive: browserMicActive, micError: browserMicError, start: startBrowserMic, stop: stopBrowserMic } = useBrowserMic(socket)
 
@@ -651,14 +645,18 @@ export default function App() {
 
   function stopAudio() {
     audioNextTime.current = 0
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      audioCtxRef.current.close().catch(() => {})
+      audioCtxRef.current = null
+    }
   }
 
   function initAudioCtx() {
     if (!audioCtxRef.current) {
       const AC = window.AudioContext || window.webkitAudioContext
       if (!AC) return null
-      audioCtxRef.current = new AC({ sampleRate: 24000 })
-      console.log('[Audio] Created AudioContext @ 24kHz')
+      audioCtxRef.current = new AC()
+      console.log('[Audio] Created AudioContext')
     }
     if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume().catch(e => console.warn('[Audio] resume failed:', e))
@@ -666,18 +664,7 @@ export default function App() {
     return audioCtxRef.current
   }
 
-  function playPcmBytes(data) {
-    if (!data) return
-    let bytes
-    if (typeof data === 'string') {
-      const bin = atob(data)
-      bytes = new Uint8Array(bin.length)
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-    } else if (Array.isArray(data) || data instanceof Uint8Array) {
-      bytes = data
-    } else {
-      return
-    }
+  function playPcmBytes(bytes) {
     if (!bytes || !bytes.length) return
     const ctx = initAudioCtx()
     if (!ctx) {
@@ -1062,11 +1049,6 @@ export default function App() {
           break
         case 'IELTSSpeaking':
           setIeltsSpeaking(state)
-          if (workflowRef.current?.workflow === 'ielts-speaking') {
-            setWorkflow(null)
-            workflowRef.current = null
-            if (workflowDismissRef.current) clearTimeout(workflowDismissRef.current)
-          }
           break
         case 'IELTSReading':
           setIeltsReading(state)
@@ -1117,10 +1099,6 @@ export default function App() {
           if (infoTimerRef.current) clearTimeout(infoTimerRef.current)
           setInfoPanel(prev => ({ ...prev, visible: false }))
           break
-        case 'workflow':
-          setWorkflow(null)
-          workflowRef.current = null
-          break
         case 'all':
           if (terminalTimerRef.current) clearTimeout(terminalTimerRef.current)
           setTerminal(prev => ({ ...prev, visible: false }))
@@ -1154,8 +1132,6 @@ export default function App() {
           setIeltsVocab(prev => ({ ...prev, visible: false }))
           setIeltsProgress(prev => ({ ...prev, visible: false }))
           setFloatingWindows([])
-          setWorkflow(null)
-          workflowRef.current = null
           break
       }
     }
@@ -1302,47 +1278,10 @@ export default function App() {
     }
     socket.on('view_file_content', onViewFile)
 
-    const onWorkflowStart = (data) => {
-      if (data?.workflow === 'pentest-scan') {
-        setPentestActive(true)
-        setPentestProgress({
-          phase: 'INIT', tool: '', status: 'starting',
-          message: data?.target ? `Target: ${data.target}` : 'Initializing...',
-        })
-        return
-      }
-      if (data && data.workflow) {
-        setWorkflow(data)
-        workflowRef.current = data
-        if (workflowDismissRef.current) clearTimeout(workflowDismissRef.current)
-      }
-    }
-    socket.on('workflow_start', onWorkflowStart)
-
     const onPentestProgress = (data) => {
       if (data) setPentestProgress(data)
     }
     socket.on('pentest_scan_progress', onPentestProgress)
-
-    const onUserTranscription = () => {
-      if (workflowRef.current) {
-        const animated = ['news-briefing', 'memory-view', 'ielts-speaking', 'ielts-mock', 'pentest-scan', 'reminder']
-        if (animated.includes(workflowRef.current.workflow)) return
-        if (workflowDismissRef.current) clearTimeout(workflowDismissRef.current)
-        workflowDismissRef.current = setTimeout(() => {
-          setWorkflow(null)
-          workflowRef.current = null
-        }, 60000)
-      }
-    }
-    socket.on('transcription', onUserTranscription)
-
-    const onNewsBriefingControl = (data) => {
-      if (workflowRef.current && workflowRef.current.workflow === 'news-briefing') {
-        setWorkflow(prev => prev ? { ...prev, newsControl: data } : prev)
-      }
-    }
-    socket.on('news_briefing_control', onNewsBriefingControl)
 
     const onTelegramMessage = (data) => {
       if (!data || !data.text) return
@@ -1457,13 +1396,6 @@ export default function App() {
     socket.on('reminder_fired', (data) => {
       if (data && data.message) {
         showNotification('SODA Reminder', data.message, data.id ? parseInt(data.id, 36) || undefined : undefined)
-        setWorkflow({
-          workflow: 'reminder',
-          message: data.message,
-          id: data.id,
-          fired_at: data.fired_at,
-        })
-        workflowRef.current = { workflow: 'reminder', message: data.message }
       }
     })
 
@@ -1516,12 +1448,9 @@ export default function App() {
       socket.off('stop_audio', stopAudio)
       socket.off('soda_remote_count', onRemoteCount)
       socket.off('reminder_fired')
-      socket.off('workflow_start', onWorkflowStart)
       socket.off('pentest_scan_progress', onPentestProgress)
       socket.off('pentest_output', onPentestOutput)
       socket.off('email_data', onEmailData)
-      socket.off('transcription', onUserTranscription)
-      socket.off('news_briefing_control', onNewsBriefingControl)
       if (clearTaskTimeoutRef.current) clearTimeout(clearTaskTimeoutRef.current)
       if (showcaseTimerRef.current) clearTimeout(showcaseTimerRef.current)
     }
@@ -2011,21 +1940,6 @@ export default function App() {
     </PanelSpaceProvider>
     </AnimationErrorBoundary>
     <CameraCapture />
-    {workflow && (
-      <WorkflowOverlay
-        workflow={workflow.workflow}
-        data={workflow}
-        onComplete={() => {
-          const wfName = workflowRef.current?.workflow
-          setWorkflow(null)
-          workflowRef.current = null
-          if (wfName === 'news-briefing') {
-            stopAudio()
-            setFloatingWindows([])
-          }
-        }}
-      />
-    )}
     </>
     </RootErrorBoundary>
   )

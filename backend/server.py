@@ -417,7 +417,7 @@ async def start_audio(sid, data=None):
     # Continue with audio loop initialization...
     from soda import AudioLoop
     def on_audio_data(data_bytes):
-        asyncio.create_task(sio.emit('audio_data', {'data': base64.b64encode(data_bytes).decode()}))
+        asyncio.create_task(sio.emit('audio_data', {'data': list(data_bytes)}))
 
     # Callback to send Transcription data to frontend
     def on_transcription(data):
@@ -830,13 +830,11 @@ async def force_tool(sid, data):
             people = memory_store.list_people(limit=20)
             lessons = memory_store.recall_lessons("", limit=10)
             payload = {
-                "workflow": "memory-view",
                 "profile": profile,
                 "facts": facts.get("facts", []),
                 "people": people,
                 "lessons": lessons,
             }
-            await sio.emit('workflow_start', payload)
             await sio.emit('tool_result', {'tool': tool, 'result': payload, 'forced': True})
         elif tool == 'remember_person':
             import memory_store

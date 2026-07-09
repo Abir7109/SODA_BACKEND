@@ -811,20 +811,20 @@ wake_up_tool = {
 close_panel_tool = {
     "name": "close_panel",
     "description": (
-        "Close/clear/dismiss everything on the screen — panels, windows, workflows, etc. "
+        "Close/clear/dismiss everything on the screen — panels, windows, etc. "
         "Use when the user says ANY of: 'close it', 'close this', 'close everything', 'close all', 'clear the screen', "
-        "'dismiss', 'get rid of this', 'make it go away', 'wipe everything', "
-        "'leave', 'leave it', 'stop', 'exit', 'cancel', 'quit', 'forget it', 'never mind'. "
+        "'dismiss', 'get rid of this', 'make it go away', "
+        "'wipe everything', 'leave', 'leave it', 'stop', 'exit', 'cancel', 'quit', 'forget it', 'never mind'. "
         "Also works for specific panels: 'close the search', 'close the file list', 'close the terminal', "
-        "'close the workflow', 'close the news'. "
-        "Panel 'all' wipes EVERYTHING — panels, floating windows, and workflows."
+        "'close the news'. "
+        "Panel 'all' wipes EVERYTHING — panels and floating windows."
     ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
             "panel": {
                 "type": "STRING",
-                "description": "Panel to close. 'all' — closes everything, clears the screen. Specific: 'terminal', 'search', 'files', 'webpage', 'file', 'info', 'tool', 'tools', 'github', 'deploy', 'webview', 'workflow'. Stacks: 'github_stack', 'deploy_stack', 'search_stack'. Special: 'file_scroll'."
+                "description": "Panel to close. 'all' — closes everything, clears the screen. Specific: 'terminal', 'search', 'files', 'webpage', 'file', 'info', 'tool', 'tools', 'github', 'deploy', 'webview'. Stacks: 'github_stack', 'deploy_stack', 'search_stack'. Special: 'file_scroll'."
             }
         },
         "required": []

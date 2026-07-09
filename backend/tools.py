@@ -1676,29 +1676,6 @@ camera_control_tool = {
     }
 }
 
-start_workflow_tool = {
-    "name": "start_workflow",
-    "description": (
-        "Launch a full-screen HUD animation. Only call this when the user EXPLICITLY asks "
-        "for one of these scenarios by name or clear description. Do NOT infer from context. "
-        "Scenarios: 'outside' → user says 'going outside' or 'leaving workflow'; "
-        "'project-review' → user says 'project review' or 'check project'; "
-        "'break-time' → user says 'break time' or 'take a break'; "
-        "'workbase-showcase' → user says 'show workbase' or 'workbase showcase'. "
-        "Do NOT call this unless the user uses clear command phrases."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "workflow": {
-                "type": "STRING",
-                "description": "Name of the workflow to launch: outside, project-review, break-time, workbase-showcase"
-            }
-        },
-        "required": ["workflow"]
-    }
-}
-
 pentest_target_tool = {
     "name": "pentest_target",
     "description": (
@@ -2260,7 +2237,6 @@ tools_list = [{"function_declarations": [
     show_agents_tool,
     shutdown_soda_tool,
     shutdown_system_tool,
-    start_workflow_tool,
     start_website_project_tool,
     web_builder_answer_tool,
     workbase_list_tool,

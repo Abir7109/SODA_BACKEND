@@ -16,8 +16,6 @@
 - `open_url` (open a URL in floating webview window — payload `{url}`)
 - `webview_action` (perform action inside a webview — payload `{id, action, params}`)
 - `close_panel` (close a panel by name — payload `{panel}`)
-- `workflow_start` (launch a workflow HUD animation — payload `{workflow, ...data}`)
-- `news_briefing_control` (navigate article in news briefing — payload `{action, index}`)
 - `stop_audio` (stop current audio playback — no payload)
 - `web_builder_status` (website builder status update — payload `{phase, message, timestamp, builder?, prompt_preview?, elapsed?}`)
 - `web_builder_progress` (website builder build progress — payload `{progress, message, phase, timestamp}`)
@@ -92,40 +90,6 @@ Colors, typography, and spacing are defined as CSS custom properties in
 - Re-add removed subsystems: CAD, web automation, face auth, printers,
   Kasa smart home, phone calls, Telegram, Ollama
 
-## Workflow System (Current State)
-
-### Socket Events Added
-| Event | Direction | Payload | Purpose |
-|---|---|---|---|
-| `workflow_start` | backend→frontend | `{workflow, articles?, profile?, facts?, people?, lessons?, ...}` | Launch HUD animation |
-| `news_briefing_control` | backend→frontend | `{action, index?}` | Navigate news articles |
-| `stop_audio` | backend→frontend | `{}` | Stop playback (barge-in) |
-| `video_frame` | frontend→backend | `{data: base64}` | Camera frame from browser |
-
-### Backend Handlers (`soda.py:_dispatch_tool`)
-- **`get_news`** — Calls `get_news_briefing()` (multi-category DDG/RSS), emits `workflow_start` with `workflow:"news-briefing"`
-- **`news_control`** — Emits `news_briefing_control` with `{action, index}` for article navigation
-- **`show_memory`** — Collects profile/facts/people/lessons, emits `workflow_start` with `workflow:"memory-view"`
-- **`start_workflow`** — Emits `workflow_start` with any named workflow from `WORKFLOW_MAP`
-- **`close_panel`** — Accepts `"workflow"` and `"all"` panel values to dismiss active workflow
-- Workflow auto-triggered in `receive_audio` via `workflow_intent.match_with_context()` (word2vec keyword matching)
-
-### Frontend Integration (`App.jsx`)
-- Imports `WorkflowOverlay` from `src/components/workflows/WorkflowOverlay.jsx`
-- State `workflow` and refs `workflowRef`, `workflowDismissRef`
-- `socket.on('workflow_start')` → `setWorkflow(data)`
-- `socket.on('news_briefing_control')` → merges `newsControl` into workflow state
-- `socket.on('transcription')` → auto-dismiss non-animated workflows after 60s
-- `onClosePanel` handles `"workflow"` and `"all"`
-- `WorkflowOverlay` renders inside `<CameraCapture />` area
-
-### Workflow Components (`src/components/workflows/`)
-- `index.js` — Exports `WORKFLOW_MAP` (workflow name → lazy component)
-- `WorkflowOverlay.jsx` — Renders active workflow, passes `data` and `onComplete`
-- `WorkflowNewsBriefing.jsx` — 6-phase animation with Electron `<webview>` article browser
-- `WorkflowMemoryView.jsx` — 7-phase animation for memory database
-- 11 animated workflow components (startup, morning, outside, etc.)
-
 ### Audio Pipeline (Echo-Safe)
 - `listen_audio()`: mic input accepted only when `_model_is_speaking == False`; during model playback mic is muted to prevent echo
 - `play_audio()`: tracks `silent_ticks` (0.5s per empty wait). Clears `_model_is_speaking` after 8 silent ticks (4s) when no tools are running. **Reset behavior**: when `_tools_running` transitions True→False, `silent_ticks` resets to 0 to give Gemini a fresh 4s window to respond to tool results.
@@ -152,6 +116,10 @@ Colors, typography, and spacing are defined as CSS custom properties in
 - Electron `<webview>` requires `webviewTag: true` in `electron/main.js`
 - News RSS fails often; DDG HTML scraping is fallback via `_parse_ddg_html()`
 - `get_news` handler has 5s cooldown (`_last_news_briefing`)
+
+### Deploy Commands
+- **Frontend (Netlify)**: `npx netlify deploy --prod --dir=dist` — deploys `dist/` to soda-hud.netlify.app
+- **Backend (Render)**: `git push soda-backend HEAD:master` — auto-deploys via Render webhook
 
 ### Local Agent (`backend/local_agent.py`)
 - Standalone Python script connecting to backend via Socket.IO client

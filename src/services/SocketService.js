@@ -4,7 +4,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || window.location.origin
 
 const socket = io(BACKEND_URL, {
   autoConnect: false,
-  transports: ['websocket', 'polling'],
+  transports: ['polling', 'websocket'],
   reconnection: true,
   reconnectionDelay: 500,
   reconnectionDelayMax: 3000,

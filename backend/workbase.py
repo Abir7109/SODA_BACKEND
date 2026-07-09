@@ -422,14 +422,4 @@ class Workbase:
             "description": entry["description"],
         }
 
-    def emit_workflow_start(self, sio):
-        projects = self.list_projects()
-        if sio:
-            import asyncio
-            loop = asyncio.get_event_loop()
-            loop.create_task(sio.emit("workflow_start", {
-                "workflow": "workbase-showcase",
-                "projects": projects,
-                "timestamp": time.time(),
-            }))
-        return projects
+

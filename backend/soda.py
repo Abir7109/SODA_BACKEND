@@ -164,9 +164,6 @@ except ImportError:
     def run_welcome_sequence(*a, **kw):
         return {"success": False, "error": "welcome_home not available"}
 import scheduler_service as scheduler
-import workflow_intent
-import workflow_data
-import workflow_memory
 from pentest import PentestOrchestrator
 from external_apis import (
     get_weather, get_ip_info, get_exchange_rate, get_news_briefing,
@@ -556,35 +553,10 @@ def _build_system_prompt():
         "'how do I', 'can you' signal a clear command — call the tool. But softer hints like "
         "'I wonder', 'I need', 'do we have', 'what about', 'is there a' may just be casual thinking aloud. "
         "When in doubt, respond naturally and ask.\n"
-        "8. HOWEVER — CRITICAL EXCEPTION: NEVER proactively call show_memory, start_workflow, or get_news. "
-        "These tools must ONLY be called when the user uses an EXPLICIT command phrase like 'show me your memory', "
-        "'what do you know about me', 'show me what you remember', 'tell me the news', 'give me news', "
-        "'start the [name] workflow', 'launch the [name] workflow'. Do NOT call them based on context, hints, "
-        "ambient conversation, or general activity inference. If you're not absolutely sure the user explicitly "
-        "asked for one of these, DO NOT call the tool. Waiting is always better than calling proactively.\n"
-        "9. If transcription contains what looks like a mix of languages, extract the English "
-        "keywords and infer the intent. For example, if you see 'আবহাওয়া weather কেমন', "
-        "the word 'weather' tells you to call get_weather. Use ANY English word in the transcription "
-        "as a clue to determine the correct action.\n"
-        "10. WORKFLOW NARRATION — When the user says 'project review', 'project overview', "
-        "'project status', 'show me the project', or similar — a PROJECT REVIEW HUD animation "
-        "automatically appears on their screen showing 7 phases: Intel Link (connecting to project "
-        "root), Holographic Display (project name), GitHub Handshake (repo info), Repo Cards "
-        "(file counts, quality score, TODOs), Radar Scan (code health visualization), Summary "
-        "(typewriter text with project stats), and Standby (persistent results). Narrate each "
-        "phase as it appears in real time — describe what the user is seeing on screen, "
-         "highlighting the key metrics shown in each phase.\n"
-         "When the 'outside' workflow is active — a FIELD DEPLOYMENT HUD animation appears "
-         "showing 4 phases: HUD Boot (HUD frame draws in), Weather Report (temperature, "
-         "condition, location from the weather data panel), Essential Gear (4 gear items "
-         "check off one by one), and Destination Input (radar scanning ring with "
-         "'WHERE ARE YOU HEADING, SIR?' text typing in). Narrate each phase as it appears: "
-         "read out the weather (temperature, condition, feels-like, humidity, wind, precipitation, "
-         "location), remind about gear items, then ask where the user is heading. When the user "
-         "responds with a destination, save it via remember_fact with key 'outside_destination' "
-         "and then call close_panel to dismiss the HUD. When the user returns and says "
-         "'I'm back', 'I'm home', 'I returned', save a fact about the return time and ask "
-         "about their trip.\n"
+         "7. If transcription contains what looks like a mix of languages, extract the English "
+         "keywords and infer the intent. For example, if you see 'আবহাওয়া weather কেমন', "
+         "the word 'weather' tells you to call get_weather. Use ANY English word in the transcription "
+         "as a clue to determine the correct action.\n"
          "CLOSE/ CLEAR COMMAND — CRITICAL: When the user says 'close it', 'close this', 'clear the screen', "
          "'wipe everything', 'dismiss all', 'close all', 'make it go away', "
          "'leave', 'leave it', 'stop', 'exit', 'cancel', 'quit', 'forget it', 'never mind', call close_panel IMMEDIATELY with panel='all'. "
@@ -616,10 +588,9 @@ def _build_system_prompt():
         "just call store_custom_memory directly.\n"
         "- Never ask 'should I remember this' — just save it.\n"
         "- At session start, the MEMORY RESTORED block below shows background context from past sessions. "
-        "Use it to inform your conversation naturally — do NOT call show_memory, get_news, or start_workflow on startup or during greeting. "
-        "Only call workflow tools when the user explicitly asks for them.\n"
-        "- When the user explicitly asks to see what you remember, call show_memory — this opens the MEMORY DATABASE HUD. Narrate each section as it appears on screen (profile, facts, people, lessons, custom schemas) at a natural pace. Do NOT call this proactively.\n"
-        "- When narrating the memory database, speak as if you're walking them through your files. Start with 'Accessing memory database, sir...' then describe each section one by one. Pause briefly between sections so the animation can keep pace."
+        "Use it to inform your conversation naturally — do NOT call show_memory or get_news on startup or during greeting. "
+        "Only call these when the user explicitly asks for them.\n"
+        "- When the user explicitly asks to see what you remember, call show_memory."
         "- Your conversation history is automatically summarized every 20 turns and stored. "
         "On reconnect, summaries are injected so you remember past sessions naturally."
 
@@ -796,7 +767,7 @@ def _build_system_prompt():
         ctx = memory_store.build_context_block()
         if ctx:
             base += "\n\n" + ctx
-            base += "\n\nREMINDER: Do NOT call show_memory, get_news, or start_workflow tools during this turn. Continue the conversation naturally."
+            base += "\n\nContinue the conversation naturally."
     except Exception:
         pass
     try:
@@ -929,8 +900,6 @@ class AudioLoop:
         self._camera_active = False
         self._last_camera_use = 0.0
         self._last_camera_fail = 0.0
-        self._last_workflow_fire = 0
-        self.wf_memory = workflow_memory.WorkflowMemory()
         self._turn_count = 0
         self._context_refresh_interval = 999
         self._last_refresh_turn = 0
@@ -945,7 +914,7 @@ class AudioLoop:
         self._pending_pastebox = None
         self._pastebox_content = ""
         self._pentest_background_task = None
-        log.info(f"Skipping learned keyword injection — threshold-based matching is sufficient")
+
 
     def _load_context_history(self):
         try:
@@ -1607,12 +1576,7 @@ class AudioLoop:
                                             self._last_close_proactive = now
                                             if self.sio:
                                                 await self.sio.emit("close_panel", {"panel": "all"})
-                                    if len(transcript) > 8:
-                                        wf_name = workflow_intent.intent_matcher.match_with_context(transcript)
-                                        if wf_name:
-                                            self._last_workflow_fire = time.time()
-                                            asyncio.create_task(self._emit_workflow(wf_name, transcript))
-                                        if len(transcript) > 15:
+                                    if len(transcript) > 15:
                                             asyncio.create_task(self._auto_detect_emotion(transcript))
                                     if self.on_transcription:
                                         self.on_transcription({"sender": "User", "text": delta})
@@ -1757,30 +1721,8 @@ class AudioLoop:
             raise e
 
 
-    async def _emit_workflow(self, wf_name, delta):
-        try:
-            log.info(f"[wf-debug] _emit_workflow starting: {wf_name}")
-            wf_data = await workflow_data.collect()
-            log.info(f"[wf-debug] workflow_data collected, keys={list(wf_data.keys())}")
-            wf_data["workflow"] = wf_name
-            if self.sio:
-                log.info(f"[wf-debug] emitting workflow_start to sio")
-                await self.sio.emit("workflow_start", wf_data)
-                log.info(f"[wf-debug] emit done")
-            log.info(f"Workflow: {wf_name}")
-            self.wf_memory.record_trigger(delta, wf_name)
-            self.wf_memory.save()
-        except Exception as e:
-            log.error(f"Workflow emit failed: {e}")
-            traceback.print_exc()
-
     async def _run_pentest_background(self, target):
         try:
-            if self.sio:
-                await self.sio.emit("workflow_start", {
-                    "workflow": "pentest-scan",
-                    "target": target,
-                })
             from pentest import PentestOrchestrator
             from pentest.pentest_report import export_txt
             orchestrator = PentestOrchestrator()
@@ -2104,14 +2046,6 @@ class AudioLoop:
                 r = await get_news_briefing(query=query, max_per_category=3)
                 self._news_articles = r.get("articles", [])
                 log.info(f"get_news: query='{query}' returned {len(self._news_articles)} articles")
-                payload = {
-                    "workflow": "news-briefing",
-                    "articles": self._news_articles,
-                    "categories": r.get("categories", []),
-                    "query": query,
-                }
-                if self.sio:
-                    await self.sio.emit("workflow_start", payload)
                 await asyncio.sleep(0.8)
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": {
                     "type": "news_briefing",
@@ -2122,19 +2056,6 @@ class AudioLoop:
             except Exception as e:
                 log.error(f"get_news failed: {e}")
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": {"articles": [], "error": str(e)}})
-
-        elif name == "news_control":
-            action = args.get("action", "next")
-            index = args.get("index")
-            if self.sio:
-                loop = asyncio.get_event_loop()
-                loop.create_task(self.sio.emit("news_briefing_control", {
-                    "action": action,
-                    "index": index,
-                }))
-                if action == "close":
-                    await self.sio.emit("close_panel", {"panel": "all"})
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": {"ok": True}})
 
         elif name == "define_word":
             r = await define_word(args.get("word", ""))
@@ -2423,16 +2344,6 @@ class AudioLoop:
                                     custom_schemas_data["entries"][name] = entries_result.get("entries", [])
                 except Exception:
                     pass
-                payload = {
-                    "workflow": "memory-view",
-                    "profile": profile,
-                    "facts": facts,
-                    "people": people,
-                    "lessons": lessons,
-                    "custom_schemas": custom_schemas_data,
-                }
-                if self.sio:
-                    await self.sio.emit("workflow_start", payload)
                 await asyncio.sleep(0.8)
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": {"shown": True}})
             except Exception as e:
@@ -3117,32 +3028,6 @@ class AudioLoop:
             system_app.send_discord(args.get("contact", ""), args.get("message", ""))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": "Sent."})
 
-        elif name == "start_workflow":
-            wf = args.get("workflow", "")
-            valid = {"outside", "project-review", "break-time", "workbase-showcase"}
-            if wf not in valid:
-                return types.FunctionResponse(
-                    id=fc.id, name=name,
-                    response={"result": f"Invalid workflow '{wf}'. Valid: {', '.join(sorted(valid))}"},
-                )
-            try:
-                data = await workflow_data.collect()
-                data["workflow"] = wf
-                if self.sio:
-                    await self.sio.emit("workflow_start", data)
-                await asyncio.sleep(0.8)
-                log.info(f"Started workflow: {wf}")
-                return types.FunctionResponse(
-                    id=fc.id, name=name,
-                    response={"result": f"Started {wf} workflow. Tell the user what's happening in character."},
-                )
-            except Exception as e:
-                log.error(f"workflow start failed: {e}")
-                return types.FunctionResponse(
-                    id=fc.id, name=name,
-                    response={"result": f"Failed to start workflow: {e}"},
-                )
-
         elif name == "start_website_project":
             from web_builder_orchestrator import WebBuilderOrchestrator
             if not self.web_builder:
@@ -3206,8 +3091,6 @@ class AudioLoop:
             folder_path = args.get("folder_path", "")
             result = self.workbase.import_project(folder_path)
             if result.get("success"):
-                if self.sio:
-                    projects = self.workbase.emit_workflow_start(self.sio)
                 return types.FunctionResponse(
                     id=fc.id, name=name,
                     response={"result": f"Imported '{result['display_name']}' into workbase. Tell the user what you found."},
@@ -3287,12 +3170,6 @@ class AudioLoop:
                 result = ss.get_part2_cue_card()
             else:
                 result = ss.get_part3_questions()
-            if self.sio:
-                loop = asyncio.get_event_loop()
-                loop.create_task(self.sio.emit("workflow_start", {
-                    "workflow": "ielts-speaking",
-                    "data": result
-                }))
             topic_txt = result.get("topic", "")
             if part == 1:
                 qs = result.get("questions", [])
@@ -3605,12 +3482,6 @@ TEXT: {text}"""
             if module in ("reading", "full"):
                 rs = _get_ielts_reading_session()
                 content["reading"] = rs.get_passage()
-            if self.sio:
-                loop = asyncio.get_event_loop()
-                loop.create_task(self.sio.emit("workflow_start", {
-                    "workflow": "ielts-mock",
-                    "data": {"module": module, "content": content}
-                }))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": json.dumps({
                 "status": "started",
                 "module": module,
