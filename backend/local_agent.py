@@ -837,6 +837,11 @@ def _dispatch(tool, args):
             if path_or_name and os.path.isfile(path_or_name):
                 match_names.append(os.path.basename(path_or_name).lower())
             match_names.append(app_lower)
+            # Add individual words so "Visual Studio Code" matches "Code.exe"
+            for m in list(match_names):
+                for w in m.replace('-', ' ').replace('_', ' ').split():
+                    if len(w) > 2:
+                        match_names.append(w)
             match_names = list(set(match_names))
 
             if HAS_PSUTIL:
@@ -956,7 +961,49 @@ def _dispatch(tool, args):
                 log.warning(f"[LocalAgent] web_app '{app}' failed: {e}")
                 # fall through to other methods
 
-        # ── 1. APP_REGISTRY lookup (instant, no search delay) ────
+        # ── 1. Start Menu search (ctypes keybd_event, stdlib) ─────
+        def _start_menu_search():
+            """Press Win, type app name, Enter via ctypes keybd_event. Returns True if keys sent."""
+            try:
+                import ctypes
+                ctypes.windll.user32.keybd_event(0x5B, 0, 0, 0)
+                time.sleep(0.05)
+                ctypes.windll.user32.keybd_event(0x5B, 0, 2, 0)
+                time.sleep(1.2)
+                for ch in app_lower:
+                    if 'a' <= ch <= 'z':
+                        vk = ord(ch) - 32
+                    elif '0' <= ch <= '9':
+                        vk = ord(ch)
+                    elif ch == ' ':
+                        vk = 0x20
+                    elif ch == '-':
+                        vk = 0xBD
+                    elif ch == '.':
+                        vk = 0xBE
+                    else:
+                        continue
+                    ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
+                    time.sleep(0.03)
+                    ctypes.windll.user32.keybd_event(vk, 0, 2, 0)
+                    time.sleep(0.03)
+                time.sleep(2.0)
+                ctypes.windll.user32.keybd_event(0x0D, 0, 0, 0)
+                time.sleep(0.05)
+                ctypes.windll.user32.keybd_event(0x0D, 0, 2, 0)
+                return True
+            except Exception as e:
+                log(f"[StartMenuSearch] Error: {e}")
+                return False
+        for _ in range(3):
+            if _start_menu_search():
+                time.sleep(2.0)
+                _ok, _detail = _verify_started(timeout=3.0)
+                if _ok:
+                    return {"success": True, "app": app, "method": "start_menu_search", "detail": _detail}
+            time.sleep(0.5)
+
+        # ── 2. APP_REGISTRY lookup (instant, no search delay) ────
         reg_match = _find_app(app)
         if reg_match:
             entry, matched_key = reg_match
@@ -990,7 +1037,7 @@ def _dispatch(tool, args):
                     except:
                         continue
 
-        # ── 2. Search Windows App Paths registry ──────────────────
+        # ── 3. Search Windows App Paths registry ──────────────────
         try:
             import winreg
             for root_key in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
@@ -1016,7 +1063,7 @@ def _dispatch(tool, args):
         except:
             pass
 
-        # ── 3. where command (PATH) ───────────────────────────────
+        # ── 4. where command (PATH) ───────────────────────────────
         for ext in ("", ".exe", ".cmd", ".bat"):
             try:
                 r = subprocess.run(["where", f"{app}{ext}"], shell=True, capture_output=True, text=True, timeout=5)
@@ -1028,7 +1075,7 @@ def _dispatch(tool, args):
             except:
                 pass
 
-        # ── 4. Start Menu walk (live scan, slower) ────────────────
+        # ── 5. Start Menu walk (live scan, slower) ────────────────
         for sm_env in ("APPDATA", "PROGRAMDATA"):
             sm_base = os.path.expandvars(f"%{sm_env}%\\Microsoft\\Windows\\Start Menu\\Programs")
             if not os.path.isdir(sm_base):
@@ -1047,7 +1094,7 @@ def _dispatch(tool, args):
             except:
                 pass
 
-        # ── 5. AppX / Store packages ──────────────────────────────
+        # ── 6. AppX / Store packages ──────────────────────────────
         try:
             ps_cmd = (
                 "$pkg = Get-AppxPackage -Name '*" + app_lower.replace("'", "''") +
@@ -1074,7 +1121,7 @@ def _dispatch(tool, args):
         except:
             pass
 
-        # ── 6. os.startfile + `start` shell ───────────────────────
+        # ── 7. os.startfile + `start` shell ───────────────────────
         try:
             os.startfile(app)
             _ok, _detail = _verify_started()
@@ -1090,44 +1137,7 @@ def _dispatch(tool, args):
         except:
             pass
 
-        # ── 7. PowerShell SendKeys (Start Menu search) ────────────
-        for attempt in range(3):
-            try:
-                search_ps = (
-                    "$null = Add-Type -AssemblyName System.Windows.Forms; "
-                    "[System.Windows.Forms.SendKeys]::SendWait('^{ESC}'); "
-                    "Start-Sleep -Milliseconds 1000; "
-                    "[System.Windows.Forms.SendKeys]::SendWait('" + app.replace("'", "''") + "'); "
-                    "Start-Sleep -Milliseconds 2000; "
-                    "[System.Windows.Forms.SendKeys]::SendWait('{ENTER}'); "
-                    "Start-Sleep -Milliseconds 2000"
-                )
-                subprocess.run(["powershell", "-NoProfile", "-Command", search_ps], capture_output=True, timeout=8)
-                _ok, _detail = _verify_started(timeout=2.0)
-                if _ok:
-                    return {"success": True, "app": app, "method": "powershell_search", "detail": _detail}
-            except:
-                time.sleep(1)
-
-        # ── 8. PyAutoGUI fallback ─────────────────────────────────
-        if HAS_PYAUTOGUI:
-            import pyautogui
-            for attempt in range(2):
-                try:
-                    time.sleep(0.5)
-                    pyautogui.hotkey("win", "s")
-                    time.sleep(1.0)
-                    pyautogui.write(app, interval=0.05)
-                    time.sleep(1.5)
-                    pyautogui.press("enter")
-                    time.sleep(2)
-                    _ok, _detail = _verify_started(timeout=1.5)
-                    if _ok:
-                        return {"success": True, "app": app, "method": "pyautogui_start", "detail": _detail}
-                except:
-                    time.sleep(1)
-
-        # ── 9. Final fallback: try as website https://{app}.com ────
+        # ── 8. Final fallback: try as website https://{app}.com ────
         if "." not in app_lower and " " not in app_lower:
             web_url = f"https://{app_lower}.com"
             log.info(f"[LocalAgent] Final fallback: trying {web_url} in browser")
@@ -1140,9 +1150,11 @@ def _dispatch(tool, args):
         # ── Final check: try to detect any matching process ──────
         if HAS_PSUTIL:
             import psutil as _psutil
+            _check_name_parts = app_lower.replace('-', ' ').replace('_', ' ').split()
             for p in _psutil.process_iter(['pid', 'name']):
                 try:
-                    if app_lower in p.info['name'].lower().replace('.exe',''):
+                    pname = p.info['name'].lower().replace('.exe','')
+                    if app_lower in pname or any(w in pname for w in _check_name_parts if len(w) > 2):
                         log(f"[LocalAgent] open_app '{app}' found running post-cascade (PID {p.info['pid']})")
                         return {"success": True, "app": app, "method": "detected_running", "detail": f"Process {p.info['name']} running"}
                 except:
