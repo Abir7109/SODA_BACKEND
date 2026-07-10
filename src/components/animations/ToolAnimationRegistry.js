@@ -99,9 +99,6 @@ export const TOOL_ANIMATIONS = {
   // ── Webview ──────────────────────────────────────────────────
   webview_action: { component: 'WebpageAnim', variant: 'open' },
 
-  // ── Tools Showcase ───────────────────────────────────────────
-  show_tools: { component: 'ToolShowcaseAnim', variant: 'showcase' },
-
   // ── Task Planning ────────────────────────────────────────────
   plan_tasks:  { component: 'AiTerminalCompiler', variant: 'default' },
   update_task: { component: 'AiTerminalCompiler', variant: 'default' },

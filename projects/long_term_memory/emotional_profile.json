@@ -8,11 +8,16 @@
     "likes_distraction": false,
     "wants_practical_help": true
   },
-  "total_episodes": 1,
+  "total_episodes": 6,
   "episodes_by_category": {
-    "exhaustion": 1
+    "exhaustion": 1,
+    "depression": 1,
+    "anger": 1,
+    "grief": 1,
+    "joy": 1,
+    "anxiety": 1
   },
-  "average_intensity": 2.0,
+  "average_intensity": 2.5,
   "last_low_point": null,
   "is_night_owl": false,
   "shares_proactively": true,

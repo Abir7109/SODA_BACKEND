@@ -889,13 +889,7 @@
 .sp-file-name { font-size: 13px; font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sp-file-meta { font-size: 10px; color: var(--text-dim); }
 
-.sp-showcase-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.sp-showcase-card { background: var(--bg-card); border: 1px solid var(--border); padding: 10px 8px; text-align: center; transition: all 0.15s ease; }
-.sp-showcase-card:hover { background: var(--bg-hover); border-color: var(--border-hover); }
-.sp-showcase-icon { font-size: 18px; margin-bottom: 4px; }
-.sp-showcase-label { font-size: 10px; font-weight: 500; color: var(--text-primary); letter-spacing: 0.03em; margin-bottom: 2px; }
-.sp-showcase-desc { font-size: 9px; color: var(--text-dim); line-height: 1.2; }
-.sp-showcase-count { text-align: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 10px; color: var(--text-dim); }
+
 
 .sp-weather-panel { text-align: center; }
 .sp-weather-main { margin-bottom: 12px; }
@@ -1023,7 +1017,7 @@
 @keyframes soda-pin-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 
 @keyframes cardFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes cardReveal { from { opacity: 0; transform: scale(0.9) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
 @keyframes slideInRight { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes slideInLeft { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
 
@@ -1044,8 +1038,6 @@
 .sp-file-list .sp-file-item:nth-child(8) { animation: slideInLeft 0.2s ease-out 0.4s both; }
 .sp-file-list .sp-file-item:nth-child(9) { animation: slideInLeft 0.2s ease-out 0.45s both; }
 .sp-file-list .sp-file-item:nth-child(10) { animation: slideInLeft 0.2s ease-out 0.5s both; }
-
-.sp-showcase-card.revealed { animation: cardReveal 0.25s ease-out forwards; }
 
 /* ── Notepad ──────────────────────────────────────────── */
 .notepad {

@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "SODA Remote",
+    "slug": "soda-remote",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#04080B"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.soda.remote"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#04080B"
+      },
+      "package": "com.soda.remote",
+      "permissions": [
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "plugins": [
+      "expo-av",
+      "expo-asset"
+    ]
+  }
+}

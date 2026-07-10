@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, Suspense, Component } from 'react'
 import socket from './services/SocketService'
-import { getCategory, CATEGORIES, getAnimationForTool, getVariantForTool, getSpecializedPanel, ALL_TOOL_NAMES } from './components/animations'
+import { getCategory, CATEGORIES, getAnimationForTool, getVariantForTool, getSpecializedPanel } from './components/animations'
 
 function getCapacitorNotifications() {
   try {
@@ -75,7 +75,7 @@ import InfoPanel from './components/panels/InfoPanel'
 import ToolOutputPanel from './components/panels/ToolOutputPanel'
 import WebpageSummaryPanel from './components/panels/WebpageSummaryPanel'
 import FileBrowserPanel from './components/panels/FileBrowserPanel'
-import ToolShowcasePanel from './components/panels/ToolShowcasePanel'
+
 import WeatherPanel from './components/panels/WeatherPanel'
 import SystemStatusPanel from './components/panels/SystemStatusPanel'
 import CurrencyPanel from './components/panels/CurrencyPanel'
@@ -602,8 +602,6 @@ export default function App() {
   const clearTaskTimeoutRef = useRef(null)
 
   // Tool showcase panel state (right)
-  const [toolShowcase, setToolShowcase] = useState({ visible: false, tools: [] })
-  const showcaseTimerRef = useRef(null)
 
   // Scraped data panel state (bottom)
   const [scrapedData, setScrapedData] = useState({ visible: false, data: null, url: '' })
@@ -786,20 +784,6 @@ export default function App() {
         })
       }
 
-      // Start showcase immediately — panel + animation, no need to wait for backend tool_showcase event
-      if (toolName === 'show_tools' && data.auto_allowed) {
-        if (showcaseTimerRef.current) clearTimeout(showcaseTimerRef.current)
-        const tools = ALL_TOOL_NAMES.map(name => ({ name, description: '' }))
-        setToolShowcase({ visible: true, tools })
-        setTaskData({ tools })
-        const ms = Math.min(tools.length * 120 + 600, 12000)
-        showcaseTimerRef.current = setTimeout(() => {
-          setTask(prev => {
-            if (!prev || prev.name !== 'show_tools') return prev
-            return { ...prev, status: 'done' }
-          })
-        }, ms)
-      }
     }
 
     const handleResolve = (event) => {
@@ -848,33 +832,7 @@ export default function App() {
       }, dismissMs)
     }
 
-    const onToolShowcase = (data) => {
-      const tools = data.tools || []
-      if (data.status === 'done') {
-        setToolShowcase({ visible: true, tools, status: 'done' })
-        if (showcaseTimerRef.current) clearTimeout(showcaseTimerRef.current)
-        return
-      }
-      setToolShowcase({ visible: true, tools })
-      if (tools.length) {
-        setTask({
-          status: 'running',
-          tool: 'show_tools',
-          name: 'show_tools',
-          category: 'data',
-          timestamp: Date.now(),
-        })
-        setTaskData(data)
-        if (showcaseTimerRef.current) clearTimeout(showcaseTimerRef.current)
-        const ms = Math.min(tools.length * 120 + 600, 12000)
-        showcaseTimerRef.current = setTimeout(() => {
-          setTask(prev => {
-            if (!prev || prev.name !== 'show_tools') return prev
-            return { ...prev, status: 'done' }
-          })
-        }, ms)
-      }
-    }
+
 
     const onSearchResults = (data) => {
       markDone()
@@ -931,7 +889,7 @@ export default function App() {
 
       const persistentAnims = new Set([
         'get_system_status', 'get_weather', 'get_news', 'get_bangladeshi_news', 'get_exchange_rate',
-        'list_files', 'show_tools', 'browse_webpage',
+        'list_files', 'browse_webpage',
         'github_list_repos', 'github_get_repo', 'github_list_issues',
         'netlify_list_sites', 'vercel_list_projects',
         'list_processes', 'get_ip_info', 'define_word', 'get_wikipedia_summary',
@@ -1153,7 +1111,7 @@ export default function App() {
           setToolPanel(prev => ({ ...prev, visible: false }))
           setWebpageSummary(prev => ({ ...prev, visible: false }))
           setFileBrowser(prev => ({ ...prev, visible: false }))
-          setToolShowcase(prev => ({ ...prev, visible: false }))
+
           setWeatherPanel(prev => ({ ...prev, visible: false }))
           setSystemStatusPanel(prev => ({ ...prev, visible: false }))
           setMemoryPanel(prev => ({ ...prev, visible: false }))
@@ -1239,7 +1197,6 @@ export default function App() {
     socket.on('audio_data', onAudioData)
     const onMicLevel = (data) => { if (data && typeof data.level === 'number') setOrbMicLevel(data.level) }
     socket.on('mic_level', onMicLevel)
-    socket.on('tool_showcase', onToolShowcase)
     socket.on('search_results', onSearchResults)
     socket.on('spotify_search_results', (data) => {
       if (!data || !data.results) return
@@ -1459,7 +1416,6 @@ export default function App() {
       socket.off('background_cmd_status')
       socket.off('audio_data', onAudioData)
       socket.off('mic_level', onMicLevel)
-      socket.off('tool_showcase', onToolShowcase)
       socket.off('search_results', onSearchResults)
       socket.off('spotify_search_results')
       socket.off('webpage_content', onWebpageContent)
@@ -1492,7 +1448,6 @@ export default function App() {
       socket.off('pentest_output', onPentestOutput)
       socket.off('email_data', onEmailData)
       if (clearTaskTimeoutRef.current) clearTimeout(clearTaskTimeoutRef.current)
-      if (showcaseTimerRef.current) clearTimeout(showcaseTimerRef.current)
     }
   }, [])
 
@@ -1783,13 +1738,6 @@ export default function App() {
         onClose={closeFileBrowser}
       />
 
-      {/* Tool Showcase Panel — slides from RIGHT */}
-      <ToolShowcasePanel
-        visible={toolShowcase.visible}
-        tools={toolShowcase.tools}
-        onClose={() => setToolShowcase(prev => ({ ...prev, visible: false }))}
-      />
-
       {/* Specialized Data Panels */}
       <WeatherPanel visible={weatherPanel.visible} data={weatherPanel.data}
         onClose={() => setWeatherPanel(prev => ({ ...prev, visible: false }))} />
@@ -1894,10 +1842,9 @@ export default function App() {
           /* ── Holographic Orb + SVG Animation overlay ── */
           <>
             {(() => {
-              const isShowcase = task && task.tool === 'show_tools'
-              const orbSize = isShowcase ? 320 : 192
+              const orbSize = 192
               return (
-            <div className={`relative flex items-center justify-center ${isShowcase ? 'w-80 h-80' : 'w-48 h-48'}`}>
+            <div className={'relative flex items-center justify-center w-48 h-48'}>
               <div
                 className="absolute inset-0 flex items-center justify-center"
                 style={{

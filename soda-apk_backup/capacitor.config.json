@@ -1,0 +1,15 @@
+{
+  "appId": "com.soda.hud",
+  "appName": "SODA HUD",
+  "webDir": "../dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_soda",
+      "iconColor": "#0a0a0f"
+    }
+  }
+}

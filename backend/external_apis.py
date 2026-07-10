@@ -889,19 +889,6 @@ close_panel_tool = {
     }
 }
 
-show_tools_tool = {
-    "name": "show_tools",
-    "description": (
-        "Show an animated showcase of all available tools in the HUD. "
-        "Use when the user asks 'how many tools do you have', 'what tools do you have', "
-        "'show me your tools', 'what can you do', or similar questions about capabilities."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {}
-    }
-}
-
 # ============ SYSTEM CONTROL TOOLS ============
 
 system_status_tool = {
