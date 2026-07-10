@@ -2327,6 +2327,7 @@ def _dispatch(tool, args):
 def _fallback_list_files(path="."):
     """Built-in file listing without system_local module."""
     import stat
+    from datetime import datetime
     try:
         p = Path(path).resolve()
         if not p.exists():
@@ -2335,16 +2336,27 @@ def _fallback_list_files(path="."):
         for entry in sorted(p.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
             try:
                 s = entry.stat()
+                is_dir = entry.is_dir()
+                mtime = datetime.fromtimestamp(s.st_mtime).strftime("%Y-%m-%d %H:%M:%S") if s.st_mtime else ""
                 items.append({
+                    "number": len(items) + 1,
                     "name": entry.name,
+                    "type": "folder" if is_dir else "file",
+                    "size": s.st_size if not is_dir else 0,
+                    "modified": mtime,
+                    "ext": "" if is_dir else str(Path(entry.name).suffix).lower(),
                     "path": str(entry),
-                    "is_dir": entry.is_dir(),
-                    "size": s.st_size if not entry.is_dir() else 0,
-                    "modified": s.st_mtime,
-                    "created": getattr(s, "st_ctime", 0),
                 })
             except (PermissionError, OSError):
-                items.append({"name": entry.name, "path": str(entry), "is_dir": entry.is_dir(), "size": 0, "modified": 0, "created": 0})
+                items.append({
+                    "number": len(items) + 1,
+                    "name": entry.name,
+                    "type": "folder" if entry.is_dir() else "file",
+                    "size": 0,
+                    "modified": "",
+                    "ext": "",
+                    "path": str(entry),
+                })
         return {"success": True, "path": str(p), "items": items, "parent": str(p.parent)}
     except Exception as e:
         return {"success": False, "error": str(e)}

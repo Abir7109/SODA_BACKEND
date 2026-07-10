@@ -449,31 +449,6 @@
       "apps)"
     ]
   },
-  "discord": {
-    "paths": [
-      {
-        "path": "C:\\Users\\Abir\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Discord Inc\\Discord.lnk",
-        "method": "start_menu",
-        "display": "Discord"
-      }
-    ],
-    "name": "Discord",
-    "aliases": []
-  },
-  "discord (discord inc)": {
-    "paths": [
-      {
-        "path": "C:\\Users\\Abir\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Discord Inc\\Discord.lnk",
-        "method": "start_menu",
-        "display": "Discord"
-      }
-    ],
-    "name": "Discord",
-    "aliases": [
-      "(discord",
-      "inc)"
-    ]
-  },
   "alacritty (kali-linux)": {
     "paths": [
       {
@@ -1511,6 +1486,11 @@
         "path": "C:\\Users\\Abir\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Visual Studio Code\\Visual Studio Code.lnk",
         "method": "start_menu",
         "display": "Visual Studio Code"
+      },
+      {
+        "path": "shell:AppsFolder\\Microsoft.VisualStudioCode_8wekyb3d8bbwe!VSCode",
+        "method": "appx",
+        "display": "Visual Studio Code"
       }
     ],
     "name": "Visual Studio Code",
@@ -1755,6 +1735,11 @@
         "path": "C:\\Program Files (x86)\\WinRAR\\UnRAR.exe",
         "method": "common",
         "display": "UnRAR"
+      },
+      {
+        "path": "shell:AppsFolder\\WinRAR.ShellExtension_d9ma7nkbkv4rp!WinRAR.ShellExtension",
+        "method": "appx",
+        "display": "WinRAR"
       }
     ],
     "name": "WinRAR",
@@ -2108,6 +2093,11 @@
       {
         "path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Microsoft Edge.lnk",
         "method": "start_menu",
+        "display": "Microsoft Edge"
+      },
+      {
+        "path": "shell:AppsFolder\\Microsoft.MicrosoftEdge.Stable_8wekyb3d8bbwe!App",
+        "method": "appx",
         "display": "Microsoft Edge"
       }
     ],
@@ -4607,6 +4597,11 @@
         "path": "C:\\Program Files\\Microsoft Office\\Root\\Office16\\OUTLOOK.EXE",
         "method": "registry",
         "display": "OUTLOOK"
+      },
+      {
+        "path": "shell:AppsFolder\\Microsoft.OutlookForWindows_8wekyb3d8bbwe!Microsoft.OutlookforWindows",
+        "method": "appx",
+        "display": "Outlook"
       }
     ],
     "name": "OUTLOOK",
@@ -4681,7 +4676,7 @@
   "gethelp": {
     "paths": [
       {
-        "path": "C:\\Program Files\\WindowsApps\\Microsoft.GetHelp_10.2409.41392.0_x64__8wekyb3d8bbwe\\GetHelp.exe",
+        "path": "C:\\Program Files\\WindowsApps\\Microsoft.GetHelp_10.2409.41742.0_x64__8wekyb3d8bbwe\\GetHelp.exe",
         "method": "registry",
         "display": "GetHelp"
       },
@@ -4702,7 +4697,7 @@
   "ms-teams": {
     "paths": [
       {
-        "path": "C:\\Program Files\\WindowsApps\\MSTeams_26149.1205.4798.6437_x64__8wekyb3d8bbwe\\ms-teams.exe",
+        "path": "C:\\Program Files\\WindowsApps\\MSTeams_26163.405.4842.717_x64__8wekyb3d8bbwe\\ms-teams.exe",
         "method": "registry",
         "display": "ms-teams"
       },
@@ -4725,7 +4720,7 @@
   "ms-teamsupdate": {
     "paths": [
       {
-        "path": "C:\\Program Files\\WindowsApps\\MSTeams_26149.1205.4798.6437_x64__8wekyb3d8bbwe\\ms-teamsupdate.exe",
+        "path": "C:\\Program Files\\WindowsApps\\MSTeams_26163.405.4842.717_x64__8wekyb3d8bbwe\\ms-teamsupdate.exe",
         "method": "registry",
         "display": "ms-teamsupdate"
       },
@@ -4769,7 +4764,7 @@
   "notepad": {
     "paths": [
       {
-        "path": "C:\\Program Files\\WindowsApps\\Microsoft.WindowsNotepad_11.2604.5.0_x64__8wekyb3d8bbwe\\Notepad\\Notepad.exe",
+        "path": "C:\\Program Files\\WindowsApps\\Microsoft.WindowsNotepad_11.2605.29.0_x64__8wekyb3d8bbwe\\Notepad\\Notepad.exe",
         "method": "registry",
         "display": "notepad"
       },
@@ -5024,7 +5019,7 @@
   "spotify_cli": {
     "paths": [
       {
-        "path": "C:\\Program Files\\WindowsApps\\SpotifyAB.SpotifyMusic_1.292.148.0_x64__zpdnekdrzrea0\\spotify_cli.exe",
+        "path": "C:\\Program Files\\WindowsApps\\SpotifyAB.SpotifyMusic_1.293.667.0_x64__zpdnekdrzrea0\\spotify_cli.exe",
         "method": "registry",
         "display": "spotify_cli"
       },
@@ -5066,7 +5061,7 @@
   "windowspackagemanagerserver": {
     "paths": [
       {
-        "path": "C:\\Program Files\\WindowsApps\\Microsoft.DesktopAppInstaller_1.28.240.0_x64__8wekyb3d8bbwe\\WindowsPackageManagerServer.exe",
+        "path": "C:\\Program Files\\WindowsApps\\Microsoft.DesktopAppInstaller_1.29.280.0_x64__8wekyb3d8bbwe\\WindowsPackageManagerServer.exe",
         "method": "registry",
         "display": "WindowsPackageManagerServer"
       },
@@ -5087,7 +5082,7 @@
   "winget": {
     "paths": [
       {
-        "path": "C:\\Program Files\\WindowsApps\\Microsoft.DesktopAppInstaller_1.28.240.0_x64__8wekyb3d8bbwe\\winget.exe",
+        "path": "C:\\Program Files\\WindowsApps\\Microsoft.DesktopAppInstaller_1.29.280.0_x64__8wekyb3d8bbwe\\winget.exe",
         "method": "registry",
         "display": "winget"
       },
@@ -5166,6 +5161,2416 @@
       }
     ],
     "name": "XboxPcAppCE",
+    "aliases": []
+  },
+  "microsoft.bioenrollment": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.BioEnrollment_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.BioEnrollment"
+      }
+    ],
+    "name": "Microsoft.BioEnrollment",
+    "aliases": []
+  },
+  "microsoft.windows.capturepicker": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.CapturePicker_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "CapturePicker"
+      }
+    ],
+    "name": "CapturePicker",
+    "aliases": []
+  },
+  "capturepicker": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.CapturePicker_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "CapturePicker"
+      }
+    ],
+    "name": "CapturePicker",
+    "aliases": []
+  },
+  "windows.cbspreview": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Windows.CBSPreview_cw5n1h2txyewy!Microsoft.Windows.CBSPreview",
+        "method": "appx",
+        "display": "Windows Barcode Preview"
+      }
+    ],
+    "name": "Windows Barcode Preview",
+    "aliases": []
+  },
+  "windows barcode preview": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Windows.CBSPreview_cw5n1h2txyewy!Microsoft.Windows.CBSPreview",
+        "method": "appx",
+        "display": "Windows Barcode Preview"
+      }
+    ],
+    "name": "Windows Barcode Preview",
+    "aliases": [
+      "windows",
+      "barcode",
+      "preview"
+    ]
+  },
+  "1527c705-839a-4832-9118-54d4bd6a0c89": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\1527c705-839a-4832-9118-54d4Bd6a0c89_cw5n1h2txyewy!Microsoft.Windows.FilePicker",
+        "method": "appx",
+        "display": "1527c705-839a-4832-9118-54d4Bd6a0c89"
+      }
+    ],
+    "name": "1527c705-839a-4832-9118-54d4Bd6a0c89",
+    "aliases": [
+      "1527c705",
+      "839a",
+      "4832",
+      "9118",
+      "54d4bd6a0c89"
+    ]
+  },
+  "microsoft.creddialoghost": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.CredDialogHost_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.CredDialogHost"
+      }
+    ],
+    "name": "Microsoft.CredDialogHost",
+    "aliases": []
+  },
+  "e2a4f912-2574-4a75-9bb0-0d023378592b": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\E2A4F912-2574-4A75-9BB0-0D023378592B_cw5n1h2txyewy!Microsoft.Windows.AppResolverUX",
+        "method": "appx",
+        "display": "E2A4F912-2574-4A75-9BB0-0D023378592B"
+      }
+    ],
+    "name": "E2A4F912-2574-4A75-9BB0-0D023378592B",
+    "aliases": [
+      "e2a4f912",
+      "2574",
+      "4a75",
+      "9bb0",
+      "0d023378592b"
+    ]
+  },
+  "appup.thunderboltcontrolcenter": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\AppUp.ThunderboltControlCenter_8j3eq9eme6ctt!App",
+        "method": "appx",
+        "display": "AppUp.ThunderboltControlCenter"
+      }
+    ],
+    "name": "AppUp.ThunderboltControlCenter",
+    "aliases": []
+  },
+  "microsoft.aad.brokerplugin": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.AAD.BrokerPlugin_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.AAD.BrokerPlugin"
+      }
+    ],
+    "name": "Microsoft.AAD.BrokerPlugin",
+    "aliases": []
+  },
+  "microsoft.xboxgameoverlay": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.XboxGameOverlay_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Xbox Game bar"
+      }
+    ],
+    "name": "Xbox Game bar",
+    "aliases": []
+  },
+  "xbox game bar": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.XboxGameOverlay_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Xbox Game bar"
+      }
+    ],
+    "name": "Xbox Game bar",
+    "aliases": [
+      "xbox",
+      "game"
+    ]
+  },
+  "microsoft.windowscommunicationsapps": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\microsoft.windowscommunicationsapps_8wekyb3d8bbwe!microsoft.windowslive.mail microsoft.windowslive.calendar microsoft.windowslive.manageaccounts",
+        "method": "appx",
+        "display": "microsoft.windowscommunicationsapps"
+      }
+    ],
+    "name": "microsoft.windowscommunicationsapps",
+    "aliases": []
+  },
+  "microsoft.xboxidentityprovider": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.XboxIdentityProvider_8wekyb3d8bbwe!Microsoft.XboxIdentityProvider",
+        "method": "appx",
+        "display": "Microsoft.XboxIdentityProvider"
+      }
+    ],
+    "name": "Microsoft.XboxIdentityProvider",
+    "aliases": []
+  },
+  "winrar.shellextension": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\WinRAR.ShellExtension_d9ma7nkbkv4rp!WinRAR.ShellExtension",
+        "method": "appx",
+        "display": "WinRAR"
+      }
+    ],
+    "name": "WinRAR",
+    "aliases": []
+  },
+  "microsoft.people": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.People_8wekyb3d8bbwe!x4c7a3b7dy2188y46d4ya362y19ac5a5805e5x",
+        "method": "appx",
+        "display": "Microsoft.People"
+      }
+    ],
+    "name": "Microsoft.People",
+    "aliases": []
+  },
+  "appup.intelgraphicsexperience": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\AppUp.IntelGraphicsExperience_8j3eq9eme6ctt!App",
+        "method": "appx",
+        "display": "AppUp.IntelGraphicsExperience"
+      }
+    ],
+    "name": "AppUp.IntelGraphicsExperience",
+    "aliases": []
+  },
+  "appup.inteloptanememoryandstoragemanagement": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\AppUp.IntelOptaneMemoryandStorageManagement_8j3eq9eme6ctt!App Notifier",
+        "method": "appx",
+        "display": "Intel© OptaneT Memory and Storage Management Intel© OptaneT Memory and Storage Management"
+      }
+    ],
+    "name": "Intel© OptaneT Memory and Storage Management Intel© OptaneT Memory and Storage Management",
+    "aliases": []
+  },
+  "intel© optanet memory and storage management intel© optanet memory and storage management": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\AppUp.IntelOptaneMemoryandStorageManagement_8j3eq9eme6ctt!App Notifier",
+        "method": "appx",
+        "display": "Intel© OptaneT Memory and Storage Management Intel© OptaneT Memory and Storage Management"
+      }
+    ],
+    "name": "Intel© OptaneT Memory and Storage Management Intel© OptaneT Memory and Storage Management",
+    "aliases": [
+      "intel©",
+      "optanet",
+      "memory",
+      "storage",
+      "management",
+      "intel©",
+      "optanet",
+      "memory",
+      "storage",
+      "management"
+    ]
+  },
+  "microsoftwindows.narratorscript.excel": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.NarratorScript.Excel_cw5n1h2txyewy!NarratorScriptPack",
+        "method": "appx",
+        "display": "Narrator Extension - Excel"
+      }
+    ],
+    "name": "Narrator Extension - Excel",
+    "aliases": []
+  },
+  "narrator extension - excel": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.NarratorScript.Excel_cw5n1h2txyewy!NarratorScriptPack",
+        "method": "appx",
+        "display": "Narrator Extension - Excel"
+      }
+    ],
+    "name": "Narrator Extension - Excel",
+    "aliases": [
+      "extension"
+    ]
+  },
+  "c5e2524a-ea46-4f67-841f-6a9465d9d515": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\c5e2524a-ea46-4f67-841f-6a9465d9d515_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "c5e2524a-ea46-4f67-841f-6a9465d9d515"
+      }
+    ],
+    "name": "c5e2524a-ea46-4f67-841f-6a9465d9d515",
+    "aliases": [
+      "c5e2524a",
+      "ea46",
+      "4f67",
+      "841f",
+      "6a9465d9d515"
+    ]
+  },
+  "f46d4000-fd22-4db4-ac8e-4e1ddde828fe": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\F46D4000-FD22-4DB4-AC8E-4E1DDDE828FE_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "F46D4000-FD22-4DB4-AC8E-4E1DDDE828FE"
+      }
+    ],
+    "name": "F46D4000-FD22-4DB4-AC8E-4E1DDDE828FE",
+    "aliases": [
+      "f46d4000",
+      "fd22",
+      "4db4",
+      "ac8e",
+      "4e1ddde828fe"
+    ]
+  },
+  "microsoft.accountscontrol": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.AccountsControl_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.AccountsControl"
+      }
+    ],
+    "name": "Microsoft.AccountsControl",
+    "aliases": []
+  },
+  "microsoft.asynctextservice": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.AsyncTextService_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.AsyncTextService"
+      }
+    ],
+    "name": "Microsoft.AsyncTextService",
+    "aliases": []
+  },
+  "microsoft.microsoftedgedevtoolsclient": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.MicrosoftEdgeDevToolsClient_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.MicrosoftEdgeDevToolsClient"
+      }
+    ],
+    "name": "Microsoft.MicrosoftEdgeDevToolsClient",
+    "aliases": []
+  },
+  "microsoft.win32webviewhost": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Win32WebViewHost_cw5n1h2txyewy!DPI.PerMonitorAware DPI.SystemAware DPI.Unaware",
+        "method": "appx",
+        "display": "Microsoft.Win32WebViewHost"
+      }
+    ],
+    "name": "Microsoft.Win32WebViewHost",
+    "aliases": []
+  },
+  "microsoft.windows.apprep.chxapp": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.Apprep.ChxApp_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.Apprep.ChxApp"
+      }
+    ],
+    "name": "Microsoft.Windows.Apprep.ChxApp",
+    "aliases": []
+  },
+  "microsoft.windows.assignedaccesslockapp": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.AssignedAccessLockApp_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.AssignedAccessLockApp"
+      }
+    ],
+    "name": "Microsoft.Windows.AssignedAccessLockApp",
+    "aliases": []
+  },
+  "microsoft.windows.cloudexperiencehost": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.CloudExperienceHost_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.CloudExperienceHost"
+      }
+    ],
+    "name": "Microsoft.Windows.CloudExperienceHost",
+    "aliases": []
+  },
+  "microsoft.windows.contentdeliverymanager": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.ContentDeliveryManager_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.ContentDeliveryManager"
+      }
+    ],
+    "name": "Microsoft.Windows.ContentDeliveryManager",
+    "aliases": []
+  },
+  "microsoft.windows.parentalcontrols": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.ParentalControls_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.ParentalControls"
+      }
+    ],
+    "name": "Microsoft.Windows.ParentalControls",
+    "aliases": []
+  },
+  "microsoft.windows.peopleexperiencehost": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.PeopleExperienceHost_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.PeopleExperienceHost"
+      }
+    ],
+    "name": "Microsoft.Windows.PeopleExperienceHost",
+    "aliases": []
+  },
+  "microsoft.windows.pinningconfirmationdialog": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.PinningConfirmationDialog_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "PinningConfirmationDialog"
+      }
+    ],
+    "name": "PinningConfirmationDialog",
+    "aliases": []
+  },
+  "pinningconfirmationdialog": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.PinningConfirmationDialog_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "PinningConfirmationDialog"
+      }
+    ],
+    "name": "PinningConfirmationDialog",
+    "aliases": []
+  },
+  "microsoft.windows.printqueueactioncenter": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.PrintQueueActionCenter_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.PrintQueueActionCenter"
+      }
+    ],
+    "name": "Microsoft.Windows.PrintQueueActionCenter",
+    "aliases": []
+  },
+  "microsoft.windows.secureassessmentbrowser": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.SecureAssessmentBrowser_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.SecureAssessmentBrowser"
+      }
+    ],
+    "name": "Microsoft.Windows.SecureAssessmentBrowser",
+    "aliases": []
+  },
+  "microsoft.windows.xgpuejectdialog": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.XGpuEjectDialog_cw5n1h2txyewy!Microsoft.Windows.XGpuEjectDialog",
+        "method": "appx",
+        "display": "Microsoft.Windows.XGpuEjectDialog"
+      }
+    ],
+    "name": "Microsoft.Windows.XGpuEjectDialog",
+    "aliases": []
+  },
+  "microsoft.xboxgamecallableui": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.XboxGameCallableUI_cw5n1h2txyewy!Microsoft.XboxGameCallableUI",
+        "method": "appx",
+        "display": "Microsoft.XboxGameCallableUI"
+      }
+    ],
+    "name": "Microsoft.XboxGameCallableUI",
+    "aliases": []
+  },
+  "windows.printdialog": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Windows.PrintDialog_cw5n1h2txyewy!Microsoft.Windows.PrintDialog",
+        "method": "appx",
+        "display": "Windows.PrintDialog"
+      }
+    ],
+    "name": "Windows.PrintDialog",
+    "aliases": []
+  },
+  "microsoft.windows.narratorquickstart": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.NarratorQuickStart_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.NarratorQuickStart"
+      }
+    ],
+    "name": "Microsoft.Windows.NarratorQuickStart",
+    "aliases": []
+  },
+  "nvidiacorp.nvidiacontrolpanel": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\NVIDIACorp.NVIDIAControlPanel_56jybvy8sckqj!NVIDIACorp.NVIDIAControlPanel",
+        "method": "appx",
+        "display": "NVIDIA Control Panel"
+      }
+    ],
+    "name": "NVIDIA Control Panel",
+    "aliases": []
+  },
+  "nvidia control panel": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\NVIDIACorp.NVIDIAControlPanel_56jybvy8sckqj!NVIDIACorp.NVIDIAControlPanel",
+        "method": "appx",
+        "display": "NVIDIA Control Panel"
+      }
+    ],
+    "name": "NVIDIA Control Panel",
+    "aliases": [
+      "nvidia",
+      "control",
+      "panel"
+    ]
+  },
+  "microsoft.rawimageextension": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.RawImageExtension_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.RawImageExtension"
+      }
+    ],
+    "name": "Microsoft.RawImageExtension",
+    "aliases": []
+  },
+  "microsoft.windowsmaps": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WindowsMaps_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.WindowsMaps"
+      }
+    ],
+    "name": "Microsoft.WindowsMaps",
+    "aliases": []
+  },
+  "microsoft.microsoftstickynotes": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.MicrosoftStickyNotes"
+      }
+    ],
+    "name": "Microsoft.MicrosoftStickyNotes",
+    "aliases": []
+  },
+  "microsoft.xboxspeechtotextoverlay": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.XboxSpeechToTextOverlay_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.XboxSpeechToTextOverlay"
+      }
+    ],
+    "name": "Microsoft.XboxSpeechToTextOverlay",
+    "aliases": []
+  },
+  "microsoft.mpeg2videoextension": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.MPEG2VideoExtension_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.MPEG2VideoExtension"
+      }
+    ],
+    "name": "Microsoft.MPEG2VideoExtension",
+    "aliases": []
+  },
+  "microsoft.applicationcompatibilityenhancements": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.ApplicationCompatibilityEnhancements_8wekyb3d8bbwe!Microsoft.ApplicationCompatibilityEnhancements",
+        "method": "appx",
+        "display": "Microsoft.ApplicationCompatibilityEnhancements"
+      }
+    ],
+    "name": "Microsoft.ApplicationCompatibilityEnhancements",
+    "aliases": []
+  },
+  "microsoft.windows.devhome": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.DevHome_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.DevHome"
+      }
+    ],
+    "name": "Microsoft.Windows.DevHome",
+    "aliases": []
+  },
+  "microsoft.webpimageextension": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WebpImageExtension_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.WebpImageExtension"
+      }
+    ],
+    "name": "Microsoft.WebpImageExtension",
+    "aliases": []
+  },
+  "microsoftwindows.client.photon": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.Photon_cw5n1h2txyewy!PackageMetadata Global.ExperienceExtensions Global.WsxPackManager",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.ExperienceExtensions Global.WsxPackManager"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.ExperienceExtensions Global.WsxPackManager",
+    "aliases": []
+  },
+  "desktoppackagemetadata global.experienceextensions global.wsxpackmanager": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.Photon_cw5n1h2txyewy!PackageMetadata Global.ExperienceExtensions Global.WsxPackManager",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.ExperienceExtensions Global.WsxPackManager"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.ExperienceExtensions Global.WsxPackManager",
+    "aliases": [
+      "desktoppackagemetadata",
+      "global.experienceextensions",
+      "global.wsxpackmanager"
+    ]
+  },
+  "microsoftwindows.voice.en-gb.ryan.1": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Voice.en-GB.Ryan.1_cw5n1h2txyewy!VoiceRyanEnGB",
+        "method": "appx",
+        "display": "Microsoft Ryan (Natural) - English (United Kingdom)"
+      }
+    ],
+    "name": "Microsoft Ryan (Natural) - English (United Kingdom)",
+    "aliases": [
+      "microsoftwindows.voice.en",
+      "gb.ryan.1"
+    ]
+  },
+  "microsoft ryan (natural) - english (united kingdom)": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Voice.en-GB.Ryan.1_cw5n1h2txyewy!VoiceRyanEnGB",
+        "method": "appx",
+        "display": "Microsoft Ryan (Natural) - English (United Kingdom)"
+      }
+    ],
+    "name": "Microsoft Ryan (Natural) - English (United Kingdom)",
+    "aliases": [
+      "microsoft",
+      "ryan",
+      "(natural)",
+      "english",
+      "(united",
+      "kingdom)"
+    ]
+  },
+  "microsoft.avcencodervideoextension": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.AVCEncoderVideoExtension_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.AVCEncoderVideoExtension"
+      }
+    ],
+    "name": "Microsoft.AVCEncoderVideoExtension",
+    "aliases": []
+  },
+  "microsoft.bingsearch": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.BingSearch_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.BingSearch"
+      }
+    ],
+    "name": "Microsoft.BingSearch",
+    "aliases": []
+  },
+  "samsungelectronicscoltd.samsungflux": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\SAMSUNGELECTRONICSCoLtd.SamsungFlux_wyx1vj98g3asy!App",
+        "method": "appx",
+        "display": "SAMSUNGELECTRONICSCoLtd.SamsungFlux"
+      }
+    ],
+    "name": "SAMSUNGELECTRONICSCoLtd.SamsungFlux",
+    "aliases": []
+  },
+  "fingersoft.hillclimbracing": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\FINGERSOFT.HILLCLIMBRACING_r6rtpscs7gwyg!App",
+        "method": "appx",
+        "display": "Hill Climb Racing"
+      }
+    ],
+    "name": "Hill Climb Racing",
+    "aliases": []
+  },
+  "hill climb racing": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\FINGERSOFT.HILLCLIMBRACING_r6rtpscs7gwyg!App",
+        "method": "appx",
+        "display": "Hill Climb Racing"
+      }
+    ],
+    "name": "Hill Climb Racing",
+    "aliases": [
+      "hill",
+      "climb",
+      "racing"
+    ]
+  },
+  "microsoft.av1videoextension": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.AV1VideoExtension_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.AV1VideoExtension"
+      }
+    ],
+    "name": "Microsoft.AV1VideoExtension",
+    "aliases": []
+  },
+  "microsoftcorporationii.quickassist": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.QuickAssist_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "MicrosoftCorporationII.QuickAssist"
+      }
+    ],
+    "name": "MicrosoftCorporationII.QuickAssist",
+    "aliases": []
+  },
+  "gulunotoz.typingpracticewithkeyboard": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Gulunotoz.TypingPracticeWithKeyboard_2q1p78h8h5n80!App",
+        "method": "appx",
+        "display": "Typing Practice With Keyboard"
+      }
+    ],
+    "name": "Typing Practice With Keyboard",
+    "aliases": []
+  },
+  "typing practice with keyboard": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Gulunotoz.TypingPracticeWithKeyboard_2q1p78h8h5n80!App",
+        "method": "appx",
+        "display": "Typing Practice With Keyboard"
+      }
+    ],
+    "name": "Typing Practice With Keyboard",
+    "aliases": [
+      "typing",
+      "practice",
+      "with",
+      "keyboard"
+    ]
+  },
+  "53887haocai.easycast-mirrordisplay": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\53887HaoCai.EasyCast-MirrorDisplay_qrw73ppzkf79y!App",
+        "method": "appx",
+        "display": "53887HaoCai.EasyCast-MirrorDisplay"
+      }
+    ],
+    "name": "53887HaoCai.EasyCast-MirrorDisplay",
+    "aliases": [
+      "53887haocai.easycast",
+      "mirrordisplay"
+    ]
+  },
+  "windows.immersivecontrolpanel": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel",
+        "method": "appx",
+        "display": "windows.immersivecontrolpanel"
+      }
+    ],
+    "name": "windows.immersivecontrolpanel",
+    "aliases": []
+  },
+  "microsoft.webmediaextensions": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WebMediaExtensions_8wekyb3d8bbwe!Microsoft.WebMediaExtensions",
+        "method": "appx",
+        "display": "Microsoft.WebMediaExtensions"
+      }
+    ],
+    "name": "Microsoft.WebMediaExtensions",
+    "aliases": []
+  },
+  "microsoft.sechealthui": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.SecHealthUI_8wekyb3d8bbwe!SecHealthUI",
+        "method": "appx",
+        "display": "Microsoft.SecHealthUI"
+      }
+    ],
+    "name": "Microsoft.SecHealthUI",
+    "aliases": []
+  },
+  "microsoftwindows.speech.en-us.1": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Speech.en-US.1_cw5n1h2txyewy!SpeechPack",
+        "method": "appx",
+        "display": "Speech Pack - English (United States)"
+      }
+    ],
+    "name": "Speech Pack - English (United States)",
+    "aliases": [
+      "microsoftwindows.speech.en",
+      "us.1"
+    ]
+  },
+  "speech pack - english (united states)": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Speech.en-US.1_cw5n1h2txyewy!SpeechPack",
+        "method": "appx",
+        "display": "Speech Pack - English (United States)"
+      }
+    ],
+    "name": "Speech Pack - English (United States)",
+    "aliases": [
+      "speech",
+      "pack",
+      "english",
+      "(united",
+      "states)"
+    ]
+  },
+  "microsoft.windows.shellexperiencehost": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy!App FullTrustApp",
+        "method": "appx",
+        "display": "Microsoft.Windows.ShellExperienceHost"
+      }
+    ],
+    "name": "Microsoft.Windows.ShellExperienceHost",
+    "aliases": []
+  },
+  "microsoft.windows.startmenuexperiencehost": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy!App FullTrustApp",
+        "method": "appx",
+        "display": "Microsoft.Windows.StartMenuExperienceHost"
+      }
+    ],
+    "name": "Microsoft.Windows.StartMenuExperienceHost",
+    "aliases": []
+  },
+  "msstorefast.329563ed232a9": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\msstorefast.329563ED232A9_fespsf2pqzq82!App",
+        "method": "appx",
+        "display": "Apple TV F1© The Movie Theme"
+      }
+    ],
+    "name": "Apple TV F1© The Movie Theme",
+    "aliases": []
+  },
+  "apple tv f1© the movie theme": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\msstorefast.329563ED232A9_fespsf2pqzq82!App",
+        "method": "appx",
+        "display": "Apple TV F1© The Movie Theme"
+      }
+    ],
+    "name": "Apple TV F1© The Movie Theme",
+    "aliases": [
+      "apple",
+      "movie",
+      "theme"
+    ]
+  },
+  "7ee7776c.linkedinforwindows": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\7EE7776C.LinkedInforWindows_w1wdnht996qgy!App",
+        "method": "appx",
+        "display": "LinkedIn"
+      }
+    ],
+    "name": "LinkedIn",
+    "aliases": []
+  },
+  "linkedin": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\7EE7776C.LinkedInforWindows_w1wdnht996qgy!App",
+        "method": "appx",
+        "display": "LinkedIn"
+      }
+    ],
+    "name": "LinkedIn",
+    "aliases": []
+  },
+  "microsoftcorporationii.winappruntime.main.1.5": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.WinAppRuntime.Main.1.5_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Windows App Runtime Main"
+      }
+    ],
+    "name": "Windows App Runtime Main",
+    "aliases": []
+  },
+  "windows app runtime main": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.WinAppRuntime.Main.1.5_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Windows App Runtime Main"
+      },
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.WinAppRuntime.Main.1.4_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Windows App Runtime Main"
+      },
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.WinAppRuntime.Main.2_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Windows App Runtime Main"
+      },
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.WinAppRuntime.Main.1.8_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Windows App Runtime Main"
+      }
+    ],
+    "name": "Windows App Runtime Main",
+    "aliases": [
+      "windows",
+      "runtime",
+      "main"
+    ]
+  },
+  "microsoft.bingnews": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.BingNews_8wekyb3d8bbwe!AppexNews",
+        "method": "appx",
+        "display": "Microsoft.BingNews"
+      }
+    ],
+    "name": "Microsoft.BingNews",
+    "aliases": []
+  },
+  "microsoft.microsoftsolitairecollection": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Solitaire & Casual Games"
+      }
+    ],
+    "name": "Solitaire & Casual Games",
+    "aliases": []
+  },
+  "solitaire & casual games": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Solitaire & Casual Games"
+      }
+    ],
+    "name": "Solitaire & Casual Games",
+    "aliases": [
+      "solitaire",
+      "casual",
+      "games"
+    ]
+  },
+  "microsoft.windows.oobenetworkcaptiveportal": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.OOBENetworkCaptivePortal_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.OOBENetworkCaptivePortal"
+      }
+    ],
+    "name": "Microsoft.Windows.OOBENetworkCaptivePortal",
+    "aliases": []
+  },
+  "microsoft.windows.oobenetworkconnectionflow": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.OOBENetworkConnectionFlow_cw5n1h2txyewy!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.OOBENetworkConnectionFlow"
+      }
+    ],
+    "name": "Microsoft.Windows.OOBENetworkConnectionFlow",
+    "aliases": []
+  },
+  "microsoft.windowsterminal": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WindowsTerminal_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.WindowsTerminal"
+      }
+    ],
+    "name": "Microsoft.WindowsTerminal",
+    "aliases": []
+  },
+  "microsoftwindows.narratorscript.outlook": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.NarratorScript.Outlook_cw5n1h2txyewy!NarratorScriptPack",
+        "method": "appx",
+        "display": "NarratorExtension - Outlook"
+      }
+    ],
+    "name": "NarratorExtension - Outlook",
+    "aliases": []
+  },
+  "narratorextension - outlook": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.NarratorScript.Outlook_cw5n1h2txyewy!NarratorScriptPack",
+        "method": "appx",
+        "display": "NarratorExtension - Outlook"
+      }
+    ],
+    "name": "NarratorExtension - Outlook",
+    "aliases": [
+      "narratorextension"
+    ]
+  },
+  "microsoftwindows.narratorextension-word": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.NarratorExtension-Word_cw5n1h2txyewy!NarratorScriptPack",
+        "method": "appx",
+        "display": "Narrator Extension - Word"
+      }
+    ],
+    "name": "Narrator Extension - Word",
+    "aliases": [
+      "microsoftwindows.narratorextension"
+    ]
+  },
+  "narrator extension - word": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.NarratorExtension-Word_cw5n1h2txyewy!NarratorScriptPack",
+        "method": "appx",
+        "display": "Narrator Extension - Word"
+      }
+    ],
+    "name": "Narrator Extension - Word",
+    "aliases": [
+      "extension"
+    ]
+  },
+  "pythonsoftwarefoundation.pythonmanager": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\PythonSoftwareFoundation.PythonManager_3847v3x7pw1km!Py.Manager.Exe Pymanager.Exe Pywmanager.Exe Py.Exe Pyw.Exe Python.Exe Python3.Exe Pythonw.Exe",
+        "method": "appx",
+        "display": "Python install manager Python install manager Python install manager (windowed) Python install manager Python install manager (windowed) Python (default) Python (default) Python (default windowed)"
+      }
+    ],
+    "name": "Python install manager Python install manager Python install manager (windowed) Python install manager Python install manager (windowed) Python (default) Python (default) Python (default windowed)",
+    "aliases": []
+  },
+  "python install manager python install manager python install manager (windowed) python install manager python install manager (windowed) python (default) python (default) python (default windowed)": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\PythonSoftwareFoundation.PythonManager_3847v3x7pw1km!Py.Manager.Exe Pymanager.Exe Pywmanager.Exe Py.Exe Pyw.Exe Python.Exe Python3.Exe Pythonw.Exe",
+        "method": "appx",
+        "display": "Python install manager Python install manager Python install manager (windowed) Python install manager Python install manager (windowed) Python (default) Python (default) Python (default windowed)"
+      }
+    ],
+    "name": "Python install manager Python install manager Python install manager (windowed) Python install manager Python install manager (windowed) Python (default) Python (default) Python (default windowed)",
+    "aliases": [
+      "install",
+      "manager",
+      "install",
+      "manager",
+      "install",
+      "manager",
+      "(windowed)",
+      "install",
+      "manager",
+      "install",
+      "manager",
+      "(windowed)",
+      "(default)",
+      "(default)",
+      "(default",
+      "windowed)"
+    ]
+  },
+  "microsoft.winappruntime.ddlm.4000.1049.117.0-x6": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WinAppRuntime.DDLM.4000.1049.117.0-x6_8wekyb3d8bbwe!DDLMCOMServer DDLM",
+        "method": "appx",
+        "display": "Microsoft Windows App Runtime DynamicDependency LifetimeManager Microsoft Windows App Runtime DynamicDependency LifetimeManager"
+      }
+    ],
+    "name": "Microsoft Windows App Runtime DynamicDependency LifetimeManager Microsoft Windows App Runtime DynamicDependency LifetimeManager",
+    "aliases": [
+      "microsoft.winappruntime.ddlm.4000.1049.117.0"
+    ]
+  },
+  "microsoft windows app runtime dynamicdependency lifetimemanager microsoft windows app runtime dynamicdependency lifetimemanager": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WinAppRuntime.DDLM.4000.1049.117.0-x6_8wekyb3d8bbwe!DDLMCOMServer DDLM",
+        "method": "appx",
+        "display": "Microsoft Windows App Runtime DynamicDependency LifetimeManager Microsoft Windows App Runtime DynamicDependency LifetimeManager"
+      }
+    ],
+    "name": "Microsoft Windows App Runtime DynamicDependency LifetimeManager Microsoft Windows App Runtime DynamicDependency LifetimeManager",
+    "aliases": [
+      "microsoft",
+      "windows",
+      "runtime",
+      "dynamicdependency",
+      "lifetimemanager",
+      "microsoft",
+      "windows",
+      "runtime",
+      "dynamicdependency",
+      "lifetimemanager"
+    ]
+  },
+  "microsoftcorporationii.winappruntime.main.1.4": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.WinAppRuntime.Main.1.4_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Windows App Runtime Main"
+      }
+    ],
+    "name": "Windows App Runtime Main",
+    "aliases": []
+  },
+  "telegrammessengerllp.telegramdesktop": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\TelegramMessengerLLP.TelegramDesktop_t4vj0pshhgkwm!Telegram.TelegramDesktop.Store",
+        "method": "appx",
+        "display": "Telegram Desktop"
+      }
+    ],
+    "name": "Telegram Desktop",
+    "aliases": []
+  },
+  "telegram desktop": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\TelegramMessengerLLP.TelegramDesktop_t4vj0pshhgkwm!Telegram.TelegramDesktop.Store",
+        "method": "appx",
+        "display": "Telegram Desktop"
+      }
+    ],
+    "name": "Telegram Desktop",
+    "aliases": [
+      "telegram",
+      "desktop"
+    ]
+  },
+  "microsoft.languageexperiencepacken-us": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.LanguageExperiencePacken-US_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "English (United States) Local Experience Pack"
+      }
+    ],
+    "name": "English (United States) Local Experience Pack",
+    "aliases": [
+      "microsoft.languageexperiencepacken"
+    ]
+  },
+  "english (united states) local experience pack": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.LanguageExperiencePacken-US_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "English (United States) Local Experience Pack"
+      }
+    ],
+    "name": "English (United States) Local Experience Pack",
+    "aliases": [
+      "english",
+      "(united",
+      "states)",
+      "local",
+      "experience",
+      "pack"
+    ]
+  },
+  "microsoft.languageexperiencepacken-gb": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.LanguageExperiencePacken-GB_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "English (United Kingdom) Local Experience Pack"
+      }
+    ],
+    "name": "English (United Kingdom) Local Experience Pack",
+    "aliases": [
+      "microsoft.languageexperiencepacken"
+    ]
+  },
+  "english (united kingdom) local experience pack": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.LanguageExperiencePacken-GB_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "English (United Kingdom) Local Experience Pack"
+      }
+    ],
+    "name": "English (United Kingdom) Local Experience Pack",
+    "aliases": [
+      "english",
+      "(united",
+      "kingdom)",
+      "local",
+      "experience",
+      "pack"
+    ]
+  },
+  "microsoft.paint": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Paint_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.Paint"
+      }
+    ],
+    "name": "Microsoft.Paint",
+    "aliases": []
+  },
+  "microsoft.4297127d64ec6": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft",
+        "method": "appx",
+        "display": "Minecraft Launcher"
+      }
+    ],
+    "name": "Minecraft Launcher",
+    "aliases": []
+  },
+  "minecraft launcher": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft",
+        "method": "appx",
+        "display": "Minecraft Launcher"
+      }
+    ],
+    "name": "Minecraft Launcher",
+    "aliases": [
+      "minecraft",
+      "launcher"
+    ]
+  },
+  "microsoft.hevcvideoextension": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.HEVCVideoExtension_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.HEVCVideoExtension"
+      }
+    ],
+    "name": "Microsoft.HEVCVideoExtension",
+    "aliases": []
+  },
+  "microsoft.screensketch": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.ScreenSketch_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.ScreenSketch"
+      }
+    ],
+    "name": "Microsoft.ScreenSketch",
+    "aliases": []
+  },
+  "microsoft.widgetsplatformruntime": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WidgetsPlatformRuntime_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "WidgetsPlatformRuntime"
+      }
+    ],
+    "name": "WidgetsPlatformRuntime",
+    "aliases": []
+  },
+  "widgetsplatformruntime": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WidgetsPlatformRuntime_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "WidgetsPlatformRuntime"
+      }
+    ],
+    "name": "WidgetsPlatformRuntime",
+    "aliases": []
+  },
+  "microsoft.ecapp": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.ECApp_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.ECApp"
+      }
+    ],
+    "name": "Microsoft.ECApp",
+    "aliases": []
+  },
+  "microsoft.lockapp": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.LockApp_cw5n1h2txyewy!WindowsDefaultLockScreen",
+        "method": "appx",
+        "display": "Microsoft.LockApp"
+      }
+    ],
+    "name": "Microsoft.LockApp",
+    "aliases": []
+  },
+  "microsoftwindows.57242383.tasbar": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.57242383.Tasbar_cw5n1h2txyewy!PackageMetadata Global.Taskbar",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.Taskbar"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.Taskbar",
+    "aliases": []
+  },
+  "desktoppackagemetadata global.taskbar": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.57242383.Tasbar_cw5n1h2txyewy!PackageMetadata Global.Taskbar",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.Taskbar"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.Taskbar",
+    "aliases": [
+      "desktoppackagemetadata",
+      "global.taskbar"
+    ]
+  },
+  "microsoftwindows.61869720.voiess": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.61869720.Voiess_cw5n1h2txyewy!PackageMetadata Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin",
+    "aliases": []
+  },
+  "desktoppackagemetadata global.voiceaccesshost global.speechrecognizerextension global.voiceaccessplugin": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.61869720.Voiess_cw5n1h2txyewy!PackageMetadata Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin",
+    "aliases": [
+      "desktoppackagemetadata",
+      "global.voiceaccesshost",
+      "global.speechrecognizerextension",
+      "global.voiceaccessplugin"
+    ]
+  },
+  "microsoftwindows.61869721.livtop": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.61869721.Livtop_cw5n1h2txyewy!PackageMetadata Global.LiveCaptionsDesktop",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.LiveCaptionsDesktop"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.LiveCaptionsDesktop",
+    "aliases": []
+  },
+  "desktoppackagemetadata global.livecaptionsdesktop": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.61869721.Livtop_cw5n1h2txyewy!PackageMetadata Global.LiveCaptionsDesktop",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.LiveCaptionsDesktop"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.LiveCaptionsDesktop",
+    "aliases": [
+      "desktoppackagemetadata",
+      "global.livecaptionsdesktop"
+    ]
+  },
+  "microsoftwindows.61869722.speion": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.61869722.Speion_cw5n1h2txyewy!PackageMetadata Global.SpeechSynthesizerExtension",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.SpeechSynthesizerExtension"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.SpeechSynthesizerExtension",
+    "aliases": []
+  },
+  "desktoppackagemetadata global.speechsynthesizerextension": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.61869722.Speion_cw5n1h2txyewy!PackageMetadata Global.SpeechSynthesizerExtension",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.SpeechSynthesizerExtension"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.SpeechSynthesizerExtension",
+    "aliases": [
+      "desktoppackagemetadata",
+      "global.speechsynthesizerextension"
+    ]
+  },
+  "microsoftwindows.61869836.inpapp": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.61869836.InpApp_cw5n1h2txyewy!PackageMetadata InputApp Global.TextInputExtensions",
+        "method": "appx",
+        "display": "DesktopPackageMetadata ms-resource:AppDisplayName Global.TextInputExtensions"
+      }
+    ],
+    "name": "DesktopPackageMetadata ms-resource:AppDisplayName Global.TextInputExtensions",
+    "aliases": []
+  },
+  "desktoppackagemetadata ms-resource:appdisplayname global.textinputextensions": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.61869836.InpApp_cw5n1h2txyewy!PackageMetadata InputApp Global.TextInputExtensions",
+        "method": "appx",
+        "display": "DesktopPackageMetadata ms-resource:AppDisplayName Global.TextInputExtensions"
+      }
+    ],
+    "name": "DesktopPackageMetadata ms-resource:AppDisplayName Global.TextInputExtensions",
+    "aliases": [
+      "desktoppackagemetadata",
+      "resource:appdisplayname",
+      "global.textinputextensions"
+    ]
+  },
+  "microsoftwindows.client.cbs": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy!PackageMetadata Global.AccountControl Global.AccountDialog Global.Accounts ActionRuntime Global.ActionUI Global.ActionUI.Common CrossDeviceResumeApp Global.DesktopSpotlight Global.DesktopStickerEditor DesktopStickerEditorCentennial Global.DragTray Global.FeatureDiscoverability InputApp Global.TextInputExtensions Global.IrisService Global.PeopleExperiencePlatform Global.PersonaCardManager Global.WindowsPersonaCard Global.RulesEngine CortanaUI CortanaUIFullTrustApp FESearchUI SoftLanding VisualAssist WebExperienceHost Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3 Global.LockCanvas Global.WidgetViewUWP WindowsBackup Global.WindowsMigration Global.WindowsPeopleExperience Global.wsw",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.AccountControl Global.AccountDialog Global.Accounts ms-resource:ActionFX/Resources/AppDisplayName Global.ActionUI Global.ActionUI.Common ms-resource:CrossDeviceResume/Resources/AppDisplayName Global.DesktopSpotlight Global.DesktopStickerEditor DesktopStickerEditorCentennial Global.DragTray Global.FeatureDiscoverability ms-resource:AppDisplayName Global.TextInputExtensions Global.IrisService Global.PeopleExperiencePlatform Global.PersonaCardManager Global.WindowsPersonaCard Global.RulesEngine ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:SoftLanding/Resources/SoftLandingAppDisplayName ms-resource:VisualAssist/Resources/AppDisplayName ms-resource:WebExperienceHostAppName/Text Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3 Global.LockCanvas Global.WidgetViewUWP ms-resource:WindowsBackup/Resources/WindowsBackupHostName Global.WindowsMigration Global.WindowsPeopleExperience Global.wsw"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.AccountControl Global.AccountDialog Global.Accounts ms-resource:ActionFX/Resources/AppDisplayName Global.ActionUI Global.ActionUI.Common ms-resource:CrossDeviceResume/Resources/AppDisplayName Global.DesktopSpotlight Global.DesktopStickerEditor DesktopStickerEditorCentennial Global.DragTray Global.FeatureDiscoverability ms-resource:AppDisplayName Global.TextInputExtensions Global.IrisService Global.PeopleExperiencePlatform Global.PersonaCardManager Global.WindowsPersonaCard Global.RulesEngine ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:SoftLanding/Resources/SoftLandingAppDisplayName ms-resource:VisualAssist/Resources/AppDisplayName ms-resource:WebExperienceHostAppName/Text Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3 Global.LockCanvas Global.WidgetViewUWP ms-resource:WindowsBackup/Resources/WindowsBackupHostName Global.WindowsMigration Global.WindowsPeopleExperience Global.wsw",
+    "aliases": []
+  },
+  "desktoppackagemetadata global.accountcontrol global.accountdialog global.accounts ms-resource:actionfx/resources/appdisplayname global.actionui global.actionui.common ms-resource:crossdeviceresume/resources/appdisplayname global.desktopspotlight global.desktopstickereditor desktopstickereditorcentennial global.dragtray global.featurediscoverability ms-resource:appdisplayname global.textinputextensions global.irisservice global.peopleexperienceplatform global.personacardmanager global.windowspersonacard global.rulesengine ms-resource:cortana.ui/resources/tiledisplayname ms-resource:cortana.ui/resources/tiledisplayname ms-resource:cortana.ui/resources/tiledisplayname ms-resource:softlanding/resources/softlandingappdisplayname ms-resource:visualassist/resources/appdisplayname ms-resource:webexperiencehostappname/text global.widgetdatamodel global.widgetpicker global.widgetviewwinui3 global.lockcanvas global.widgetviewuwp ms-resource:windowsbackup/resources/windowsbackuphostname global.windowsmigration global.windowspeopleexperience global.wsw": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy!PackageMetadata Global.AccountControl Global.AccountDialog Global.Accounts ActionRuntime Global.ActionUI Global.ActionUI.Common CrossDeviceResumeApp Global.DesktopSpotlight Global.DesktopStickerEditor DesktopStickerEditorCentennial Global.DragTray Global.FeatureDiscoverability InputApp Global.TextInputExtensions Global.IrisService Global.PeopleExperiencePlatform Global.PersonaCardManager Global.WindowsPersonaCard Global.RulesEngine CortanaUI CortanaUIFullTrustApp FESearchUI SoftLanding VisualAssist WebExperienceHost Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3 Global.LockCanvas Global.WidgetViewUWP WindowsBackup Global.WindowsMigration Global.WindowsPeopleExperience Global.wsw",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.AccountControl Global.AccountDialog Global.Accounts ms-resource:ActionFX/Resources/AppDisplayName Global.ActionUI Global.ActionUI.Common ms-resource:CrossDeviceResume/Resources/AppDisplayName Global.DesktopSpotlight Global.DesktopStickerEditor DesktopStickerEditorCentennial Global.DragTray Global.FeatureDiscoverability ms-resource:AppDisplayName Global.TextInputExtensions Global.IrisService Global.PeopleExperiencePlatform Global.PersonaCardManager Global.WindowsPersonaCard Global.RulesEngine ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:SoftLanding/Resources/SoftLandingAppDisplayName ms-resource:VisualAssist/Resources/AppDisplayName ms-resource:WebExperienceHostAppName/Text Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3 Global.LockCanvas Global.WidgetViewUWP ms-resource:WindowsBackup/Resources/WindowsBackupHostName Global.WindowsMigration Global.WindowsPeopleExperience Global.wsw"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.AccountControl Global.AccountDialog Global.Accounts ms-resource:ActionFX/Resources/AppDisplayName Global.ActionUI Global.ActionUI.Common ms-resource:CrossDeviceResume/Resources/AppDisplayName Global.DesktopSpotlight Global.DesktopStickerEditor DesktopStickerEditorCentennial Global.DragTray Global.FeatureDiscoverability ms-resource:AppDisplayName Global.TextInputExtensions Global.IrisService Global.PeopleExperiencePlatform Global.PersonaCardManager Global.WindowsPersonaCard Global.RulesEngine ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:Cortana.UI/Resources/TileDisplayName ms-resource:SoftLanding/Resources/SoftLandingAppDisplayName ms-resource:VisualAssist/Resources/AppDisplayName ms-resource:WebExperienceHostAppName/Text Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3 Global.LockCanvas Global.WidgetViewUWP ms-resource:WindowsBackup/Resources/WindowsBackupHostName Global.WindowsMigration Global.WindowsPeopleExperience Global.wsw",
+    "aliases": [
+      "desktoppackagemetadata",
+      "global.accountcontrol",
+      "global.accountdialog",
+      "global.accounts",
+      "resource:actionfx/resources/appdisplayname",
+      "global.actionui",
+      "global.actionui.common",
+      "resource:crossdeviceresume/resources/appdisplayname",
+      "global.desktopspotlight",
+      "global.desktopstickereditor",
+      "desktopstickereditorcentennial",
+      "global.dragtray",
+      "global.featurediscoverability",
+      "resource:appdisplayname",
+      "global.textinputextensions",
+      "global.irisservice",
+      "global.peopleexperienceplatform",
+      "global.personacardmanager",
+      "global.windowspersonacard",
+      "global.rulesengine",
+      "resource:cortana.ui/resources/tiledisplayname",
+      "resource:cortana.ui/resources/tiledisplayname",
+      "resource:cortana.ui/resources/tiledisplayname",
+      "resource:softlanding/resources/softlandingappdisplayname",
+      "resource:visualassist/resources/appdisplayname",
+      "resource:webexperiencehostappname/text",
+      "global.widgetdatamodel",
+      "global.widgetpicker",
+      "global.widgetviewwinui3",
+      "global.lockcanvas",
+      "global.widgetviewuwp",
+      "resource:windowsbackup/resources/windowsbackuphostname",
+      "global.windowsmigration",
+      "global.windowspeopleexperience",
+      "global.wsw"
+    ]
+  },
+  "microsoftwindows.client.coreai": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.CoreAI_cw5n1h2txyewy!PackageMetadata aicontext ClickToDoApp Global.ModelManagementUX Global.DiscoveryOverlay Global.Feedback",
+        "method": "appx",
+        "display": "DesktopPackageMetadata aicontext ms-resource:AIXHost/ClickToDo/AppDisplayName Global.ModelManagementUX Global.DiscoveryOverlay Global.Feedback"
+      }
+    ],
+    "name": "DesktopPackageMetadata aicontext ms-resource:AIXHost/ClickToDo/AppDisplayName Global.ModelManagementUX Global.DiscoveryOverlay Global.Feedback",
+    "aliases": []
+  },
+  "desktoppackagemetadata aicontext ms-resource:aixhost/clicktodo/appdisplayname global.modelmanagementux global.discoveryoverlay global.feedback": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.CoreAI_cw5n1h2txyewy!PackageMetadata aicontext ClickToDoApp Global.ModelManagementUX Global.DiscoveryOverlay Global.Feedback",
+        "method": "appx",
+        "display": "DesktopPackageMetadata aicontext ms-resource:AIXHost/ClickToDo/AppDisplayName Global.ModelManagementUX Global.DiscoveryOverlay Global.Feedback"
+      }
+    ],
+    "name": "DesktopPackageMetadata aicontext ms-resource:AIXHost/ClickToDo/AppDisplayName Global.ModelManagementUX Global.DiscoveryOverlay Global.Feedback",
+    "aliases": [
+      "desktoppackagemetadata",
+      "aicontext",
+      "resource:aixhost/clicktodo/appdisplayname",
+      "global.modelmanagementux",
+      "global.discoveryoverlay",
+      "global.feedback"
+    ]
+  },
+  "microsoftwindows.client.core": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.Core_cw5n1h2txyewy!PackageMetadata Global.AppListBackup Global.BackupBanner Global.LiveCaptionsDesktop LogonWebHost Global.MicrosoftGraphRecentItemsManager ScreenClipping SettingsModelService Global.SnapLayout Global.SpeechSynthesizerExtension Global.StartMenu Global.FamilyValueProp Global.ValueBanner Global.SystemTray Global.Taskbar Global.TwinSxS Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.AppListBackup Global.BackupBanner Global.LiveCaptionsDesktop LogonWebHost Global.MicrosoftGraphRecentItemsManager ms-resource:ScreenClippingAppName/Text SettingsModelService Global.SnapLayout Global.SpeechSynthesizerExtension Global.StartMenu Global.FamilyValueProp Global.ValueBanner Global.SystemTray Global.Taskbar Global.TwinSxS Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.AppListBackup Global.BackupBanner Global.LiveCaptionsDesktop LogonWebHost Global.MicrosoftGraphRecentItemsManager ms-resource:ScreenClippingAppName/Text SettingsModelService Global.SnapLayout Global.SpeechSynthesizerExtension Global.StartMenu Global.FamilyValueProp Global.ValueBanner Global.SystemTray Global.Taskbar Global.TwinSxS Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin",
+    "aliases": []
+  },
+  "desktoppackagemetadata global.applistbackup global.backupbanner global.livecaptionsdesktop logonwebhost global.microsoftgraphrecentitemsmanager ms-resource:screenclippingappname/text settingsmodelservice global.snaplayout global.speechsynthesizerextension global.startmenu global.familyvalueprop global.valuebanner global.systemtray global.taskbar global.twinsxs global.voiceaccesshost global.speechrecognizerextension global.voiceaccessplugin": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.Core_cw5n1h2txyewy!PackageMetadata Global.AppListBackup Global.BackupBanner Global.LiveCaptionsDesktop LogonWebHost Global.MicrosoftGraphRecentItemsManager ScreenClipping SettingsModelService Global.SnapLayout Global.SpeechSynthesizerExtension Global.StartMenu Global.FamilyValueProp Global.ValueBanner Global.SystemTray Global.Taskbar Global.TwinSxS Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.AppListBackup Global.BackupBanner Global.LiveCaptionsDesktop LogonWebHost Global.MicrosoftGraphRecentItemsManager ms-resource:ScreenClippingAppName/Text SettingsModelService Global.SnapLayout Global.SpeechSynthesizerExtension Global.StartMenu Global.FamilyValueProp Global.ValueBanner Global.SystemTray Global.Taskbar Global.TwinSxS Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.AppListBackup Global.BackupBanner Global.LiveCaptionsDesktop LogonWebHost Global.MicrosoftGraphRecentItemsManager ms-resource:ScreenClippingAppName/Text SettingsModelService Global.SnapLayout Global.SpeechSynthesizerExtension Global.StartMenu Global.FamilyValueProp Global.ValueBanner Global.SystemTray Global.Taskbar Global.TwinSxS Global.VoiceAccessHost Global.SpeechRecognizerExtension Global.VoiceAccessPlugin",
+    "aliases": [
+      "desktoppackagemetadata",
+      "global.applistbackup",
+      "global.backupbanner",
+      "global.livecaptionsdesktop",
+      "logonwebhost",
+      "global.microsoftgraphrecentitemsmanager",
+      "resource:screenclippingappname/text",
+      "settingsmodelservice",
+      "global.snaplayout",
+      "global.speechsynthesizerextension",
+      "global.startmenu",
+      "global.familyvalueprop",
+      "global.valuebanner",
+      "global.systemtray",
+      "global.taskbar",
+      "global.twinsxs",
+      "global.voiceaccesshost",
+      "global.speechrecognizerextension",
+      "global.voiceaccessplugin"
+    ]
+  },
+  "microsoftwindows.client.fileexp": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.FileExp_cw5n1h2txyewy!PackageMetadata Global.FileExplorerExtensions",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.FileExplorerExtensions"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.FileExplorerExtensions",
+    "aliases": []
+  },
+  "desktoppackagemetadata global.fileexplorerextensions": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.FileExp_cw5n1h2txyewy!PackageMetadata Global.FileExplorerExtensions",
+        "method": "appx",
+        "display": "DesktopPackageMetadata Global.FileExplorerExtensions"
+      }
+    ],
+    "name": "DesktopPackageMetadata Global.FileExplorerExtensions",
+    "aliases": [
+      "desktoppackagemetadata",
+      "global.fileexplorerextensions"
+    ]
+  },
+  "microsoftwindows.client.oobe": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.OOBE_cw5n1h2txyewy!PackageMetadata OobeHost Global.WindowsOobeAppHost WindowsOobeAppHost",
+        "method": "appx",
+        "display": "DesktopPackageMetadata ms-resource:OobeHostAppName/Text Global.WindowsOobeAppHost ms-resource:OobeHostAppName/Text"
+      }
+    ],
+    "name": "DesktopPackageMetadata ms-resource:OobeHostAppName/Text Global.WindowsOobeAppHost ms-resource:OobeHostAppName/Text",
+    "aliases": []
+  },
+  "desktoppackagemetadata ms-resource:oobehostappname/text global.windowsoobeapphost ms-resource:oobehostappname/text": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.OOBE_cw5n1h2txyewy!PackageMetadata OobeHost Global.WindowsOobeAppHost WindowsOobeAppHost",
+        "method": "appx",
+        "display": "DesktopPackageMetadata ms-resource:OobeHostAppName/Text Global.WindowsOobeAppHost ms-resource:OobeHostAppName/Text"
+      }
+    ],
+    "name": "DesktopPackageMetadata ms-resource:OobeHostAppName/Text Global.WindowsOobeAppHost ms-resource:OobeHostAppName/Text",
+    "aliases": [
+      "desktoppackagemetadata",
+      "resource:oobehostappname/text",
+      "global.windowsoobeapphost",
+      "resource:oobehostappname/text"
+    ]
+  },
+  "microsoft.winget.source": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Winget.Source_8wekyb3d8bbwe!SourceData",
+        "method": "appx",
+        "display": "Windows Package Manager Source (winget) V2"
+      }
+    ],
+    "name": "Windows Package Manager Source (winget) V2",
+    "aliases": []
+  },
+  "windows package manager source (winget) v2": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Winget.Source_8wekyb3d8bbwe!SourceData",
+        "method": "appx",
+        "display": "Windows Package Manager Source (winget) V2"
+      }
+    ],
+    "name": "Windows Package Manager Source (winget) V2",
+    "aliases": [
+      "windows",
+      "package",
+      "manager",
+      "source",
+      "(winget)"
+    ]
+  },
+  "microsoftcorporationii.windowssubsystemforlinux": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.WindowsSubsystemForLinux_8wekyb3d8bbwe!wsl",
+        "method": "appx",
+        "display": "MicrosoftCorporationII.WindowsSubsystemForLinux"
+      }
+    ],
+    "name": "MicrosoftCorporationII.WindowsSubsystemForLinux",
+    "aliases": []
+  },
+  "microsoft.heifimageextension": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.HEIFImageExtension_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.HEIFImageExtension"
+      }
+    ],
+    "name": "Microsoft.HEIFImageExtension",
+    "aliases": []
+  },
+  "microsoft.xboxgamingoverlay": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.XboxGamingOverlay_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Game Bar"
+      }
+    ],
+    "name": "Game Bar",
+    "aliases": []
+  },
+  "game bar": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.XboxGamingOverlay_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Game Bar"
+      }
+    ],
+    "name": "Game Bar",
+    "aliases": [
+      "game"
+    ]
+  },
+  "microsoft.todos": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Todos_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.Todos"
+      }
+    ],
+    "name": "Microsoft.Todos",
+    "aliases": []
+  },
+  "microsoftcorporationii.winappruntime.main.2": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.WinAppRuntime.Main.2_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Windows App Runtime Main"
+      }
+    ],
+    "name": "Windows App Runtime Main",
+    "aliases": []
+  },
+  "microsoft.windowsstore": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WindowsStore_8wekyb3d8bbwe!App StoreDesktopExtension StoreCLI",
+        "method": "appx",
+        "display": "Microsoft Store Microsoft Store Server Microsoft Store CLI tool"
+      }
+    ],
+    "name": "Microsoft Store Microsoft Store Server Microsoft Store CLI tool",
+    "aliases": []
+  },
+  "microsoft store microsoft store server microsoft store cli tool": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WindowsStore_8wekyb3d8bbwe!App StoreDesktopExtension StoreCLI",
+        "method": "appx",
+        "display": "Microsoft Store Microsoft Store Server Microsoft Store CLI tool"
+      }
+    ],
+    "name": "Microsoft Store Microsoft Store Server Microsoft Store CLI tool",
+    "aliases": [
+      "microsoft",
+      "microsoft",
+      "server",
+      "microsoft",
+      "tool"
+    ]
+  },
+  "microsoft.outlookforwindows": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.OutlookForWindows_8wekyb3d8bbwe!Microsoft.OutlookforWindows",
+        "method": "appx",
+        "display": "Outlook"
+      }
+    ],
+    "name": "Outlook",
+    "aliases": []
+  },
+  "microsoft.powerautomatedesktop": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.PowerAutomateDesktop_8wekyb3d8bbwe!PAD.Console",
+        "method": "appx",
+        "display": "Microsoft.PowerAutomateDesktop"
+      }
+    ],
+    "name": "Microsoft.PowerAutomateDesktop",
+    "aliases": []
+  },
+  "microsoft.gamingapp": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App Microsoft.Xbox.AppL Microsoft.Xbox.WidgetsApp",
+        "method": "appx",
+        "display": "Xbox Xbox Xbox Game Bar Widgets"
+      }
+    ],
+    "name": "Xbox Xbox Xbox Game Bar Widgets",
+    "aliases": []
+  },
+  "xbox xbox xbox game bar widgets": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App Microsoft.Xbox.AppL Microsoft.Xbox.WidgetsApp",
+        "method": "appx",
+        "display": "Xbox Xbox Xbox Game Bar Widgets"
+      }
+    ],
+    "name": "Xbox Xbox Xbox Game Bar Widgets",
+    "aliases": [
+      "xbox",
+      "xbox",
+      "xbox",
+      "game",
+      "widgets"
+    ]
+  },
+  "aimgr": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\aimgr_8wekyb3d8bbwe!aimgr",
+        "method": "appx",
+        "display": "Local AI Manager for Microsoft 365"
+      }
+    ],
+    "name": "Local AI Manager for Microsoft 365",
+    "aliases": []
+  },
+  "local ai manager for microsoft 365": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\aimgr_8wekyb3d8bbwe!aimgr",
+        "method": "appx",
+        "display": "Local AI Manager for Microsoft 365"
+      }
+    ],
+    "name": "Local AI Manager for Microsoft 365",
+    "aliases": [
+      "local",
+      "manager",
+      "microsoft"
+    ]
+  },
+  "microsoft.windowscamera": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WindowsCamera_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.WindowsCamera"
+      }
+    ],
+    "name": "Microsoft.WindowsCamera",
+    "aliases": []
+  },
+  "microsoft.storepurchaseapp": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.StorePurchaseApp_8wekyb3d8bbwe!App PurchaseDesktopExtension",
+        "method": "appx",
+        "display": "ms-resource:DisplayTitle Purchase Desktop Extension"
+      }
+    ],
+    "name": "ms-resource:DisplayTitle Purchase Desktop Extension",
+    "aliases": []
+  },
+  "ms-resource:displaytitle purchase desktop extension": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.StorePurchaseApp_8wekyb3d8bbwe!App PurchaseDesktopExtension",
+        "method": "appx",
+        "display": "ms-resource:DisplayTitle Purchase Desktop Extension"
+      }
+    ],
+    "name": "ms-resource:DisplayTitle Purchase Desktop Extension",
+    "aliases": [
+      "resource:displaytitle",
+      "purchase",
+      "desktop",
+      "extension"
+    ]
+  },
+  "microsoft.windowsalarms": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WindowsAlarms_8wekyb3d8bbwe!App ClockWidgets",
+        "method": "appx",
+        "display": "Microsoft.WindowsAlarms"
+      }
+    ],
+    "name": "Microsoft.WindowsAlarms",
+    "aliases": []
+  },
+  "microsoft.windowssoundrecorder": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WindowsSoundRecorder_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.WindowsSoundRecorder"
+      }
+    ],
+    "name": "Microsoft.WindowsSoundRecorder",
+    "aliases": []
+  },
+  "microsoft.windowscalculator": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.WindowsCalculator"
+      }
+    ],
+    "name": "Microsoft.WindowsCalculator",
+    "aliases": []
+  },
+  "microsoft.zunevideo": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.ZuneVideo_8wekyb3d8bbwe!Microsoft.ZuneVideo",
+        "method": "appx",
+        "display": "Microsoft.ZuneVideo"
+      }
+    ],
+    "name": "Microsoft.ZuneVideo",
+    "aliases": []
+  },
+  "microsoft.zunemusic": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.ZuneMusic_8wekyb3d8bbwe!Microsoft.ZuneMusic",
+        "method": "appx",
+        "display": "Microsoft.ZuneMusic"
+      }
+    ],
+    "name": "Microsoft.ZuneMusic",
+    "aliases": []
+  },
+  "microsoft.bingweather": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.BingWeather_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.BingWeather"
+      }
+    ],
+    "name": "Microsoft.BingWeather",
+    "aliases": []
+  },
+  "microsoft.vp9videoextensions": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.VP9VideoExtensions_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.VP9VideoExtensions"
+      }
+    ],
+    "name": "Microsoft.VP9VideoExtensions",
+    "aliases": []
+  },
+  "microsoft.windows.photos": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Windows.Photos_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.Windows.Photos"
+      }
+    ],
+    "name": "Microsoft.Windows.Photos",
+    "aliases": []
+  },
+  "microsoft.officepushnotificationutility": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.OfficePushNotificationUtility_8wekyb3d8bbwe!OPushUtil",
+        "method": "appx",
+        "display": "Microsoft 365 Push Notifications Utility"
+      }
+    ],
+    "name": "Microsoft 365 Push Notifications Utility",
+    "aliases": []
+  },
+  "microsoft 365 push notifications utility": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.OfficePushNotificationUtility_8wekyb3d8bbwe!OPushUtil",
+        "method": "appx",
+        "display": "Microsoft 365 Push Notifications Utility"
+      }
+    ],
+    "name": "Microsoft 365 Push Notifications Utility",
+    "aliases": [
+      "microsoft",
+      "push",
+      "notifications",
+      "utility"
+    ]
+  },
+  "microsoft.office.actionsserver": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Office.ActionsServer_8wekyb3d8bbwe!Microsoft.Office.ActionsServer",
+        "method": "appx",
+        "display": "Microsoft Office"
+      }
+    ],
+    "name": "Microsoft Office",
+    "aliases": []
+  },
+  "microsoft office": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.Office.ActionsServer_8wekyb3d8bbwe!Microsoft.Office.ActionsServer",
+        "method": "appx",
+        "display": "Microsoft Office"
+      }
+    ],
+    "name": "Microsoft Office",
+    "aliases": [
+      "microsoft",
+      "office"
+    ]
+  },
+  "msteams": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MSTeams_8wekyb3d8bbwe!MSTeamsRemoteModuleContainer MSTeams MSTeams.Update msteamsautostarter",
+        "method": "appx",
+        "display": "Microsoft Teams Remote Module Microsoft Teams ms-teamsupdate msteamsautostarter"
+      }
+    ],
+    "name": "Microsoft Teams Remote Module Microsoft Teams ms-teamsupdate msteamsautostarter",
+    "aliases": []
+  },
+  "microsoft teams remote module microsoft teams ms-teamsupdate msteamsautostarter": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MSTeams_8wekyb3d8bbwe!MSTeamsRemoteModuleContainer MSTeams MSTeams.Update msteamsautostarter",
+        "method": "appx",
+        "display": "Microsoft Teams Remote Module Microsoft Teams ms-teamsupdate msteamsautostarter"
+      }
+    ],
+    "name": "Microsoft Teams Remote Module Microsoft Teams ms-teamsupdate msteamsautostarter",
+    "aliases": [
+      "microsoft",
+      "teams",
+      "remote",
+      "module",
+      "microsoft",
+      "teams",
+      "teamsupdate",
+      "msteamsautostarter"
+    ]
+  },
+  "microsoft.microsoftedge.stable": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.MicrosoftEdge.Stable_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft Edge"
+      }
+    ],
+    "name": "Microsoft Edge",
+    "aliases": []
+  },
+  "facebook.instagrambeta": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Facebook.InstagramBeta_8xx8rvfyw5nnt!App",
+        "method": "appx",
+        "display": "Instagram"
+      }
+    ],
+    "name": "Instagram",
+    "aliases": []
+  },
+  "instagram": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Facebook.InstagramBeta_8xx8rvfyw5nnt!App",
+        "method": "appx",
+        "display": "Instagram"
+      }
+    ],
+    "name": "Instagram",
+    "aliases": []
+  },
+  "facebook.facebook": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\FACEBOOK.FACEBOOK_8xx8rvfyw5nnt!App",
+        "method": "appx",
+        "display": "Facebook"
+      }
+    ],
+    "name": "Facebook",
+    "aliases": []
+  },
+  "facebook": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\FACEBOOK.FACEBOOK_8xx8rvfyw5nnt!App",
+        "method": "appx",
+        "display": "Facebook"
+      }
+    ],
+    "name": "Facebook",
+    "aliases": []
+  },
+  "spotifyab.spotifymusic": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify SpotifyCli SpotifyLauncher SpotifyWidgetProvider Widget",
+        "method": "appx",
+        "display": "Spotify Spotify CLI Spotify Launcher Spotify Widget Provider Spotify Widget"
+      }
+    ],
+    "name": "Spotify Spotify CLI Spotify Launcher Spotify Widget Provider Spotify Widget",
+    "aliases": []
+  },
+  "spotify spotify cli spotify launcher spotify widget provider spotify widget": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify SpotifyCli SpotifyLauncher SpotifyWidgetProvider Widget",
+        "method": "appx",
+        "display": "Spotify Spotify CLI Spotify Launcher Spotify Widget Provider Spotify Widget"
+      }
+    ],
+    "name": "Spotify Spotify CLI Spotify Launcher Spotify Widget Provider Spotify Widget",
+    "aliases": [
+      "launcher",
+      "widget",
+      "provider",
+      "widget"
+    ]
+  },
+  "microsoft.windowsnotepad": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.WindowsNotepad_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.WindowsNotepad"
+      }
+    ],
+    "name": "Microsoft.WindowsNotepad",
+    "aliases": []
+  },
+  "microsoft.gethelp": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.GetHelp_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.GetHelp"
+      }
+    ],
+    "name": "Microsoft.GetHelp",
+    "aliases": []
+  },
+  "microsoft.gamingservices": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.GamingServices_8wekyb3d8bbwe!Microsoft.GamingServices GamingServices Microsoft.GamingServicesFT",
+        "method": "appx",
+        "display": "ms-resource:DisplayName Gaming Services ms-resource:DisplayName"
+      }
+    ],
+    "name": "ms-resource:DisplayName Gaming Services ms-resource:DisplayName",
+    "aliases": []
+  },
+  "ms-resource:displayname gaming services ms-resource:displayname": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.GamingServices_8wekyb3d8bbwe!Microsoft.GamingServices GamingServices Microsoft.GamingServicesFT",
+        "method": "appx",
+        "display": "ms-resource:DisplayName Gaming Services ms-resource:DisplayName"
+      }
+    ],
+    "name": "ms-resource:DisplayName Gaming Services ms-resource:DisplayName",
+    "aliases": [
+      "resource:displayname",
+      "gaming",
+      "resource:displayname"
+    ]
+  },
+  "microsoft.microsoftofficehub": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe!Microsoft.MicrosoftOfficeHub",
+        "method": "appx",
+        "display": "Microsoft 365 Copilot"
+      }
+    ],
+    "name": "Microsoft 365 Copilot",
+    "aliases": []
+  },
+  "microsoft 365 copilot": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe!Microsoft.MicrosoftOfficeHub",
+        "method": "appx",
+        "display": "Microsoft 365 Copilot"
+      }
+    ],
+    "name": "Microsoft 365 Copilot",
+    "aliases": [
+      "microsoft",
+      "copilot"
+    ]
+  },
+  "5319275a.whatsappdesktop": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App",
+        "method": "appx",
+        "display": "WhatsApp"
+      }
+    ],
+    "name": "WhatsApp",
+    "aliases": []
+  },
+  "whatsapp": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App",
+        "method": "appx",
+        "display": "WhatsApp"
+      }
+    ],
+    "name": "WhatsApp",
+    "aliases": []
+  },
+  "microsoft.yourphone": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Microsoft.YourPhone"
+      }
+    ],
+    "name": "Microsoft.YourPhone",
+    "aliases": []
+  },
+  "microsoft.startexperiencesapp": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.StartExperiencesApp_8wekyb3d8bbwe!MicrosoftStart",
+        "method": "appx",
+        "display": "Microsoft.StartExperiencesApp"
+      }
+    ],
+    "name": "Microsoft.StartExperiencesApp",
+    "aliases": []
+  },
+  "microsoftcorporationii.winappruntime.singleton": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.WinAppRuntime.Singleton_8wekyb3d8bbwe!PushNotifications.LongRunningTask",
+        "method": "appx",
+        "display": "Microsoft Windows App Runtime Singleton"
+      }
+    ],
+    "name": "Microsoft Windows App Runtime Singleton",
+    "aliases": []
+  },
+  "microsoft windows app runtime singleton": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.WinAppRuntime.Singleton_8wekyb3d8bbwe!PushNotifications.LongRunningTask",
+        "method": "appx",
+        "display": "Microsoft Windows App Runtime Singleton"
+      }
+    ],
+    "name": "Microsoft Windows App Runtime Singleton",
+    "aliases": [
+      "microsoft",
+      "windows",
+      "runtime",
+      "singleton"
+    ]
+  },
+  "microsoftcorporationii.winappruntime.main.1.8": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftCorporationII.WinAppRuntime.Main.1.8_8wekyb3d8bbwe!App",
+        "method": "appx",
+        "display": "Windows App Runtime Main"
+      }
+    ],
+    "name": "Windows App Runtime Main",
+    "aliases": []
+  },
+  "microsoftwindows.crossdevice": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.CrossDevice_cw5n1h2txyewy!App SettingsUXHostApp StreamingUXHostApp FilesUXHostApp",
+        "method": "appx",
+        "display": "ms-resource://MicrosoftWindows.CrossDevice/CrossDevice.Core/Resources/AppName ms-resource://MicrosoftWindows.CrossDevice/SettingsResources/SettingsPageTitle ms-resource://MicrosoftWindows.CrossDevice/CrossDevice.Streaming/StreamingResources/StreamingUxHostName CrossDevice Files"
+      }
+    ],
+    "name": "ms-resource://MicrosoftWindows.CrossDevice/CrossDevice.Core/Resources/AppName ms-resource://MicrosoftWindows.CrossDevice/SettingsResources/SettingsPageTitle ms-resource://MicrosoftWindows.CrossDevice/CrossDevice.Streaming/StreamingResources/StreamingUxHostName CrossDevice Files",
+    "aliases": []
+  },
+  "ms-resource://microsoftwindows.crossdevice/crossdevice.core/resources/appname ms-resource://microsoftwindows.crossdevice/settingsresources/settingspagetitle ms-resource://microsoftwindows.crossdevice/crossdevice.streaming/streamingresources/streaminguxhostname crossdevice files": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.CrossDevice_cw5n1h2txyewy!App SettingsUXHostApp StreamingUXHostApp FilesUXHostApp",
+        "method": "appx",
+        "display": "ms-resource://MicrosoftWindows.CrossDevice/CrossDevice.Core/Resources/AppName ms-resource://MicrosoftWindows.CrossDevice/SettingsResources/SettingsPageTitle ms-resource://MicrosoftWindows.CrossDevice/CrossDevice.Streaming/StreamingResources/StreamingUxHostName CrossDevice Files"
+      }
+    ],
+    "name": "ms-resource://MicrosoftWindows.CrossDevice/CrossDevice.Core/Resources/AppName ms-resource://MicrosoftWindows.CrossDevice/SettingsResources/SettingsPageTitle ms-resource://MicrosoftWindows.CrossDevice/CrossDevice.Streaming/StreamingResources/StreamingUxHostName CrossDevice Files",
+    "aliases": [
+      "resource://microsoftwindows.crossdevice/crossdevice.core/resources/appname",
+      "resource://microsoftwindows.crossdevice/settingsresources/settingspagetitle",
+      "resource://microsoftwindows.crossdevice/crossdevice.streaming/streamingresources/streaminguxhostname",
+      "crossdevice",
+      "files"
+    ]
+  },
+  "microsoft.desktopappinstaller": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe!App ProtocolShim PythonRedirector winget WinGetComServer WinGetMCPServer",
+        "method": "appx",
+        "display": "ms-resource:appDisplayName ms-resource:appDisplayName ms-resource:appDisplayName ms-resource:wingetAppDisplayName WinGet COM Server WinGet MCP Server"
+      }
+    ],
+    "name": "ms-resource:appDisplayName ms-resource:appDisplayName ms-resource:appDisplayName ms-resource:wingetAppDisplayName WinGet COM Server WinGet MCP Server",
+    "aliases": []
+  },
+  "ms-resource:appdisplayname ms-resource:appdisplayname ms-resource:appdisplayname ms-resource:wingetappdisplayname winget com server winget mcp server": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe!App ProtocolShim PythonRedirector winget WinGetComServer WinGetMCPServer",
+        "method": "appx",
+        "display": "ms-resource:appDisplayName ms-resource:appDisplayName ms-resource:appDisplayName ms-resource:wingetAppDisplayName WinGet COM Server WinGet MCP Server"
+      }
+    ],
+    "name": "ms-resource:appDisplayName ms-resource:appDisplayName ms-resource:appDisplayName ms-resource:wingetAppDisplayName WinGet COM Server WinGet MCP Server",
+    "aliases": [
+      "resource:appdisplayname",
+      "resource:appdisplayname",
+      "resource:appdisplayname",
+      "resource:wingetappdisplayname",
+      "server",
+      "server"
+    ]
+  },
+  "microsoftwindows.client.webexperience": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy!PackageMetadata Widgets Global.WidgetBoard Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3",
+        "method": "appx",
+        "display": "DesktopPackageMetadata ms-resource:PkgDisplayName ms-resource:WidgetBoard/Resources/AppDisplayName Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3"
+      }
+    ],
+    "name": "DesktopPackageMetadata ms-resource:PkgDisplayName ms-resource:WidgetBoard/Resources/AppDisplayName Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3",
+    "aliases": []
+  },
+  "desktoppackagemetadata ms-resource:pkgdisplayname ms-resource:widgetboard/resources/appdisplayname global.widgetdatamodel global.widgetpicker global.widgetviewwinui3": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy!PackageMetadata Widgets Global.WidgetBoard Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3",
+        "method": "appx",
+        "display": "DesktopPackageMetadata ms-resource:PkgDisplayName ms-resource:WidgetBoard/Resources/AppDisplayName Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3"
+      }
+    ],
+    "name": "DesktopPackageMetadata ms-resource:PkgDisplayName ms-resource:WidgetBoard/Resources/AppDisplayName Global.WidgetDataModel Global.WidgetPicker Global.WidgetViewWinUI3",
+    "aliases": [
+      "desktoppackagemetadata",
+      "resource:pkgdisplayname",
+      "resource:widgetboard/resources/appdisplayname",
+      "global.widgetdatamodel",
+      "global.widgetpicker",
+      "global.widgetviewwinui3"
+    ]
+  },
+  "microsoft.visualstudiocode": {
+    "paths": [
+      {
+        "path": "shell:AppsFolder\\Microsoft.VisualStudioCode_8wekyb3d8bbwe!VSCode",
+        "method": "appx",
+        "display": "Visual Studio Code"
+      }
+    ],
+    "name": "Visual Studio Code",
     "aliases": []
   },
   "calculator": {
@@ -6211,6 +8616,11 @@
         "path": "C:\\Users\\Abir\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\code-tunnel.exe",
         "method": "common",
         "display": "code-tunnel"
+      },
+      {
+        "path": "C:\\Users\\Abir\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\old_code-tunnel.exe",
+        "method": "common",
+        "display": "old_code-tunnel"
       }
     ],
     "name": "bash",
@@ -9983,6 +12393,11 @@
         "display": "Code"
       },
       {
+        "path": "C:\\Users\\Abir\\AppData\\Local\\Programs\\Microsoft VS Code\\old_Code.exe",
+        "method": "common",
+        "display": "old_Code"
+      },
+      {
         "path": "C:\\Users\\Abir\\AppData\\Local\\Programs\\Microsoft VS Code\\unins000.exe",
         "method": "common",
         "display": "unins000"
@@ -9993,6 +12408,17 @@
       "microsoft"
     ]
   },
+  "old_code": {
+    "paths": [
+      {
+        "path": "C:\\Users\\Abir\\AppData\\Local\\Programs\\Microsoft VS Code\\old_Code.exe",
+        "method": "common",
+        "display": "old_Code"
+      }
+    ],
+    "name": "old_Code",
+    "aliases": []
+  },
   "code-tunnel": {
     "paths": [
       {
@@ -10002,6 +12428,19 @@
       }
     ],
     "name": "code-tunnel",
+    "aliases": [
+      "tunnel"
+    ]
+  },
+  "old_code-tunnel": {
+    "paths": [
+      {
+        "path": "C:\\Users\\Abir\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\old_code-tunnel.exe",
+        "method": "common",
+        "display": "old_code-tunnel"
+      }
+    ],
+    "name": "old_code-tunnel",
     "aliases": [
       "tunnel"
     ]
@@ -10719,7 +13158,6 @@
     ],
     "name": "python",
     "aliases": [
-      "microsoft.desktopappinstaller",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10738,7 +13176,6 @@
     ],
     "name": "XboxPcAppAdminServer",
     "aliases": [
-      "microsoft.gamingapp",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10752,7 +13189,6 @@
     ],
     "name": "GetHelp",
     "aliases": [
-      "microsoft.gethelp",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10766,7 +13202,6 @@
     ],
     "name": "olk",
     "aliases": [
-      "microsoft.outlookforwindows",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10785,7 +13220,6 @@
     ],
     "name": "mspaint",
     "aliases": [
-      "microsoft.paint",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10799,7 +13233,6 @@
     ],
     "name": "SnippingTool",
     "aliases": [
-      "microsoft.screensketch",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10813,7 +13246,6 @@
     ],
     "name": "notepad",
     "aliases": [
-      "microsoft.windowsnotepad",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10832,7 +13264,6 @@
     ],
     "name": "microsoftstore",
     "aliases": [
-      "microsoft.windowsstore",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10846,7 +13277,6 @@
     ],
     "name": "wt",
     "aliases": [
-      "microsoft.windowsterminal",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10860,7 +13290,6 @@
     ],
     "name": "GameBarElevatedFT_Alias",
     "aliases": [
-      "microsoft.xboxgamingoverlay",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10874,7 +13303,6 @@
     ],
     "name": "MediaPlayer",
     "aliases": [
-      "microsoft.zunemusic",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10898,7 +13326,6 @@
     ],
     "name": "bash",
     "aliases": [
-      "microsoftcorporationii.windowssubsystemforlinux",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10917,7 +13344,6 @@
     ],
     "name": "ActionsMcpHost",
     "aliases": [
-      "microsoftwindows.client.cbs",
       "cw5n1h2txyewy"
     ]
   },
@@ -10946,7 +13372,6 @@
     ],
     "name": "ms-teams",
     "aliases": [
-      "msteams",
       "8wekyb3d8bbwe"
     ]
   },
@@ -10990,7 +13415,6 @@
     ],
     "name": "py",
     "aliases": [
-      "pythonsoftwarefoundation.pythonmanager",
       "3847v3x7pw1km"
     ]
   },
@@ -11009,7 +13433,6 @@
     ],
     "name": "Spotify",
     "aliases": [
-      "spotifyab.spotifymusic",
       "zpdnekdrzrea0"
     ]
   }
