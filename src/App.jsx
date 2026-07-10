@@ -755,6 +755,7 @@ export default function App() {
       setTask({
         id: data.id,
         tool: toolName,
+        name: toolName,
         args: data.args || {},
         status: data.auto_allowed ? 'running' : 'pending',
         category: getCategory(toolName)
@@ -783,6 +784,17 @@ export default function App() {
           output: null,
           args: data.args || {}
         })
+      }
+
+      // Fallback timer for show_tools — marks done if tool_showcase event never arrives
+      if (toolName === 'show_tools' && data.auto_allowed) {
+        if (showcaseTimerRef.current) clearTimeout(showcaseTimerRef.current)
+        showcaseTimerRef.current = setTimeout(() => {
+          setTask(prev => {
+            if (!prev || prev.name !== 'show_tools') return prev
+            return { ...prev, status: 'done' }
+          })
+        }, 8000)
       }
     }
 
