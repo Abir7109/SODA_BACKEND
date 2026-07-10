@@ -563,15 +563,11 @@ welcome_home_tool = {
 control_system_tool = {
     "name": "control_system",
     "description": (
-        "Control system volume, brightness, and applications. "
+        "Control system volume and brightness only. "
         "Actions: volume_up, volume_down, volume_set (requires value 0-100), "
         "mute, unmute, toggle_mute, "
-        "brightness_up, brightness_down, brightness_set (requires value), "
-        "open_app (requires app name), close_app, minimize, maximize, "
-        "full_screen, show_desktop, switch_window, task_manager, "
-        "screenshot, lock_screen, file_explorer, open_settings, "
-        "restart, shutdown, type_text (requires text), "
-        "press_key (requires key), scroll_up, scroll_down. "
+        "brightness_up, brightness_down, brightness_set (requires value). "
+        "Do NOT use for opening or closing apps — use open_app or close_app tools instead. "
         "Use for: 'turn it up', 'turn it down', 'set volume to X', "
         "'mute', 'unmute', 'volume 50', 'volume 70 percent', "
         "'increase volume', 'decrease volume', 'louder', 'softer', "
