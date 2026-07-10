@@ -224,6 +224,10 @@ const AI_CARD_TOOLS = new Set([
   'get_system_status', 'get_weather', 'terminal_execute', 'set_reminder', 'search_and_send_telegram', 'shutdown_soda',
 ])
 
+const VISION_TOOLS = new Set([
+  'screenshot', 'analyze_screen', 'read_screen_text', 'take_photo', 'recognize_face', 'remember_face',
+])
+
 function AnimationStage({ category, status, toolName, data }) {
   const AnimComponent = getAnimationForTool(toolName)
   const variant = getVariantForTool(toolName)
@@ -1959,7 +1963,7 @@ export default function App() {
     </div>
     </PanelSpaceProvider>
     </AnimationErrorBoundary>
-    <CameraCapture />
+    {task && VISION_TOOLS.has(task.tool) && <CameraCapture />}
     </>
     </RootErrorBoundary>
   )
