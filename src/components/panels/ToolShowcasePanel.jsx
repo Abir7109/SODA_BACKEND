@@ -71,25 +71,52 @@ export default function ToolShowcasePanel({ visible, tools, onClose }) {
   const scrollRef = useRef(null)
   const [activeCategory, setActiveCategory] = useState(null)
   const [briefing, setBriefing] = useState(null)
+  const revealIntervalRef = useRef(null)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+
+  // Touch swipe-to-close
+  const touchStartRef = useRef(null)
+  const panelRef = useRef(null)
+
+  const handleTouchStart = useCallback((e) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  }, [])
+
+  const handleTouchEnd = useCallback((e) => {
+    if (!touchStartRef.current) return
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x
+    const dy = e.changedTouches[0].clientY - touchStartRef.current.y
+    touchStartRef.current = null
+    if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (onClose) onClose()
+    }
+  }, [onClose])
 
   useEffect(() => {
     if (!visible) {
+      if (revealIntervalRef.current) { clearInterval(revealIntervalRef.current); revealIntervalRef.current = null }
       setRevealedCount(0)
       setActiveCategory(null)
       setBriefing(null)
       return
     }
     if (!tools || tools.length === 0) return
+    if (revealIntervalRef.current) { clearInterval(revealIntervalRef.current); revealIntervalRef.current = null }
     setRevealedCount(0)
     setActiveCategory(null)
     setBriefing(null)
     let i = 0
-    const interval = setInterval(() => {
+    const speed = isMobile ? 30 : 60
+    revealIntervalRef.current = setInterval(() => {
       i++
       setRevealedCount(i)
-      if (i >= tools.length) clearInterval(interval)
-    }, 60)
-    return () => clearInterval(interval)
+      if (i >= tools.length) {
+        if (revealIntervalRef.current) { clearInterval(revealIntervalRef.current); revealIntervalRef.current = null }
+      }
+    }, speed)
+    return () => {
+      if (revealIntervalRef.current) { clearInterval(revealIntervalRef.current); revealIntervalRef.current = null }
+    }
   }, [visible, tools])
 
   useEffect(() => {
@@ -97,13 +124,10 @@ export default function ToolShowcasePanel({ visible, tools, onClose }) {
     const idx = Math.min(revealedCount - 1, tools.length - 1)
     const tool = tools[idx]
     if (!tool) return
-    const cat = getCategoryForTool(tool.name || tool)
+    const name = typeof tool === 'string' ? tool : tool?.name || ''
+    const cat = getCategoryForTool(name)
     setActiveCategory(cat.key)
-    setBriefing({
-      name: tool.name || tool,
-      description: tool.description || '',
-      category: cat
-    })
+    setBriefing({ name, category: cat })
   }, [revealedCount, tools])
 
   if (!tools || tools.length === 0) return null
@@ -111,104 +135,139 @@ export default function ToolShowcasePanel({ visible, tools, onClose }) {
   const total = tools.length
 
   return (
-    <SlidePanel
-      visible={visible}
-      direction="right"
-      title="SODA TOOLKIT"
-      icon={<Wrench size={11} />}
-      accentColor="#00fbfb"
-      onClose={onClose}
-      autoDismissMs={0}
-    >
-      <div ref={scrollRef} style={{ maxHeight: '65vh', overflowY: 'auto', padding: '0 2px' }}>
-        <div style={{ padding: '8px 0', borderBottom: '1px solid rgba(0,251,251,0.15)', marginBottom: 8 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#00fbfb', letterSpacing: 1 }}>
-            {total} TOOLS
+    <div ref={panelRef} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <SlidePanel
+        visible={visible}
+        direction="right"
+        title="SODA TOOLKIT"
+        icon={<Wrench size={11} />}
+        accentColor="#00fbfb"
+        onClose={onClose}
+        autoDismissMs={0}
+      >
+        <div ref={scrollRef} style={{
+          maxHeight: isMobile ? '50vh' : '65vh',
+          overflowY: 'auto',
+          padding: '0 2px',
+          WebkitOverflowScrolling: 'touch',
+        }}>
+          <div style={{
+            padding: isMobile ? '6px 0' : '8px 0',
+            borderBottom: '1px solid rgba(0,251,251,0.15)',
+            marginBottom: 8
+          }}>
+            <div style={{
+              fontSize: isMobile ? 18 : 22,
+              fontWeight: 700,
+              color: '#00fbfb',
+              letterSpacing: 1
+            }}>
+              {total} TOOLS
+            </div>
+            <div style={{
+              fontSize: 9,
+              color: 'rgba(255,255,255,0.4)',
+              textTransform: 'uppercase',
+              letterSpacing: 2,
+              marginTop: 2
+            }}>
+              Loaded &amp; Ready
+            </div>
           </div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>
-            Loaded &amp; Ready
-          </div>
-        </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {tools.filter(Boolean).map((tool, i) => {
-            const name = (typeof tool === 'string' ? tool : tool?.name) || ''
-            const desc = (typeof tool === 'object' && tool ? tool.description : '') || ''
-            const cat = getCategoryForTool(name)
-            const isRevealed = i < revealedCount
-            const isActive = isRevealed && briefing && briefing.name === name
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {tools.filter(Boolean).map((tool, i) => {
+              const name = (typeof tool === 'string' ? tool : tool?.name) || ''
+              const cat = getCategoryForTool(name)
+              const isRevealed = i < revealedCount
+              const isActive = isRevealed && briefing && briefing.name === name
 
-            return (
-              <div
-                key={name}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 8,
-                  padding: '6px 8px',
-                  borderRadius: 3,
-                  background: isActive ? 'rgba(0,251,251,0.08)' : 'transparent',
-                  borderLeft: `2px solid ${isActive ? cat.color : 'transparent'}`,
-                  opacity: isRevealed ? 1 : 0,
-                  transform: isRevealed ? 'translateX(0)' : 'translateX(-8px)',
-                  transition: 'all 0.3s ease',
-                  transitionDelay: `${i * 0.03}s`,
-                }}
-              >
-                <div style={{
-                  width: 18, height: 18, borderRadius: 2,
-                  background: cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 8, fontWeight: 700, color: '#0a0a0a', flexShrink: 0, marginTop: 1
-                }}>
-                  {i + 1}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+              return (
+                <div
+                  key={name}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 8,
+                    padding: isMobile ? '5px 6px' : '6px 8px',
+                    borderRadius: 3,
+                    background: isActive ? 'rgba(0,251,251,0.08)' : 'transparent',
+                    borderLeft: `2px solid ${isActive ? cat.color : 'transparent'}`,
+                    opacity: isRevealed ? 1 : 0,
+                    transform: isRevealed ? 'translateX(0)' : 'translateX(-8px)',
+                    transition: 'opacity 0.25s ease, transform 0.25s ease',
+                    transitionDelay: `${i * (isMobile ? 0.015 : 0.03)}s`,
+                    cursor: 'pointer',
+                  }}
+                >
                   <div style={{
-                    fontSize: 10, fontWeight: 600, color: '#e0e0e0',
-                    textTransform: 'uppercase', letterSpacing: 0.5
+                    width: isMobile ? 16 : 18,
+                    height: isMobile ? 16 : 18,
+                    borderRadius: 2,
+                    background: cat.color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: isMobile ? 7 : 8,
+                    fontWeight: 700,
+                    color: '#0a0a0a',
+                    flexShrink: 0,
+                    marginTop: 1
                   }}>
-                    {toolLabel(name)}
+                    {i + 1}
                   </div>
-                  {desc && (
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 1,
-                      lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden'
+                      fontSize: isMobile ? 9 : 10,
+                      fontWeight: 600,
+                      color: '#e0e0e0',
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5
                     }}>
-                      {desc}
+                      {toolLabel(name)}
                     </div>
-                  )}
+                  </div>
+                  <div style={{
+                    fontSize: isMobile ? 6 : 7,
+                    color: cat.color,
+                    whiteSpace: 'nowrap',
+                    padding: isMobile ? '1px 3px' : '1px 4px',
+                    borderRadius: 2,
+                    background: `${cat.color}15`,
+                    marginLeft: 4,
+                    flexShrink: 0,
+                    marginTop: 2
+                  }}>
+                    {cat.label}
+                  </div>
                 </div>
-                <div style={{
-                  fontSize: 7, color: cat.color, whiteSpace: 'nowrap',
-                  padding: '1px 4px', borderRadius: 2,
-                  background: `${cat.color}15`, marginLeft: 4, flexShrink: 0, marginTop: 2
-                }}>
-                  {cat.label}
-                </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
-      </div>
 
-      <div style={{
-        borderTop: '1px solid rgba(0,251,251,0.15)', padding: '6px 8px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        fontSize: 9, color: 'rgba(255,255,255,0.4)'
-      }}>
-        <span>
-          <span style={{ color: '#00fbfb', fontWeight: 700 }}>{revealedCount}</span> / {total} tools
-        </span>
-        {briefing && activeCategory && revealedCount < total && (
-          <span style={{ color: briefing.category.color }}>
-            {briefing.category.label}
+        <div style={{
+          borderTop: '1px solid rgba(0,251,251,0.15)',
+          padding: '6px 8px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: 9,
+          color: 'rgba(255,255,255,0.4)'
+        }}>
+          <span>
+            <span style={{ color: '#00fbfb', fontWeight: 700 }}>{revealedCount}</span> / {total} tools
           </span>
-        )}
-        {revealedCount >= total && (
-          <span style={{ color: '#81c784' }}>Complete</span>
-        )}
-      </div>
-    </SlidePanel>
+          {briefing && activeCategory && revealedCount < total && (
+            <span style={{ color: briefing.category.color }}>
+              {briefing.category.label}
+            </span>
+          )}
+          {revealedCount >= total && (
+            <span style={{ color: '#81c784' }}>Complete</span>
+          )}
+        </div>
+      </SlidePanel>
+    </div>
   )
 }

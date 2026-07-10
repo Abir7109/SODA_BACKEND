@@ -28,16 +28,16 @@ export function PanelSpaceProvider({ children }) {
     const vw = window.innerWidth
     if (direction === 'top') {
       if (visibleDirections.has('right')) {
-        offsetX = -(PANEL_RIGHT + 40)
+        offsetX = vw < 640 ? 0 : -(PANEL_RIGHT + 40)
       } else {
-        offsetX = vw < 800 ? 80 : vw < 1024 ? 120 : 160
+        offsetX = vw < 640 ? 0 : vw < 800 ? 80 : vw < 1024 ? 120 : 160
       }
     }
     if (direction === 'bottom') {
       if (visibleDirections.has('left')) {
-        offsetX = PANEL_LEFT + 40
+        offsetX = vw < 640 ? 0 : PANEL_LEFT + 40
       } else {
-        offsetX = vw < 800 ? 80 : vw < 1024 ? 140 : 200
+        offsetX = vw < 640 ? 0 : vw < 800 ? 80 : vw < 1024 ? 140 : 200
       }
     }
     return { offsetX, offsetY }

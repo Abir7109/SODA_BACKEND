@@ -829,18 +829,30 @@ export default function App() {
     }
 
     const onToolShowcase = (data) => {
-      setToolShowcase({ visible: true, tools: data.tools || [] })
       const tools = data.tools || []
+      if (data.status === 'done') {
+        setToolShowcase({ visible: true, tools, status: 'done' })
+        if (showcaseTimerRef.current) clearTimeout(showcaseTimerRef.current)
+        return
+      }
+      setToolShowcase({ visible: true, tools })
       if (tools.length) {
-        setTask({ status: 'running', name: 'show_tools', timestamp: Date.now() })
+        setTask({
+          status: 'running',
+          tool: 'show_tools',
+          name: 'show_tools',
+          category: 'data',
+          timestamp: Date.now(),
+        })
         setTaskData(data)
         if (showcaseTimerRef.current) clearTimeout(showcaseTimerRef.current)
+        const ms = Math.min(tools.length * 120 + 600, 12000)
         showcaseTimerRef.current = setTimeout(() => {
           setTask(prev => {
             if (!prev || prev.name !== 'show_tools') return prev
             return { ...prev, status: 'done' }
           })
-        }, Math.min(tools.length * 180 + 600, 6000))
+        }, ms)
       }
     }
 

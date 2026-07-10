@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 
 export default function ToolShowcaseAnim({ status, data = null }) {
   const isError = status === 'error'
+  const isDone = status === 'done'
   const stroke = isError ? 'var(--error)' : '#00fbfb'
   const tools = data?.tools || []
   const total = tools.length
@@ -10,35 +11,43 @@ export default function ToolShowcaseAnim({ status, data = null }) {
   const [phase, setPhase] = useState('idle')
   const [entering, setEntering] = useState(null)
   const intervalRef = useRef(null)
+  const enteringTimerRef = useRef(null)
+
+  const skipToDone = () => {
+    setDisplayed(tools)
+    setPhase('done')
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
+    if (enteringTimerRef.current) { clearTimeout(enteringTimerRef.current); enteringTimerRef.current = null }
+  }
 
   useEffect(() => {
     if (!total) return
+    if (isDone) { skipToDone(); return }
     setPhase('cycle')
     setDisplayed([tools[0]])
-    const t = setTimeout(() => setEntering(null), 80)
     setEntering(0)
-    return () => clearTimeout(t)
-  }, [total])
+    enteringTimerRef.current = setTimeout(() => setEntering(null), 80)
+    return () => {
+      if (enteringTimerRef.current) clearTimeout(enteringTimerRef.current)
+    }
+  }, [total, isDone])
 
   useEffect(() => {
     if (phase !== 'cycle' || total <= 1) return
     intervalRef.current = setInterval(() => {
       setDisplayed(prev => {
-        const nextIdx = prev.length
-        if (nextIdx >= total) {
+        if (prev.length >= total) {
           setPhase('done')
           return prev
         }
-        return [...prev, tools[nextIdx]]
+        return [...prev, tools[prev.length]]
       })
       setEntering(prev => prev !== null ? prev + 1 : null)
-      const t = setTimeout(() => setEntering(null), 80)
-      return () => clearTimeout(t)
-    }, 180)
-
-    const timeoutRef = intervalRef.current
+      if (enteringTimerRef.current) clearTimeout(enteringTimerRef.current)
+      enteringTimerRef.current = setTimeout(() => setEntering(null), 80)
+    }, 120)
     return () => {
-      clearInterval(timeoutRef)
+      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
     }
   }, [phase, total])
 
@@ -50,10 +59,12 @@ export default function ToolShowcaseAnim({ status, data = null }) {
   }, [phase, total])
 
   useEffect(() => {
+    if (isDone && phase !== 'done') skipToDone()
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
+      if (enteringTimerRef.current) { clearTimeout(enteringTimerRef.current); enteringTimerRef.current = null }
     }
-  }, [])
+  }, [isDone])
 
   return (
     <svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg">
@@ -62,11 +73,6 @@ export default function ToolShowcaseAnim({ status, data = null }) {
           <stop offset="0%" stopColor={stroke} stopOpacity="0" />
           <stop offset="50%" stopColor={stroke} stopOpacity="0.14" />
           <stop offset="100%" stopColor={stroke} stopOpacity="0" />
-        </linearGradient>
-        <linearGradient id="tsc-card-edge" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={stroke} stopOpacity="0.4" />
-          <stop offset="50%" stopColor={stroke} stopOpacity="0.15" />
-          <stop offset="100%" stopColor={stroke} stopOpacity="0.4" />
         </linearGradient>
         <filter id="tsc-blur">
           <feGaussianBlur stdDeviation="1.5" />
@@ -81,7 +87,7 @@ export default function ToolShowcaseAnim({ status, data = null }) {
       </defs>
 
       {/* HUD Corner brackets */}
-      <g stroke={stroke} strokeWidth="1.2" strokeOpacity="0.25" fill="none"
+      <g stroke={stroke} strokeWidth="1.2" strokeOpacity={phase === 'idle' ? '0.08' : '0.25'} fill="none"
         style={{ animation: 'hud-bracket-in 0.4s ease-out' }}>
         <path d="M 8 14 L 8 8 L 14 8" />
         <path d="M 132 8 L 126 8 L 126 14" />
@@ -95,6 +101,13 @@ export default function ToolShowcaseAnim({ status, data = null }) {
       <circle cx="70" cy="70" r="50" fill="none" stroke={stroke} strokeWidth="0.3" strokeOpacity="0.03" />
       <circle cx="70" cy="70" r="30" fill="none" stroke={stroke} strokeWidth="0.3" strokeOpacity="0.03" />
 
+      {phase === 'idle' && (
+        <text x={70} y={74} textAnchor="middle" fill={stroke} fillOpacity="0.5"
+          fontSize={7} fontFamily="monospace" letterSpacing="1.5">
+          LOADING TOOLS...
+        </text>
+      )}
+
       {displayed.map((tool, idx) => {
         const toolName = (typeof tool === 'string' ? tool : tool?.name) || ''
         const toolDesc = (typeof tool === 'object' && tool ? tool.description : '') || ''
@@ -104,7 +117,7 @@ export default function ToolShowcaseAnim({ status, data = null }) {
         const yOffset = isCurrent
           ? (isEntering ? 28 : 0)
           : -(4 + stackIdx * 16)
-        const opacity = isCurrent
+        const opacity = phase === 'idle' ? 0 : isCurrent
           ? (isEntering ? 0 : 1)
           : Math.max(0.1, 0.35 - stackIdx * 0.07)
         const scale = isCurrent ? 1 : 0.78
@@ -132,10 +145,12 @@ export default function ToolShowcaseAnim({ status, data = null }) {
                   fontSize={8.5} fontFamily="monospace" fontWeight="700">
                   {toolName.replace(/_/g, ' ')}
                 </text>
-                <text x={70} y={80} textAnchor="middle" fill={stroke} fillOpacity={0.55}
-                  fontSize={5} fontFamily="monospace">
-                  {toolDesc}
-                </text>
+                {toolDesc && (
+                  <text x={70} y={80} textAnchor="middle" fill={stroke} fillOpacity={0.55}
+                    fontSize={5} fontFamily="monospace">
+                    {toolDesc.length > 40 ? toolDesc.slice(0, 39) + '…' : toolDesc}
+                  </text>
+                )}
               </>
             ) : (
               <>

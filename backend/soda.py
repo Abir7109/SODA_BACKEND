@@ -2100,8 +2100,8 @@ class AudioLoop:
 
         elif name == "show_tools":
             decls = tools_list[0]["function_declarations"] if isinstance(tools_list, list) and len(tools_list) > 0 and isinstance(tools_list[0], dict) and "function_declarations" in tools_list[0] else tools_list
-            tool_names = [t.get("name", "?") for t in decls]
-            r = json.dumps(tool_names, indent=2)
+            tool_names = [{"name": t.get("name", "?"), "description": t.get("description", "")} for t in decls]
+            r = json.dumps([t["name"] for t in tool_names], indent=2)
             if self.sio:
                 loop = asyncio.get_event_loop()
                 loop.create_task(self.sio.emit("tool_showcase", {"tools": tool_names}))
