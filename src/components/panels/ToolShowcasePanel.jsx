@@ -130,7 +130,14 @@ export default function ToolShowcasePanel({ visible, tools, onClose }) {
     setBriefing({ name, category: cat })
   }, [revealedCount, tools])
 
-  if (!tools || tools.length === 0) return null
+  if (!tools || tools.length === 0) {
+    return (
+      <SlidePanel visible={false} direction="right" title="SODA TOOLKIT"
+        icon={<Wrench size={11} />} onClose={onClose} autoDismissMs={0}>
+        <div />
+      </SlidePanel>
+    )
+  }
 
   const total = tools.length
 
