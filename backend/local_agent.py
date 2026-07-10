@@ -41,7 +41,7 @@ def log(msg):
     line = f"[{timestamp}] {msg}"
     # Print still works when running with python.exe (for testing)
     try:
-        log(line, flush=True)
+        print(line, flush=True)
     except:
         pass
     # Always write to file (works with pythonw.exe too)
@@ -115,7 +115,9 @@ def _build_app_registry():
     entries = defaultdict(list)  # name_lower -> list of {path, method, display}
 
     def _add(name, path, method, display=None):
-        if not path or not os.path.isfile(path):
+        if not path:
+            return
+        if method != "appx" and not os.path.isfile(path):
             return
         name_lower = name.lower().strip()
         for existing in entries[name_lower]:
@@ -830,46 +832,43 @@ def _dispatch(tool, args):
 
         def _verify_started(path_or_name=None, timeout=3.0):
             """Check that the app actually launched. Returns (ok: bool, detail: str)."""
-            # Method 1: Check if process started (psutil) — most reliable
-            if HAS_PSUTIL and path_or_name and os.path.isfile(path_or_name):
+            # Determine what names to match against
+            match_names = []
+            if path_or_name and os.path.isfile(path_or_name):
+                match_names.append(os.path.basename(path_or_name).lower())
+            match_names.append(app_lower)
+            match_names = list(set(match_names))
+
+            if HAS_PSUTIL:
                 import psutil as _psutil
-                exe_name = os.path.basename(path_or_name).lower()
-                before = set()
-                try:
-                    before = set(p.info['pid'] for p in _psutil.process_iter(['pid', 'name']))
-                except:
-                    pass
+                # Check if app is already running — no new PID needed
+                for p in _psutil.process_iter(['pid', 'name']):
+                    try:
+                        pname = p.info['name'].lower()
+                        for m in match_names:
+                            if m in pname or m.replace('.exe','') in pname.replace('.exe',''):
+                                return (True, f"App already running (PID {p.info['pid']})")
+                    except:
+                        pass
+                # Wait for new process
                 time.sleep(timeout)
                 after = set()
                 try:
                     after = set(p.info['pid'] for p in _psutil.process_iter(['pid', 'name']))
                 except:
                     pass
-                new_pids = after - before
-                for pid in new_pids:
+                # Check ALL running processes against match names (not just new ones)
+                for p in _psutil.process_iter(['pid', 'name']):
                     try:
-                        p = _psutil.Process(pid)
-                        if exe_name in p.name().lower() or exe_name.replace('.exe','') in p.name().lower():
-                            return (True, f"Process {p.name()} (PID {pid}) started")
+                        pname = p.info['name'].lower()
+                        for m in match_names:
+                            if m in pname or m.replace('.exe','') in pname.replace('.exe',''):
+                                return (True, f"Process {p.name()} (PID {p.info['pid']}) started")
                     except:
                         pass
-                # Give it one more chance — some apps start via a launcher
-                time.sleep(2.0)
-                try:
-                    after2 = set(p.info['pid'] for p in _psutil.process_iter(['pid', 'name']))
-                    new_pids2 = after2 - before
-                    for pid in new_pids2:
-                        try:
-                            p = _psutil.Process(pid)
-                            return (True, f"Process {p.name()} (PID {pid}) started (delayed)")
-                        except:
-                            pass
-                except:
-                    pass
-                # psutil matched nothing — return false instead of falling through
-                return (False, f"No new process matching '{os.path.basename(path_or_name)}' detected")
+                return (False, f"No process matching '{app_lower}' detected")
 
-            # Method 2: Check for new window (pygetwindow) — only used when psutil not available
+            # Method 2: Check for new window (pygetwindow)
             if HAS_PYGETWINDOW:
                 import pygetwindow as gw
                 try:
@@ -883,13 +882,7 @@ def _dispatch(tool, args):
                     after = set()
                 new_windows = after - before
                 if new_windows:
-                    new_title = new_windows.pop()
-                    # Only confirm if window title relates to app name
-                    if not path_or_name or app_lower in new_title.lower() or any(w in new_title.lower() for w in path_or_name.lower().replace('.exe','').replace('.lnk','').split('\\')):
-                        return (True, f"Window opened: '{new_title}'")
-                    # Window appeared but doesn't match — might be a false positive
-                    return (False, f"Unrelated window '{new_title}' appeared, target app not confirmed")
-                # Try once more after delay
+                    return (True, f"Window opened: '{new_windows.pop()}'")
                 time.sleep(2.0)
                 try:
                     after2 = set(w.title.strip() for w in gw.getAllWindows() if w.title.strip() and len(w.title.strip()) > 2)
@@ -897,12 +890,9 @@ def _dispatch(tool, args):
                     after2 = set()
                 new_windows2 = after2 - before
                 if new_windows2:
-                    new_title = new_windows2.pop()
-                    if not path_or_name or app_lower in new_title.lower() or any(w in new_title.lower() for w in path_or_name.lower().replace('.exe','').replace('.lnk','').split('\\')):
-                        return (True, f"Window opened (delayed): '{new_title}'")
-                    return (False, f"Unrelated window '{new_title}' appeared, target app not confirmed")
+                    return (True, f"Window opened (delayed): '{new_windows2.pop()}'")
+                return (False, f"No new window detected for '{app_lower}'")
 
-            # No verification available — return false instead of guessing success
             return (False, "Could not verify if app launched (no process or window detection available)")
 
         def _launch(path_or_name):
@@ -985,6 +975,7 @@ def _dispatch(tool, args):
                             "path": p, "method": f"registry_{method}",
                             "matched": matched_key, "detail": _detail,
                         }
+                    log(f"[LocalAgent] open_app '{app}' → registry path '{p}' launched but verify: {_detail}")
                 except:
                     try:
                         subprocess.Popen(["start", "", p], shell=True)
@@ -995,6 +986,7 @@ def _dispatch(tool, args):
                                 "path": p, "method": f"registry_{method}_start",
                                 "matched": matched_key, "detail": _detail,
                             }
+                        log(f"[LocalAgent] open_app '{app}' → start '{p}' verify: {_detail}")
                     except:
                         continue
 
@@ -1145,7 +1137,18 @@ def _dispatch(tool, args):
             except Exception as e:
                 return {"success": False, "error": f"Could not find '{app}' installed on this system. Also failed to open website: {e}", "not_found": True}
 
-        # ── All methods exhausted ─────────────────────────────────
+        # ── Final check: try to detect any matching process ──────
+        if HAS_PSUTIL:
+            import psutil as _psutil
+            for p in _psutil.process_iter(['pid', 'name']):
+                try:
+                    if app_lower in p.info['name'].lower().replace('.exe',''):
+                        log(f"[LocalAgent] open_app '{app}' found running post-cascade (PID {p.info['pid']})")
+                        return {"success": True, "app": app, "method": "detected_running", "detail": f"Process {p.info['name']} running"}
+                except:
+                    pass
+
+        log(f"[LocalAgent] All methods exhausted for '{app}'")
         return {"success": False, "error": f"Could not find '{app}' installed on this system. Try searching the web for it.", "not_found": True}
 
     elif tool == "list_installed_apps":
