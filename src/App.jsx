@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, Suspense, Component } from 'react'
 import socket from './services/SocketService'
-import { getCategory, CATEGORIES, getAnimationForTool, getVariantForTool, getSpecializedPanel } from './components/animations'
+import { getCategory, CATEGORIES, getAnimationForTool, getVariantForTool, getSpecializedPanel, ALL_TOOL_NAMES } from './components/animations'
 
 function getCapacitorNotifications() {
   try {
@@ -786,15 +786,19 @@ export default function App() {
         })
       }
 
-      // Fallback timer for show_tools — marks done if tool_showcase event never arrives
+      // Start showcase immediately — panel + animation, no need to wait for backend tool_showcase event
       if (toolName === 'show_tools' && data.auto_allowed) {
         if (showcaseTimerRef.current) clearTimeout(showcaseTimerRef.current)
+        const tools = ALL_TOOL_NAMES.map(name => ({ name, description: '' }))
+        setToolShowcase({ visible: true, tools })
+        setTaskData({ tools })
+        const ms = Math.min(tools.length * 120 + 600, 12000)
         showcaseTimerRef.current = setTimeout(() => {
           setTask(prev => {
             if (!prev || prev.name !== 'show_tools') return prev
             return { ...prev, status: 'done' }
           })
-        }, 8000)
+        }, ms)
       }
     }
 

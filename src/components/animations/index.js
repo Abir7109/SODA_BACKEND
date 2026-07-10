@@ -174,6 +174,8 @@ export const TOOL_CATEGORY = {
   email_config: CATEGORIES.SYSTEM,
 }
 
+export const ALL_TOOL_NAMES = Object.keys(TOOL_CATEGORY)
+
 export function getCategory(toolName) {
   if (!toolName) return CATEGORIES.DEFAULT
   return TOOL_CATEGORY[toolName] || CATEGORIES.DEFAULT
