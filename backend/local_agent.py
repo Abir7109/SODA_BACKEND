@@ -24,6 +24,8 @@ import threading
 import urllib.parse
 from tool_abort import abort, clear, AbortError
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
 
 # Ensure backend/ directory is on the path
 _script_dir = os.path.dirname(os.path.abspath(__file__))
