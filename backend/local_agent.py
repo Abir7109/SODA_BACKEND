@@ -1397,7 +1397,10 @@ def _dispatch(tool, args):
         if not HAS_PYAUTOGUI:
             return {"success": False, "error": "pyautogui required"}
         import pyautogui
-        pyautogui.drag(args.get("start_x", 0), args.get("start_y", 0), args.get("end_x", 0), args.get("end_y", 0), duration=args.get("duration", 0.5))
+        sx, sy = args.get("start_x", 0), args.get("start_y", 0)
+        ex, ey = args.get("end_x", 0), args.get("end_y", 0)
+        pyautogui.moveTo(sx, sy)
+        pyautogui.drag(ex - sx, ey - sy, duration=args.get("duration", 0.5))
         return {"success": True}
 
     elif tool == "keyboard_type":
@@ -1993,6 +1996,69 @@ def _dispatch(tool, args):
             keys = keys.split("+")
         pyautogui.hotkey(*keys)
         return {"success": True, "keys": keys}
+
+    # ── AI-grounded element interaction ────────────────────────────
+    elif tool == "click_element":
+        desc = args.get("description", "")
+        if not desc:
+            return {"success": False, "error": "description is required"}
+        if not HAS_PYAUTOGUI:
+            return {"success": False, "error": "pyautogui required"}
+        import pyautogui, io
+        from grounding import find
+        try:
+            png = pyautogui.screenshot()
+            buf = io.BytesIO()
+            png.save(buf, format="PNG")
+            result = find(buf.getvalue(), desc)
+            if not result.get("success"):
+                return result
+            pyautogui.click(result["x"], result["y"])
+            return {"success": True, "x": result["x"], "y": result["y"],
+                    "width": result.get("width", 0), "height": result.get("height", 0)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif tool == "type_into":
+        text = args.get("text", "")
+        desc = args.get("description", None)
+        if not text:
+            return {"success": False, "error": "text is required"}
+        if not HAS_PYAUTOGUI:
+            return {"success": False, "error": "pyautogui required"}
+        import pyautogui, io
+        if desc:
+            from grounding import find
+            try:
+                png = pyautogui.screenshot()
+                buf = io.BytesIO()
+                png.save(buf, format="PNG")
+                result = find(buf.getvalue(), desc)
+                if not result.get("success"):
+                    return result
+                pyautogui.click(result["x"], result["y"])
+                time.sleep(0.2)
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        pyautogui.write(text, interval=0.05)
+        return {"success": True, "typed": text, "into": desc or "current focus"}
+
+    elif tool == "find_element":
+        desc = args.get("description", "")
+        if not desc:
+            return {"success": False, "error": "description is required"}
+        if not HAS_PYAUTOGUI:
+            return {"success": False, "error": "pyautogui required"}
+        import pyautogui, io
+        from grounding import find
+        try:
+            png = pyautogui.screenshot()
+            buf = io.BytesIO()
+            png.save(buf, format="PNG")
+            result = find(buf.getvalue(), desc)
+            return result
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     # ── Browser ────────────────────────────────────────────────────
     elif tool == "browser_command":

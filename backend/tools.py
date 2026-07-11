@@ -1558,6 +1558,48 @@ keyboard_press_tool = {
     }
 }
 
+click_element_tool = {
+    "name": "click_element",
+    "description": "Click a UI element described in natural language (e.g. 'the Submit button', 'the search box', 'the login link'). "
+                   "Uses AI vision to find the element on screen — no coordinates needed. "
+                   "PREFER this over mouse_click(x,y) when you know what to click but not the exact coordinates.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "description": {"type": "STRING", "description": "Natural language description of the element to click"}
+        },
+        "required": ["description"]
+    }
+}
+
+type_into_tool = {
+    "name": "type_into",
+    "description": "Type text into a UI element. Optionally describe the element (e.g. 'the email field', 'the search bar') — "
+                   "AI vision finds it and clicks it first, then types. If description is omitted, types at the current cursor position. "
+                   "PREFER this over keyboard_type when you need to type into a specific field.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "text": {"type": "STRING", "description": "Text to type"},
+            "description": {"type": "STRING", "description": "Optional: description of the element to type into"}
+        },
+        "required": ["text"]
+    }
+}
+
+find_element_tool = {
+    "name": "find_element",
+    "description": "Find a UI element on screen by description and return its coordinates. "
+                   "Useful when you need to know where something is before interacting with it.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "description": {"type": "STRING", "description": "Natural language description of the element to find"}
+        },
+        "required": ["description"]
+    }
+}
+
 open_app_tool = {
     "name": "open_app",
     "description": "Open an installed application instantly. Uses a pre-built app registry of all installed apps "
@@ -1953,6 +1995,9 @@ tools_list = [{"function_declarations": [
     mouse_drag_tool,
     keyboard_type_tool,
     keyboard_press_tool,
+    click_element_tool,
+    type_into_tool,
+    find_element_tool,
     window_focus_tool,
     window_list_tool,
     window_move_tool,

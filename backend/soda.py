@@ -202,7 +202,7 @@ LOCAL_AGENT_TOOLS = {
     "mouse_click", "mouse_move", "mouse_scroll",
     "mouse_drag", "mouse_get_pos", "mouse_hover", "mouse_right_click",
     "keyboard_type", "keyboard_press", "keyboard_hotkey",
-    "click_image", "click_text",
+    "click_element", "type_into", "find_element",
     # Screenshot
     "screenshot", "take_screenshot",
     # Screen analysis (needs local display / cv2 / mss)
@@ -748,6 +748,25 @@ def _build_system_prompt():
 "- credential_delete(service) — remove saved credentials\n"
 "- CRITICAL: When user asks to log in somewhere, FIRST call credential_get THEN browser_automate.\n"
 "- Store credentials whenever user provides login info voluntarily.\n"
+"\nAI-GROUNDED UI INTERACTION (PREFER THESE OVER RAW COORDINATES):\n"
+"- click_element(description) — CLICK any UI element by describing it in plain English. "
+"AI Vision scans the screen, finds the element, and clicks it. "
+"PREFER this over mouse_click(x,y) when you know what to click but not the exact pixel. "
+"Examples: click_element('the Submit button'), click_element('the search icon'), "
+"click_element('the login link'), click_element('the send button').\n"
+"- type_into(text, description?) — TYPE text into a UI element. "
+"Optionally give a description of the element to click first "
+"(AI finds it and clicks it before typing). "
+"If no description given, types at current cursor. "
+"Examples: type_into('hello@email.com', 'the email field'), "
+"type_into('password123', 'the password box'), "
+"type_into('ls -la') — into terminal that already has focus.\n"
+"- find_element(description) — FIND where an element is on screen. "
+"Returns coordinates. Useful when you need to know locations without clicking. "
+"Example: find_element('the notification bell icon').\n"
+"- IMPORTANT: These work on ANY application (not just Chrome/browser). "
+"They use AI vision — if the element is visible on screen, they can find it. "
+"Fall back to mouse_click(x,y) only when you have exact coordinates from a previous action.\n"
 "\nSCHEDULED TASKS:\n"
 "- When the user says 'schedule [action] at [time]', 'every [interval] do [action]', "
 "'remind me to [action] at [time]' — use create_scheduled_task with the action_text "
