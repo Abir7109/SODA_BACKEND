@@ -25,6 +25,7 @@ import urllib.parse
 from tool_abort import abort, clear, AbortError
 from pathlib import Path
 from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / '.env')
 load_dotenv()
 
 # Ensure backend/ directory is on the path
@@ -37,21 +38,29 @@ if _script_dir not in sys.path:
 _agent_pid = os.getpid()
 _agent_log_file = os.path.join(os.path.dirname(_script_dir), f"agent_{_agent_pid}.log")
 
-def log(msg):
-    """Write to both stdout AND agent.log (pythonw.exe-safe)."""
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    line = f"[{timestamp}] {msg}"
-    # Print still works when running with python.exe (for testing)
-    try:
-        print(line, flush=True)
-    except:
-        pass
-    # Always write to file (works with pythonw.exe too)
-    try:
-        with open(_agent_log_file, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
-    except:
-        pass
+class _Log:
+    def __call__(self, msg):
+        self._write(msg)
+    def info(self, msg):
+        self._write(msg)
+    def warning(self, msg):
+        self._write(f"[WARN] {msg}")
+    def error(self, msg):
+        self._write(f"[ERROR] {msg}")
+    def _write(self, msg):
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        line = f"[{timestamp}] {msg}"
+        try:
+            print(line, flush=True)
+        except:
+            pass
+        try:
+            with open(_agent_log_file, "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        except:
+            pass
+
+log = _Log()
 
 BACKEND_URL = os.getenv("BACKEND_URL", "https://soda-backend-sar2.onrender.com")
 AGENT_TOKEN = os.getenv("AGENT_TOKEN", "soda-local-agent-default")
@@ -819,18 +828,9 @@ def _dispatch(tool, args):
             return {"success": False, "error": "No app name provided"}
         app_lower = app.lower().strip()
 
-        # ── WhatsApp intercept: open_app("whatsapp") → check_whatsapp ──
+        # ── WhatsApp: just open the app, no Gemini intercept ──
         if app_lower in ("whatsapp", "whatapp", "watsapp", "whats app", "what's app", "whats"):
-            log.info(f"[WA] open_app('{app_lower}') intercepted → redirecting to check_whatsapp")
-            try:
-                from whatsapp_bridge import check_whatsapp_sync
-                result = check_whatsapp_sync()
-                result["_intercepted_from"] = "open_app"
-                return result
-            except ImportError:
-                log.warning("[WA] whatsapp_bridge not available for intercept")
-            except Exception as e:
-                log.warning(f"[WA] intercept failed: {e}")
+            log.info(f"[LocalAgent] Opening WhatsApp")
 
         def _verify_started(path_or_name=None, timeout=3.0):
             """Check that the app actually launched. Returns (ok: bool, detail: str)."""

@@ -162,46 +162,11 @@ def _click_call_uia():
         return False
 
 
-async def _click_call_ai_vision():
-    rect = _get_window_rect()
-    if not rect:
-        return False
-    left, top, right, bottom = rect
-    width = right - left
-    height = bottom - top
-    if width < 100 or height < 100:
-        return False
-    try:
-        import mss
-        from screen_vision import analyze_screen
-        with mss.mss() as sct:
-            monitor = {"left": left, "top": top, "width": width, "height": height}
-            screenshot = sct.grab(monitor)
-            png_bytes = mss.tools.to_png(screenshot.rgb, screenshot.size)
-        prompt = (
-            "This is a screenshot of WhatsApp Desktop with a chat open. "
-            "In the chat header at the top of the right panel, there is a "
-            "voice call button (phone handset icon). "
-            "Return ONLY the x,y pixel coordinates of its center "
-            "on the FULL SCREEN (not relative to this crop). "
-            "Format: 'X,Y' — example: '971,58'. No other text."
-        )
-        result = await analyze_screen(prompt=prompt, screenshot=png_bytes)
-        if not result.get("success"):
-            return False
-        text = result.get("analysis", "").strip()
-        match = re.search(r'(\d{1,5})\s*,\s*(\d{1,5})', text)
-        if match:
-            x, y = int(match.group(1)), int(match.group(2))
-            log.info(f"[WA] AI Vision cropped -> click ({x}, {y})")
-            pyautogui.click(x, y)
-            time.sleep(0.3)
-            return True
-        log.warning(f"[WA] AI Vision unparseable: {text[:80]}")
-        return False
-    except Exception as e:
-        log.warning(f"[WA] AI Vision failed: {e}")
-        return False
+async def _click_call_button():
+    if _click_call_uia():
+        return True
+    log.info("[WA] uiautomation failed, trying coordinate fallback...")
+    return _click_call_fallback()
 
 
 def _click_call_fallback():
@@ -215,19 +180,6 @@ def _click_call_fallback():
     time.sleep(0.3)
     log.info(f"[WA] Coordinate fallback click at ({x}, {y})")
     return True
-
-
-async def _click_call_button():
-    if _click_call_uia():
-        return True
-    log.info("[WA] uiautomation failed, trying AI Vision...")
-    try:
-        if await _click_call_ai_vision():
-            return True
-    except Exception as e:
-        log.warning(f"[WA] AI Vision failed: {e}")
-    log.info("[WA] AI Vision failed, trying coordinate fallback...")
-    return _click_call_fallback()
 
 
 async def call_contact(contact_name):
@@ -296,26 +248,19 @@ async def check_whatsapp(query="check messages"):
     if win_w < 200 or win_h < 200:
         return {"success": False, "error": "WhatsApp window too small"}
     try:
-        from screen_vision import analyze_screen
+        import pytesseract
+        from PIL import Image
+        import io
         crop_w = int(win_w * 0.35)
         png_bytes = _screenshot_region(left, top, crop_w, win_h)
-        prompt = (
-            "You are looking at the CHAT LIST of WhatsApp Desktop (left panel only).\n"
-            "TASK: Identify any chats with UNREAD messages.\n"
-            "Unread indicators: a green dot next to the contact name, a green number badge on the avatar, "
-            "or the contact name/partial message appearing in bold text (not greyed out).\n"
-            "STRICT RULES:\n"
-            "- ONLY report what you can CLEARLY SEE. Do NOT guess or infer.\n"
-            "- If you are UNSURE about any indicator, do NOT count it as unread.\n"
-            "- If you see NO clear unread indicators, say exactly: 'No unread messages detected'.\n"
-            "- Do NOT make up contact names or message previews.\n"
-            "- If you see a chat but cannot read the name or preview clearly, say 'unread chat (name unclear)'.\n"
-            "- When in doubt, report LESS rather than more.\n\n"
-            "OUTPUT FORMAT:\n"
-            "If unread found, list each as: '• [contact name]: [last message preview]'"
-        )
-        result = await analyze_screen(prompt=prompt, screenshot=png_bytes)
-        return result
+        img = Image.open(io.BytesIO(png_bytes))
+        text = pytesseract.image_to_string(img)
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+        if not lines:
+            return {"success": True, "prompt": "check messages", "model": "ocr",
+                    "analysis": "No unread messages detected", "screenshot": ""}
+        return {"success": True, "prompt": "check messages", "model": "ocr",
+                "analysis": "Chat list text:\n" + "\n".join(lines[:30]), "screenshot": ""}
     except Exception as e:
         log.error(f"[WA] check_whatsapp failed: {e}")
         return {"success": False, "error": str(e)}
@@ -354,7 +299,9 @@ async def read_whatsapp_chat(contact_name, message=None):
     if not _search_and_open_chat(contact_name):
         return {"success": False, "error": "Could not open chat with {contact_name}"}
     try:
-        from screen_vision import analyze_screen
+        import pytesseract
+        from PIL import Image
+        import io
         rect = _get_window_rect()
         if not rect:
             return {"success": False, "error": "Could not get window position"}
@@ -367,21 +314,12 @@ async def read_whatsapp_chat(contact_name, message=None):
         chat_w = win_w - int(win_w * 0.35)
         chat_h = win_h - 120
         png_bytes = _screenshot_region(chat_left, chat_top, chat_w, chat_h)
-
-        prompt = (
-            "You are looking at a WhatsApp conversation (the right panel with messages).\n"
-            "TASK: Read and describe the most recent messages visible in this chat.\n"
-            "STRICT RULES:\n"
-            "- Only report text you can CLEARLY read from the messages.\n"
-            "- Do NOT guess, infer, or make up any message content.\n"
-            "- If you cannot read any messages clearly, say: 'Could not read the conversation clearly'.\n"
-            "- Identify who sent each message if visible (sender name/label above the bubble).\n"
-            "- If only a single side of the conversation is visible, note that.\n"
-            "- Output in format:\n"
-            "  'Most recent messages in chat with [contact]:'\n"
-            "  '[Sender]: [message text]'  (for each visible message)"
-        )
-        result = await analyze_screen(prompt=prompt, screenshot=png_bytes)
+        img = Image.open(io.BytesIO(png_bytes))
+        text = pytesseract.image_to_string(img)
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+        result = {"success": True, "prompt": f"Read chat with {contact_name}", "model": "ocr",
+                  "analysis": "\n".join(lines) if lines else "(no text visible)",
+                  "screenshot": ""}
 
         if message and result.get("success"):
             time.sleep(0.5)
