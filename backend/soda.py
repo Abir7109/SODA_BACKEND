@@ -3744,9 +3744,21 @@ TEXT: {text}"""
         elif name == "get_navigation_route":
             global _live_location
             origin = args.get("origin", "")
-            if _live_location and any(kw in origin.lower() for kw in ["my location", "live location", "here", "current location"]):
+            vague = any(kw in origin.lower() for kw in ["my location", "live location", "here", "current location", ""])
+            if _live_location and vague:
                 args["origin_lat"] = _live_location.get("lat")
                 args["origin_lon"] = _live_location.get("lon")
+            elif vague:
+                try:
+                    import urllib.request, json
+                    loop = asyncio.get_event_loop()
+                    geo = await loop.run_in_executor(None, lambda: json.loads(urllib.request.urlopen("http://ip-api.com/json/", timeout=5).read()))
+                    if geo.get("status") == "success":
+                        _live_location = {"lat": geo["lat"], "lon": geo["lon"]}
+                        args["origin_lat"] = geo["lat"]
+                        args["origin_lon"] = geo["lon"]
+                except Exception:
+                    pass
             r = await get_navigation_route(**args)
             if self.sio and r.get("success"):
                 loop = asyncio.get_event_loop()
