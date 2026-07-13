@@ -99,6 +99,7 @@ import IELTSReadingPanel from './components/panels/IELTSReadingPanel'
 import IELTSVocabPanel from './components/panels/IELTSVocabPanel'
 import IELTSProgressPanel from './components/panels/IELTSProgressPanel'
 import SpotifySearchPanel from './components/panels/SpotifySearchPanel'
+import NavigationPanel from './components/panels/NavigationPanel'
 import { PanelSpaceProvider } from './contexts/PanelSpaceContext'
 import WebviewActionService from './services/WebviewActionService'
 import SlidePanel from './components/SlidePanel'
@@ -622,6 +623,7 @@ export default function App() {
   const [deployPanel, setDeployPanel] = useState({ visible: false, data: null })
   const [pageSpeedPanel, setPageSpeedPanel] = useState({ visible: false, data: null })
   const [emailPanel, setEmailPanel] = useState({ visible: false, data: null })
+  const [navigation, setNavigation] = useState({ visible: false, data: null })
   const [ieltsDashboard, setIeltsDashboard] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsWriting, setIeltsWriting] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsSpeaking, setIeltsSpeaking] = useState({ visible: false, data: null, direction: 'right' })
@@ -969,6 +971,9 @@ export default function App() {
           case 'EmailPanel':
             setEmailPanel({ visible: true, data: result.result || result })
             return
+          case 'NavigationPanel':
+            if (result.success) setNavigation({ visible: true, data: result })
+            return
         }
       }
 
@@ -1123,6 +1128,7 @@ export default function App() {
           setDeployPanel(prev => ({ ...prev, visible: false }))
           setPageSpeedPanel(prev => ({ ...prev, visible: false }))
           setEmailPanel(prev => ({ ...prev, visible: false }))
+          setNavigation(prev => ({ ...prev, visible: false }))
           setIeltsDashboard(prev => ({ ...prev, visible: false }))
           setIeltsWriting(prev => ({ ...prev, visible: false }))
           setIeltsSpeaking(prev => ({ ...prev, visible: false }))
@@ -1381,7 +1387,16 @@ export default function App() {
     }
     socket.on('background_mode', onBackgroundMode)
     const onSpeakingState = (data) => {
-      if (data && data.state) setSpeakingState(data.state)
+      if (data && data.state) {
+        setSpeakingState(data.state)
+        if (data.state === 'user' && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => socket.emit('live_location', { lat: pos.coords.latitude, lon: pos.coords.longitude }),
+            () => {},
+            { timeout: 10000, maximumAge: 30000 }
+          )
+        }
+      }
     }
     socket.on('speaking_state', onSpeakingState)
     socket.on('personality', onPersonality)
@@ -1759,6 +1774,15 @@ export default function App() {
         onClose={() => setPageSpeedPanel(prev => ({ ...prev, visible: false }))} />
       <EmailPanel visible={emailPanel.visible} data={emailPanel.data}
         onClose={() => setEmailPanel(prev => ({ ...prev, visible: false }))} />
+
+      {/* ── Navigation Panel (full-screen 3D map) ── */}
+      {navigation.visible && navigation.data && (
+        <NavigationPanel
+          data={navigation.data}
+          socket={socket}
+          onClose={() => setNavigation(prev => ({ ...prev, visible: false }))}
+        />
+      )}
 
       {/* ── IELTS Panels ── */}
       <SlidePanel visible={ieltsDashboard.visible} direction={ieltsDashboard.direction}

@@ -178,6 +178,7 @@ from workbase import (
 )
 from ielts_tools import IELTS_TOOLS
 from feelings_tools import FEELINGS_TOOLS_SCHEMA
+from navigation_tools import get_navigation_route
 
 clipboard_read_tool = {
     "name": "clipboard_read",
@@ -1896,6 +1897,22 @@ store_custom_memory_tool = {
     }
 }
 
+get_navigation_route_tool = {
+    "name": "get_navigation_route",
+    "description": "Get turn-by-turn navigation route between two locations. Checks for traffic obstacles, road closures, and construction along the route. Supports driving, walking, and cycling. Opens a 3D map in the frontend automatically.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "origin": {"type": "STRING", "description": "Starting location name or address. Use 'my location' or 'live location' if user wants current GPS position."},
+            "destination": {"type": "STRING", "description": "Destination location name or address."},
+            "mode": {"type": "STRING", "enum": ["drive", "walk", "bike"], "description": "Travel mode. Default: drive"},
+            "origin_lat": {"type": "NUMBER", "description": "Latitude of live location (provided by frontend if user says 'my location')."},
+            "origin_lon": {"type": "NUMBER", "description": "Longitude of live location (provided by frontend if user says 'my location')."},
+        },
+        "required": ["origin", "destination"],
+    }
+}
+
 query_custom_memory_tool = {
     "name": "query_custom_memory",
     "description": "Query entries from a custom memory schema. Returns matching entries with their stored data. Empty query returns all recent entries. Use when the user asks 'what books do I have', 'show me my recipes', 'find projects about X'.",
@@ -2063,6 +2080,7 @@ tools_list = [{"function_declarations": [
     list_custom_schemas_tool,
     store_custom_memory_tool,
     query_custom_memory_tool,
+    get_navigation_route_tool,
 
     
 ]}]

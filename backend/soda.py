@@ -165,6 +165,7 @@ except ImportError:
         return {"success": False, "error": "welcome_home not available"}
 import scheduler_service as scheduler
 from pentest import PentestOrchestrator
+from navigation_tools import get_navigation_route
 from external_apis import (
     get_weather, get_ip_info, get_exchange_rate, get_news_briefing,
     get_bangladeshi_news,
@@ -180,6 +181,7 @@ from external_apis import (
 # server.py sets _connected_agents and _pending_agent_results at import time.
 _connected_agents: dict[str, dict] = {}
 _pending_agent_results: dict[str, 'asyncio.Future'] = {}
+_live_location: dict = {}  # Cached by server.py on live_location event
 
 LOCAL_AGENT_TOOLS = {
     # Window / app management (Windows-only)
@@ -3737,6 +3739,21 @@ TEXT: {text}"""
                 limit=args.get("limit", 20),
             )
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        # ── Navigation ────────────────────────────────────────────
+        elif name == "get_navigation_route":
+            global _live_location
+            origin = args.get("origin", "")
+            if _live_location and any(kw in origin.lower() for kw in ["my location", "live location", "here", "current location"]):
+                args["origin_lat"] = _live_location.get("lat")
+                args["origin_lon"] = _live_location.get("lon")
+            r = await get_navigation_route(**args)
+            if self.sio and r.get("success"):
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("navigation_data", r))
+            return types.FunctionResponse(id=fc.id, name=name, response={
+                "result": r.get("voice_summary", "Route calculated.") if r.get("success") else r.get("error", "Navigation failed.")
+            })
 
         log.warning(f"Unknown tool: {name}")
         return types.FunctionResponse(
