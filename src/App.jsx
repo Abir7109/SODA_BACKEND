@@ -1399,16 +1399,31 @@ export default function App() {
       }
     }
     socket.on('background_mode', onBackgroundMode)
+    const emitLocation = (lat, lon, source) => {
+      console.log(`[SODA] Location from ${source}:`, lat, lon)
+      socket.emit('live_location', { lat, lon })
+    }
     const requestLiveLocation = () => {
-      if (!navigator.geolocation) return
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          console.log('[SODA] Location:', pos.coords.latitude, pos.coords.longitude, '±' + Math.round(pos.coords.accuracy) + 'm')
-          socket.emit('live_location', { lat: pos.coords.latitude, lon: pos.coords.longitude })
-        },
-        (err) => console.warn('[SODA] Geolocation error:', err.code === 1 ? 'Permission denied' : err.message),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
-      )
+      // Try browser geolocation first (most accurate, needs permission)
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => emitLocation(pos.coords.latitude, pos.coords.longitude, 'browser-gps'),
+          () => {
+            // Browser geolocation failed (denied/timeout) → fallback to IP geolocation from browser
+            fetch('http://ip-api.com/json/')
+              .then(r => r.json())
+              .then(d => { if (d.status === 'success') emitLocation(d.lat, d.lon, 'ip-api') })
+              .catch(() => {})
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
+        )
+      } else {
+        // No geolocation API → IP fallback
+        fetch('http://ip-api.com/json/')
+          .then(r => r.json())
+          .then(d => { if (d.status === 'success') emitLocation(d.lat, d.lon, 'ip-api') })
+          .catch(() => {})
+      }
     }
     requestLiveLocationRef.current = requestLiveLocation
 
