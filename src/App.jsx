@@ -1102,6 +1102,9 @@ export default function App() {
           if (infoTimerRef.current) clearTimeout(infoTimerRef.current)
           setInfoPanel(prev => ({ ...prev, visible: false }))
           break
+        case 'navigation':
+          setNavigation(prev => ({ ...prev, visible: false }))
+          break
         case 'all':
           if (terminalTimerRef.current) clearTimeout(terminalTimerRef.current)
           setTerminal(prev => ({ ...prev, visible: false }))
@@ -1386,16 +1389,19 @@ export default function App() {
       }
     }
     socket.on('background_mode', onBackgroundMode)
+    const requestLiveLocation = () => {
+      if (!navigator.geolocation) return
+      navigator.geolocation.getCurrentPosition(
+        (pos) => socket.emit('live_location', { lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        () => {},
+        { timeout: 10000, maximumAge: 30000 }
+      )
+    }
+
     const onSpeakingState = (data) => {
       if (data && data.state) {
         setSpeakingState(data.state)
-        if (data.state === 'user' && navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => socket.emit('live_location', { lat: pos.coords.latitude, lon: pos.coords.longitude }),
-            () => {},
-            { timeout: 10000, maximumAge: 30000 }
-          )
-        }
+        if (data.state === 'user') requestLiveLocation()
       }
     }
     socket.on('speaking_state', onSpeakingState)
@@ -1412,12 +1418,14 @@ export default function App() {
     })
 
     setTimeout(requestNotifPermission, 2000)
+    setTimeout(requestLiveLocation, 1000)
 
     socket.connect()
 
     // Handle already-connected edge case (e.g., StrictMode double-mount in dev)
     if (socket.connected) {
       onConnect()
+      requestLiveLocation()
     }
 
     return () => {

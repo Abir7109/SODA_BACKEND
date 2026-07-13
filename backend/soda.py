@@ -3751,9 +3751,7 @@ TEXT: {text}"""
             if self.sio and r.get("success"):
                 loop = asyncio.get_event_loop()
                 loop.create_task(self.sio.emit("navigation_data", r))
-            return types.FunctionResponse(id=fc.id, name=name, response={
-                "result": r.get("voice_summary", "Route calculated.") if r.get("success") else r.get("error", "Navigation failed.")
-            })
+            return types.FunctionResponse(id=fc.id, name=name, response=r)
 
         log.warning(f"Unknown tool: {name}")
         return types.FunctionResponse(
