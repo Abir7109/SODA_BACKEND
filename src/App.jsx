@@ -704,6 +704,7 @@ export default function App() {
   }
 
   const connectGuardRef = useRef(false)
+  const requestLiveLocationRef = useRef(null)
 
   useEffect(() => {
     const onConnect = () => {
@@ -1403,11 +1404,15 @@ export default function App() {
     const requestLiveLocation = () => {
       if (!navigator.geolocation) return
       navigator.geolocation.getCurrentPosition(
-        (pos) => socket.emit('live_location', { lat: pos.coords.latitude, lon: pos.coords.longitude }),
-        (err) => console.warn('[SODA] Geolocation error:', err.code, err.message),
+        (pos) => {
+          console.log('[SODA] Location:', pos.coords.latitude, pos.coords.longitude, '±' + Math.round(pos.coords.accuracy) + 'm')
+          socket.emit('live_location', { lat: pos.coords.latitude, lon: pos.coords.longitude })
+        },
+        (err) => console.warn('[SODA] Geolocation error:', err.code === 1 ? 'Permission denied' : err.message),
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
       )
     }
+    requestLiveLocationRef.current = requestLiveLocation
 
     const onSpeakingState = (data) => {
       if (data && data.state) {
@@ -1672,7 +1677,7 @@ export default function App() {
         pointerEvents: backgroundMode ? 'none' : 'auto',
         transition: 'opacity 0.25s ease',
       }}
-      onClick={() => { initAudioCtx(); resumeMicAudio() }}
+      onClick={() => { initAudioCtx(); resumeMicAudio(); requestLiveLocationRef.current?.() }}
     >
       {/* ── Remote Connection Indicator (top-right) ── */}
       {remoteCount > 0 && (
