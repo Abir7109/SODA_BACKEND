@@ -100,7 +100,6 @@ import IELTSVocabPanel from './components/panels/IELTSVocabPanel'
 import IELTSProgressPanel from './components/panels/IELTSProgressPanel'
 import SpotifySearchPanel from './components/panels/SpotifySearchPanel'
 import NavigationPanel from './components/panels/NavigationPanel'
-import LocationSettings from './components/panels/LocationSettings'
 import { PanelSpaceProvider } from './contexts/PanelSpaceContext'
 import WebviewActionService from './services/WebviewActionService'
 import SlidePanel from './components/SlidePanel'
@@ -625,7 +624,6 @@ export default function App() {
   const [pageSpeedPanel, setPageSpeedPanel] = useState({ visible: false, data: null })
   const [emailPanel, setEmailPanel] = useState({ visible: false, data: null })
   const [navigation, setNavigation] = useState({ visible: false, data: null })
-  const [locationSettingsVisible, setLocationSettingsVisible] = useState(false)
   const [ieltsDashboard, setIeltsDashboard] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsWriting, setIeltsWriting] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsSpeaking, setIeltsSpeaking] = useState({ visible: false, data: null, direction: 'right' })
@@ -1806,12 +1804,7 @@ export default function App() {
         />
       )}
 
-      {/* ── Location Settings Panel ── */}
-      <SlidePanel visible={locationSettingsVisible} direction="right"
-        title="LOCATION" accentColor="#00fbfb"
-        onClose={() => setLocationSettingsVisible(false)}>
-        <LocationSettings socket={socket} onClose={() => setLocationSettingsVisible(false)} />
-      </SlidePanel>
+
 
       {/* ── IELTS Panels ── */}
       <SlidePanel visible={ieltsDashboard.visible} direction={ieltsDashboard.direction}
@@ -1964,13 +1957,6 @@ export default function App() {
                 AGENT {agentState.connected ? 'ONLINE' : 'OFFLINE'}
               </span>
             )}
-            <button
-              className="location-trigger"
-              onClick={() => setLocationSettingsVisible(v => !v)}
-              title="Set your location"
-            >
-              📍
-            </button>
             {agentState?.error && !agentState.connected && (
               <div className="mt-2 px-2 py-1 border text-[9px] leading-relaxed cursor-pointer"
                 style={{ borderColor: 'rgba(255,51,85,0.3)', backgroundColor: 'rgba(255,51,85,0.08)', color: '#ff4466' }}
