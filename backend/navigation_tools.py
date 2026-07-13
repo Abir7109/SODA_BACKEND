@@ -3,7 +3,7 @@ import aiohttp
 import json
 import math
 from typing import Optional
-from logger import logger
+from logger import log as logger
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org"
 OSRM_URL = "https://router.project-osrm.org"
