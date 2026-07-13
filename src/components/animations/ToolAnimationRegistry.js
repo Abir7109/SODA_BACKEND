@@ -130,7 +130,6 @@ export const TOOL_ANIMATIONS = {
   email_config: { component: 'DefaultAnimation', variant: 'default' },
 
   // ── Navigation ────────────────────────────────────────────────
-  get_navigation_route: { component: 'NavigationAnimation', variant: 'route', panel: 'NavigationPanel', panelDir: 'right' },
 }
 
 /**

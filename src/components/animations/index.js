@@ -27,7 +27,6 @@ const GitDeployAnim       = lazy(() => import('./GitDeployAnim'))
 const TelegramAnim        = lazy(() => import('./TelegramAnim'))
 const SearchSendAnim      = lazy(() => import('./SearchSendAnim'))
 const BackgroundCommandAnim = lazy(() => import('./BackgroundCommandAnim'))
-const NavigationAnimation   = lazy(() => import('./NavigationAnimation'))
 
 // ── Animation map (component name → lazy component) ─────────────
 export const ANIMATION_MAP = {
@@ -56,7 +55,6 @@ export const ANIMATION_MAP = {
   TelegramAnim,
   SearchSendAnim,
   BackgroundCommandAnim,
-  NavigationAnimation,
 }
 
 // ── Full 34-tool category mapping (backward compatible) ─────────

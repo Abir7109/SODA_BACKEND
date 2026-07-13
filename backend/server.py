@@ -1428,16 +1428,6 @@ async def pastebox_content(sid, data=None):
 
 
 @sio.event
-async def live_location(sid, data):
-    """Cache live location from frontend for navigation tool."""
-    import soda as soda_mod
-    lat = (data or {}).get("lat")
-    lon = (data or {}).get("lon")
-    if lat is not None and lon is not None:
-        soda_mod._live_location = {"lat": lat, "lon": lon}
-        log.info(f"[NAV] Live location cached: {lat}, {lon}")
-
-@sio.event
 async def browser_audio(sid, data):
     """Receive raw PCM audio chunks from browser mic and feed to AudioLoop."""
     global audio_loop

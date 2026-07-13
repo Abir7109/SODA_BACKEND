@@ -165,7 +165,6 @@ except ImportError:
         return {"success": False, "error": "welcome_home not available"}
 import scheduler_service as scheduler
 from pentest import PentestOrchestrator
-from navigation_tools import get_navigation_route
 from external_apis import (
     get_weather, get_ip_info, get_exchange_rate, get_news_briefing,
     get_bangladeshi_news,
@@ -181,7 +180,6 @@ from external_apis import (
 # server.py sets _connected_agents and _pending_agent_results at import time.
 _connected_agents: dict[str, dict] = {}
 _pending_agent_results: dict[str, 'asyncio.Future'] = {}
-_live_location: dict = {}  # Cached by server.py on live_location event
 
 LOCAL_AGENT_TOOLS = {
     # Window / app management (Windows-only)
@@ -516,17 +514,6 @@ def _build_system_prompt():
         "The exported file opens automatically in SODA's viewer.\n"
          "12. If user declines scraping, move on. Do NOT ask repeatedly.\n"
          "Never narrate the search results list. Only speak about the specific page the user asked you to open.\n"
-         "NAVIGATION WORKFLOW — When the user asks for directions, routing, navigation, or how to get somewhere:\n"
-         "1. Call get_navigation_route IMMEDIATELY — do not search the web for directions.\n"
-         "2. If the user says 'from my location', 'from here', or 'from current location', "
-         "set origin='my location' — the backend automatically resolves coordinates from their device or IP.\n"
-         "3. If the user says 'from [place]', set origin='[place]' — it will be geocoded.\n"
-         "4. destination is always required — set it to whatever place the user wants to go to.\n"
-         "5. mode can be 'drive' (default), 'walk', or 'bike' — infer from context.\n"
-         "6. After the tool returns, read the voice_summary field and say it aloud to the user. "
-         "That's your spoken response — the 3D map opens on screen automatically. "
-         "Do NOT describe the map or tell the user to look at it — just speak the summary naturally.\n"
-         "7. If the tool returns success=False, tell the user the error message and offer alternatives.\n"
          "Complete every task fully. Never refuse a valid request. "
         "CRITICAL — NEVER tell the user to do something themselves. When they ask you to check, read, open, or "
         "look up something, YOU must do it. Do NOT say 'you can check it yourself', 'I opened it, you read it', "
@@ -3752,33 +3739,6 @@ TEXT: {text}"""
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         # ── Navigation ────────────────────────────────────────────
-        elif name == "get_navigation_route":
-            global _live_location
-            origin = args.get("origin", "")
-            vague = any(kw in origin.lower() for kw in ["my location", "live location", "here", "current location", ""])
-            if _live_location and vague:
-                args["origin_lat"] = _live_location.get("lat")
-                args["origin_lon"] = _live_location.get("lon")
-            elif vague:
-                try:
-                    import urllib.request, json
-                    loop = asyncio.get_event_loop()
-                    geo = await loop.run_in_executor(None, lambda: json.loads(urllib.request.urlopen("http://ip-api.com/json/", timeout=2).read()))
-                    if geo.get("status") == "success":
-                        _live_location = {"lat": geo["lat"], "lon": geo["lon"]}
-                        args["origin_lat"] = geo["lat"]
-                        args["origin_lon"] = geo["lon"]
-                except Exception:
-                    pass
-            try:
-                r = await asyncio.wait_for(get_navigation_route(**args), timeout=8)
-            except asyncio.TimeoutError:
-                r = {"success": False, "error": "Navigation request timed out. Try a shorter route or specific addresses."}
-            if self.sio and r.get("success"):
-                loop = asyncio.get_event_loop()
-                loop.create_task(self.sio.emit("navigation_data", r))
-            return types.FunctionResponse(id=fc.id, name=name, response=r)
-
         log.warning(f"Unknown tool: {name}")
         return types.FunctionResponse(
             id=fc.id, name=name,

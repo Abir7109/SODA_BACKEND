@@ -99,7 +99,6 @@ import IELTSReadingPanel from './components/panels/IELTSReadingPanel'
 import IELTSVocabPanel from './components/panels/IELTSVocabPanel'
 import IELTSProgressPanel from './components/panels/IELTSProgressPanel'
 import SpotifySearchPanel from './components/panels/SpotifySearchPanel'
-import NavigationPanel from './components/panels/NavigationPanel'
 import { PanelSpaceProvider } from './contexts/PanelSpaceContext'
 import WebviewActionService from './services/WebviewActionService'
 import SlidePanel from './components/SlidePanel'
@@ -623,7 +622,6 @@ export default function App() {
   const [deployPanel, setDeployPanel] = useState({ visible: false, data: null })
   const [pageSpeedPanel, setPageSpeedPanel] = useState({ visible: false, data: null })
   const [emailPanel, setEmailPanel] = useState({ visible: false, data: null })
-  const [navigation, setNavigation] = useState({ visible: false, data: null })
   const [ieltsDashboard, setIeltsDashboard] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsWriting, setIeltsWriting] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsSpeaking, setIeltsSpeaking] = useState({ visible: false, data: null, direction: 'right' })
@@ -702,22 +700,12 @@ export default function App() {
   }
 
   const connectGuardRef = useRef(false)
-  const requestLiveLocationRef = useRef(null)
 
   useEffect(() => {
     const onConnect = () => {
       setConnectionStatus('connected')
       if (connectGuardRef.current) return
       connectGuardRef.current = true
-      requestLiveLocation()
-      // Emit saved location from localStorage if available
-      try {
-        const saved = localStorage.getItem('soda-location')
-        if (saved) {
-          const loc = JSON.parse(saved)
-          if (loc.lat && loc.lon) socket.emit('live_location', { lat: loc.lat, lon: loc.lon })
-        }
-      } catch {}
       socket.emit('start_audio')
       startBrowserMic()
       if (!audioReadyRef.current) {
@@ -981,9 +969,6 @@ export default function App() {
           case 'EmailPanel':
             setEmailPanel({ visible: true, data: result.result || result })
             return
-          case 'NavigationPanel':
-            if (result.success) setNavigation({ visible: true, data: result })
-            return
         }
       }
 
@@ -1111,9 +1096,6 @@ export default function App() {
         case 'info':
           if (infoTimerRef.current) clearTimeout(infoTimerRef.current)
           setInfoPanel(prev => ({ ...prev, visible: false }))
-          break
-        case 'navigation':
-          setNavigation(prev => ({ ...prev, visible: false }))
           break
         case 'all':
           if (terminalTimerRef.current) clearTimeout(terminalTimerRef.current)
@@ -1399,38 +1381,9 @@ export default function App() {
       }
     }
     socket.on('background_mode', onBackgroundMode)
-    const emitLocation = (lat, lon, source) => {
-      console.log(`[SODA] Location from ${source}:`, lat, lon)
-      socket.emit('live_location', { lat, lon })
-    }
-    const requestLiveLocation = () => {
-      // Try browser geolocation first (most accurate, needs permission)
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => emitLocation(pos.coords.latitude, pos.coords.longitude, 'browser-gps'),
-          () => {
-            // Browser geolocation failed (denied/timeout) → fallback to IP geolocation from browser
-            fetch('http://ip-api.com/json/')
-              .then(r => r.json())
-              .then(d => { if (d.status === 'success') emitLocation(d.lat, d.lon, 'ip-api') })
-              .catch(() => {})
-          },
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
-        )
-      } else {
-        // No geolocation API → IP fallback
-        fetch('http://ip-api.com/json/')
-          .then(r => r.json())
-          .then(d => { if (d.status === 'success') emitLocation(d.lat, d.lon, 'ip-api') })
-          .catch(() => {})
-      }
-    }
-    requestLiveLocationRef.current = requestLiveLocation
-
     const onSpeakingState = (data) => {
       if (data && data.state) {
         setSpeakingState(data.state)
-        if (data.state === 'user') requestLiveLocation()
       }
     }
     socket.on('speaking_state', onSpeakingState)
@@ -1690,7 +1643,7 @@ export default function App() {
         pointerEvents: backgroundMode ? 'none' : 'auto',
         transition: 'opacity 0.25s ease',
       }}
-      onClick={() => { initAudioCtx(); resumeMicAudio(); requestLiveLocationRef.current?.() }}
+      onClick={() => { initAudioCtx(); resumeMicAudio() }}
     >
       {/* ── Remote Connection Indicator (top-right) ── */}
       {remoteCount > 0 && (
@@ -1809,15 +1762,6 @@ export default function App() {
         onClose={() => setPageSpeedPanel(prev => ({ ...prev, visible: false }))} />
       <EmailPanel visible={emailPanel.visible} data={emailPanel.data}
         onClose={() => setEmailPanel(prev => ({ ...prev, visible: false }))} />
-
-      {/* ── Navigation Panel (full-screen 3D map) ── */}
-      {navigation.visible && navigation.data && (
-        <NavigationPanel
-          data={navigation.data}
-          socket={socket}
-          onClose={() => setNavigation(prev => ({ ...prev, visible: false }))}
-        />
-      )}
 
 
 
