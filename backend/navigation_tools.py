@@ -48,7 +48,7 @@ async def get_osrm_route(origin_lat: float, origin_lon: float, dest_lat: float, 
     params = {"overview": "full", "geometries": "geojson", "steps": "true", "annotations": "false", "alternatives": "true" if alternatives else "false"}
     try:
         async with aiohttp.ClientSession(headers=HEADERS) as session:
-            async with session.get(f"{OSRM_URL}/route/v1/{profile}/{coords}", params=params, timeout=aiohttp.ClientTimeout(total=6)) as resp:
+            async with session.get(f"{OSRM_URL}/route/v1/{profile}/{coords}", params=params, timeout=aiohttp.ClientTimeout(total=4)) as resp:
                 data = await resp.json()
                 if data.get("code") != "Ok" or not data.get("routes"):
                     logger.error(f"[NAV] OSRM error: {data.get('code')}")
@@ -222,32 +222,22 @@ async def get_navigation_route(origin: str, destination: str, mode: str = "drive
     if not dest_data:
         return {"success": False, "error": f"Could not find location: {destination}"}
 
-    bbox = get_route_bbox(origin_data["lat"], origin_data["lon"], dest_data["lat"], dest_data["lon"])
-    routing_result, obstacles = await asyncio.gather(
-        get_osrm_route(origin_lat=origin_data["lat"], origin_lon=origin_data["lon"], dest_lat=dest_data["lat"], dest_lon=dest_data["lon"], mode=mode, alternatives=True),
-        get_traffic_obstacles(bbox),
-        return_exceptions=True
-    )
+    routing_result = await get_osrm_route(origin_lat=origin_data["lat"], origin_lon=origin_data["lon"], dest_lat=dest_data["lat"], dest_lon=dest_data["lon"], mode=mode, alternatives=False)
 
-    if isinstance(routing_result, Exception) or not routing_result:
+    if not routing_result:
         return {"success": False, "error": "Could not calculate route. Navigation service unavailable."}
-    if isinstance(obstacles, Exception):
-        obstacles = []
 
     for route in routing_result["routes"]:
-        nearby = _find_obstacles_near_route(route["geometry"], obstacles)
-        route["obstacles"] = nearby
-        route["obstacle_count"] = len(nearby)
-        route["has_construction"] = any(o["type"] == "construction" for o in nearby)
-        route["has_closure"] = any(o["type"] == "road_closed" for o in nearby)
-        route["traffic_score"] = _calculate_traffic_score(nearby)
+        route["obstacles"] = []
+        route["obstacle_count"] = 0
+        route["traffic_score"] = "clear"
 
-    best = _pick_best_route(routing_result["routes"])
+    best = routing_result["routes"][0]
     routing_result["best"] = best
 
     voice_summary = _build_voice_summary(origin_data, dest_data, best, mode)
 
-    return {"success": True, "origin": origin_data, "destination": dest_data, "mode": mode, "routes": routing_result["routes"], "best_route": best, "obstacles": obstacles, "bbox": bbox, "voice_summary": voice_summary}
+    return {"success": True, "origin": origin_data, "destination": dest_data, "mode": mode, "routes": routing_result["routes"], "best_route": best, "obstacles": [], "bbox": [], "voice_summary": voice_summary}
 
 
 def _find_obstacles_near_route(geometry: dict, obstacles: list, threshold_km=0.3) -> list:

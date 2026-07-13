@@ -3770,7 +3770,10 @@ TEXT: {text}"""
                         args["origin_lon"] = geo["lon"]
                 except Exception:
                     pass
-            r = await get_navigation_route(**args)
+            try:
+                r = await asyncio.wait_for(get_navigation_route(**args), timeout=8)
+            except asyncio.TimeoutError:
+                r = {"success": False, "error": "Navigation request timed out. Try a shorter route or specific addresses."}
             if self.sio and r.get("success"):
                 loop = asyncio.get_event_loop()
                 loop.create_task(self.sio.emit("navigation_data", r))
