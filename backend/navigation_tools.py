@@ -18,7 +18,7 @@ async def geocode_location(query: str) -> Optional[dict]:
     params = {"q": query, "format": "json", "limit": 1, "addressdetails": 1}
     try:
         async with aiohttp.ClientSession(headers=HEADERS) as session:
-            async with session.get(f"{NOMINATIM_URL}/search", params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            async with session.get(f"{NOMINATIM_URL}/search", params=params, timeout=aiohttp.ClientTimeout(total=4)) as resp:
                 data = await resp.json()
                 if not data:
                     logger.warning(f"[NAV] Geocode found nothing for: {query}")
@@ -34,7 +34,7 @@ async def reverse_geocode(lat: float, lon: float) -> Optional[dict]:
     params = {"lat": lat, "lon": lon, "format": "json"}
     try:
         async with aiohttp.ClientSession(headers=HEADERS) as session:
-            async with session.get(f"{NOMINATIM_URL}/reverse", params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            async with session.get(f"{NOMINATIM_URL}/reverse", params=params, timeout=aiohttp.ClientTimeout(total=4)) as resp:
                 data = await resp.json()
                 return {"display_name": data.get("display_name", "Unknown Location"), "lat": float(data.get("lat", lat)), "lon": float(data.get("lon", lon))}
     except Exception as e:
@@ -48,7 +48,7 @@ async def get_osrm_route(origin_lat: float, origin_lon: float, dest_lat: float, 
     params = {"overview": "full", "geometries": "geojson", "steps": "true", "annotations": "false", "alternatives": "true" if alternatives else "false"}
     try:
         async with aiohttp.ClientSession(headers=HEADERS) as session:
-            async with session.get(f"{OSRM_URL}/route/v1/{profile}/{coords}", params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            async with session.get(f"{OSRM_URL}/route/v1/{profile}/{coords}", params=params, timeout=aiohttp.ClientTimeout(total=6)) as resp:
                 data = await resp.json()
                 if data.get("code") != "Ok" or not data.get("routes"):
                     logger.error(f"[NAV] OSRM error: {data.get('code')}")
@@ -129,7 +129,7 @@ async def get_traffic_obstacles(bbox: tuple) -> list:
     obstacles = []
     try:
         async with aiohttp.ClientSession(headers=HEADERS) as session:
-            async with session.post(OVERPASS_URL, data={"data": query}, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+            async with session.post(OVERPASS_URL, data={"data": query}, timeout=aiohttp.ClientTimeout(total=5)) as resp:
                 data = await resp.json()
                 for element in data.get("elements", []):
                     tags = element.get("tags", {})
@@ -208,14 +208,17 @@ async def get_navigation_route(origin: str, destination: str, mode: str = "drive
     logger.info(f"[NAV] Route request: {origin} → {destination} ({mode})")
 
     if origin_lat and origin_lon:
-        loc_name = await reverse_geocode(origin_lat, origin_lon)
-        origin_data = {"name": "Your Location", "lat": origin_lat, "lon": origin_lon, "display_name": loc_name["display_name"] if loc_name else "Your Location"}
+        origin_data = {"name": "Your Location", "lat": origin_lat, "lon": origin_lon, "display_name": "Your Location"}
+        dest_data = await geocode_location(destination)
     else:
-        origin_data = await geocode_location(origin)
-        if not origin_data:
-            return {"success": False, "error": f"Could not find location: {origin}"}
+        origin_data, dest_data = await asyncio.gather(
+            geocode_location(origin), geocode_location(destination), return_exceptions=True
+        )
+        if isinstance(origin_data, Exception): origin_data = None
+        if isinstance(dest_data, Exception): dest_data = None
 
-    dest_data = await geocode_location(destination)
+    if not origin_data:
+        return {"success": False, "error": f"Could not find location: {origin}"}
     if not dest_data:
         return {"success": False, "error": f"Could not find location: {destination}"}
 
