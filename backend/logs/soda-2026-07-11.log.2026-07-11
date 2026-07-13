@@ -1,0 +1,76 @@
+[2026-07-11 04:53:52] [INFO ] [backend\logger.py:83] Logger initialized
+[2026-07-11 04:53:52] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 04:53:52] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 04:53:57] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 04:53:57] [WARNING] [backend\whatsapp_bridge.py:98] [WA] open_app result: Opened whatsapp via Start Menu.
+[2026-07-11 04:53:57] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 04:53:57] [WARNING] [backend\whatsapp_bridge.py:98] [WA] open_app result: Opened whatsapp via Start Menu.
+[2026-07-11 04:55:00] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 04:55:03] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 04:55:03] [WARNING] [backend\whatsapp_bridge.py:98] [WA] open_app result: Could not open whatsapp. It may not be installed.
+[2026-07-11 04:55:41] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 04:55:47] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 09:53:47] [INFO ] [backend\whatsapp_bridge.py:460] [WA] whatsapp_handler: tool=check_whatsapp, contact='', msg_len=0
+[2026-07-11 09:53:47] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 21:04:44] [INFO ] [backend\whatsapp_bridge.py:460] [WA] whatsapp_handler: tool=check_whatsapp, contact='', msg_len=0
+[2026-07-11 21:04:44] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 21:04:49] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 21:09:33] [INFO ] [backend\whatsapp_bridge.py:460] [WA] whatsapp_handler: tool=whatsapp_find_and_message, contact='Choto Bouin', msg_len=36
+[2026-07-11 21:09:33] [INFO ] [backend\whatsapp_bridge.py:112] [WA] Opening WhatsApp for 'Choto Bouin'
+[2026-07-11 21:09:33] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 21:09:38] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 21:09:39] [INFO ] [backend\whatsapp_bridge.py:117] [WA] Step 1: Ctrl+N new chat
+[2026-07-11 21:09:40] [INFO ] [backend\whatsapp_bridge.py:122] [WA] Step 2: Typing 'Choto Bouin'
+[2026-07-11 21:09:42] [INFO ] [backend\whatsapp_bridge.py:127] [WA] Step 3: Selecting contact
+[2026-07-11 21:09:44] [INFO ] [backend\whatsapp_bridge.py:132] [WA] Step 4: Typing message (36 chars)
+[2026-07-11 21:09:46] [INFO ] [backend\whatsapp_bridge.py:137] [WA] Step 5: Sending
+[2026-07-11 21:09:47] [INFO ] [backend\whatsapp_bridge.py:141] [WA] ✅ Sent to 'Choto Bouin': What should you like? Coffee or cha?
+[2026-07-11 21:10:21] [INFO ] [backend\whatsapp_bridge.py:460] [WA] whatsapp_handler: tool=whatsapp_find_and_message, contact='Choto Boin', msg_len=36
+[2026-07-11 21:10:21] [INFO ] [backend\whatsapp_bridge.py:112] [WA] Opening WhatsApp for 'Choto Boin'
+[2026-07-11 21:10:21] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 21:10:26] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 21:10:27] [INFO ] [backend\whatsapp_bridge.py:117] [WA] Step 1: Ctrl+N new chat
+[2026-07-11 21:10:28] [INFO ] [backend\whatsapp_bridge.py:122] [WA] Step 2: Typing 'Choto Boin'
+[2026-07-11 21:10:30] [INFO ] [backend\whatsapp_bridge.py:127] [WA] Step 3: Selecting contact
+[2026-07-11 21:10:32] [INFO ] [backend\whatsapp_bridge.py:132] [WA] Step 4: Typing message (36 chars)
+[2026-07-11 21:10:34] [INFO ] [backend\whatsapp_bridge.py:137] [WA] Step 5: Sending
+[2026-07-11 21:10:35] [INFO ] [backend\whatsapp_bridge.py:141] [WA] ✅ Sent to 'Choto Boin': What should you like? Coffee or cha?
+[2026-07-11 21:11:12] [INFO ] [backend\whatsapp_bridge.py:460] [WA] whatsapp_handler: tool=reply_whatsapp, contact='Choto Boin', msg_len=126
+[2026-07-11 21:11:12] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 21:11:13] [INFO ] [backend\whatsapp_bridge.py:417] [WA] Replying to 'Choto Boin'
+[2026-07-11 21:11:27] [INFO ] [backend\whatsapp_bridge.py:448] [WA] Reply sent to 'Choto Boin': By the way, I'm SODA, Abir sir's assistant. He told me to se
+[2026-07-11 21:12:06] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 21:12:11] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 21:12:14] [INFO ] [backend\whatsapp_bridge.py:460] [WA] whatsapp_handler: tool=check_whatsapp, contact='', msg_len=0
+[2026-07-11 21:12:14] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 21:12:17] [INFO ] [backend\whatsapp_bridge.py:460] [WA] whatsapp_handler: tool=reply_whatsapp, contact='Choto Boin', msg_len=293
+[2026-07-11 21:12:17] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 21:12:18] [INFO ] [backend\whatsapp_bridge.py:417] [WA] Replying to 'Choto Boin'
+[2026-07-11 21:32:46] [INFO ] [backend\logger.py:83] Logger initialized
+[2026-07-11 21:32:46] [INFO ] [backend\whatsapp_bridge.py:460] [WA] whatsapp_handler: tool=check_whatsapp, contact='', msg_len=0
+[2026-07-11 21:32:46] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 21:32:52] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 21:48:10] [INFO ] [backend\logger.py:83] Logger initialized
+[2026-07-11 21:48:10] [INFO ] [backend\whatsapp_bridge.py:460] [WA] whatsapp_handler: tool=check_whatsapp, contact='', msg_len=0
+[2026-07-11 21:48:10] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 21:48:16] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 21:59:49] [INFO ] [backend\logger.py:83] Logger initialized
+[2026-07-11 21:59:49] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 21:59:55] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 22:04:23] [INFO ] [backend\logger.py:83] Logger initialized
+[2026-07-11 22:04:23] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 22:04:28] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 22:10:55] [INFO ] [backend\logger.py:83] Logger initialized
+[2026-07-11 22:10:55] [INFO ] [backend\whatsapp_bridge.py:460] [WA] whatsapp_handler: tool=check_whatsapp, contact='', msg_len=0
+[2026-07-11 22:10:55] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 22:11:00] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 22:45:11] [INFO ] [backend\logger.py:83] Logger initialized
+[2026-07-11 22:45:11] [INFO ] [backend\whatsapp_bridge.py:398] [WA] whatsapp_handler: tool=check_whatsapp, contact='', msg_len=0
+[2026-07-11 22:45:11] [WARNING] [backend\whatsapp_bridge.py:77] [WA] WhatsApp window not found
+[2026-07-11 22:45:16] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 22:45:39] [INFO ] [backend\whatsapp_bridge.py:398] [WA] whatsapp_handler: tool=read_whatsapp_chat, contact='Ammu', msg_len=0
+[2026-07-11 22:45:39] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 22:45:40] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 22:46:13] [INFO ] [backend\whatsapp_bridge.py:398] [WA] whatsapp_handler: tool=read_whatsapp_chat, contact='Ammu', msg_len=0
+[2026-07-11 22:46:13] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
+[2026-07-11 22:46:14] [INFO ] [backend\whatsapp_bridge.py:80] [WA] Focusing: 'WhatsApp'
