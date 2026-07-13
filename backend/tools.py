@@ -1899,15 +1899,13 @@ store_custom_memory_tool = {
 
 get_navigation_route_tool = {
     "name": "get_navigation_route",
-    "description": "Get turn-by-turn navigation route between two locations. Checks for traffic obstacles, road closures, and construction along the route. Supports driving, walking, and cycling. Opens a 3D map in the frontend automatically.",
+    "description": "Get turn-by-turn navigation between two locations. Checks traffic, road closures, and construction. Supports drive/walk/bike. Opens a 3D map. Call this INSTEAD of web search for directions.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "origin": {"type": "STRING", "description": "Starting location name or address. Use 'my location' or 'live location' if user wants current GPS position."},
-            "destination": {"type": "STRING", "description": "Destination location name or address."},
+            "origin": {"type": "STRING", "description": "Starting location. Use 'my location' if user wants current position. Or pass a place name (e.g. 'Connaught Place, Delhi'). The backend geocodes it."},
+            "destination": {"type": "STRING", "description": "Destination place name or address."},
             "mode": {"type": "STRING", "enum": ["drive", "walk", "bike"], "description": "Travel mode. Default: drive"},
-            "origin_lat": {"type": "NUMBER", "description": "Latitude of live location (provided by frontend if user says 'my location')."},
-            "origin_lon": {"type": "NUMBER", "description": "Longitude of live location (provided by frontend if user says 'my location')."},
         },
         "required": ["origin", "destination"],
     }

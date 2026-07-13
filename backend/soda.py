@@ -514,9 +514,20 @@ def _build_system_prompt():
         "also pass the path parameter set to the full save path including filename (e.g. '~/Downloads/report.json'). "
         "Use ~ for home directory. Supported formats: json, html, markdown, csv, docx. "
         "The exported file opens automatically in SODA's viewer.\n"
-        "12. If user declines scraping, move on. Do NOT ask repeatedly.\n"
-        "Never narrate the search results list. Only speak about the specific page the user asked you to open.\n"
-        "Complete every task fully. Never refuse a valid request. "
+         "12. If user declines scraping, move on. Do NOT ask repeatedly.\n"
+         "Never narrate the search results list. Only speak about the specific page the user asked you to open.\n"
+         "NAVIGATION WORKFLOW — When the user asks for directions, routing, navigation, or how to get somewhere:\n"
+         "1. Call get_navigation_route IMMEDIATELY — do not search the web for directions.\n"
+         "2. If the user says 'from my location', 'from here', or 'from current location', "
+         "set origin='my location' — the backend automatically resolves coordinates from their device or IP.\n"
+         "3. If the user says 'from [place]', set origin='[place]' — it will be geocoded.\n"
+         "4. destination is always required — set it to whatever place the user wants to go to.\n"
+         "5. mode can be 'drive' (default), 'walk', or 'bike' — infer from context.\n"
+         "6. After the tool returns, read the voice_summary field and say it aloud to the user. "
+         "That's your spoken response — the 3D map opens on screen automatically. "
+         "Do NOT describe the map or tell the user to look at it — just speak the summary naturally.\n"
+         "7. If the tool returns success=False, tell the user the error message and offer alternatives.\n"
+         "Complete every task fully. Never refuse a valid request. "
         "CRITICAL — NEVER tell the user to do something themselves. When they ask you to check, read, open, or "
         "look up something, YOU must do it. Do NOT say 'you can check it yourself', 'I opened it, you read it', "
         "'take a look yourself', 'you can see it', or anything similar. Always summarize what you found. "
@@ -3752,7 +3763,7 @@ TEXT: {text}"""
                 try:
                     import urllib.request, json
                     loop = asyncio.get_event_loop()
-                    geo = await loop.run_in_executor(None, lambda: json.loads(urllib.request.urlopen("http://ip-api.com/json/", timeout=5).read()))
+                    geo = await loop.run_in_executor(None, lambda: json.loads(urllib.request.urlopen("http://ip-api.com/json/", timeout=2).read()))
                     if geo.get("status") == "success":
                         _live_location = {"lat": geo["lat"], "lon": geo["lon"]}
                         args["origin_lat"] = geo["lat"]
