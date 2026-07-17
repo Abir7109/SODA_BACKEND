@@ -1427,7 +1427,6 @@ class AudioLoop:
                     else:
                         self.on_mic_level(0.0)
                 if self.on_audio_data:
-                    print(f"[D] play_audio: forwarding {len(data)} bytes")
                     self.on_audio_data(data)
             except Exception:
                 silent_ticks += 1
@@ -1564,7 +1563,6 @@ class AudioLoop:
                             continue
 
                     if data := response.data:
-                        print(f"[D] receive_audio: got {len(data)} bytes from model")
                         if not self._model_is_speaking:
                             self._model_is_speaking = True
                             self._clear_queues()
