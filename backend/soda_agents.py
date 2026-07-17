@@ -20,6 +20,9 @@ from agents import (
     SocialAgent,
     TranslateAgent,
     SummarizerAgent,
+    SecurityAgent,
+    DatabaseAgent,
+    DevOpsAgent,
 )
 
 
@@ -92,6 +95,9 @@ class AgentOrchestrator:
         self.register(SocialAgent())
         self.register(TranslateAgent())
         self.register(SummarizerAgent())
+        self.register(SecurityAgent())
+        self.register(DatabaseAgent())
+        self.register(DevOpsAgent())
 
     def register(self, agent: BaseAgent):
         """Register an agent by name."""

@@ -10,6 +10,9 @@ from .monitor_agent import MonitorAgent
 from .social_agent import SocialAgent
 from .translate_agent import TranslateAgent
 from .summarizer_agent import SummarizerAgent
+from .security_agent import SecurityAgent
+from .database_agent import DatabaseAgent
+from .devops_agent import DevOpsAgent
 
 __all__ = [
     "BaseAgent",
@@ -24,4 +27,7 @@ __all__ = [
     "SocialAgent",
     "TranslateAgent",
     "SummarizerAgent",
+    "SecurityAgent",
+    "DatabaseAgent",
+    "DevOpsAgent",
 ]

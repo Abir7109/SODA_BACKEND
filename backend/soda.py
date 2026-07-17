@@ -614,7 +614,7 @@ def _build_system_prompt():
 "Returns articles in Bengali. Results appear in the info panel.\n"
 "Only call news tools if the user EXPLICITLY asks for news or current events. "
 "Do NOT call them proactively during greetings or general conversation."
-"\n\nSUB-AGENTS — You have 11 specialized background sub-agents. "
+"\n\nSUB-AGENTS — You have 14 specialized background sub-agents. "
 "Use the show_agents tool when the user wants to learn about your agents or what you can do. "
 "It slides up a panel with agent names, roles, stats, and recent tasks.\n"
 "\n\nALL WHATSAPP TOOLS:\n"
