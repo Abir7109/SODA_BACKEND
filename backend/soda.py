@@ -2722,10 +2722,17 @@ class AudioLoop:
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         elif name == "show_agents":
-            r = "SODA has the following capabilities: " + ", ".join(
-                t.get("name", "") for t in __import__("tools", fromlist=["tools_list"]).tools_list
-            )
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+            agents = self._orchestrator.get_agent_summary()
+            tasks = self._orchestrator.get_task_summary()
+            tools_count = len(self._orchestrator.get_agent_tools())
+            return types.FunctionResponse(id=fc.id, name=name, response={
+                "result": {
+                    "agents": agents,
+                    "tasks": tasks,
+                    "total_agents": len(agents),
+                    "total_tools": tools_count,
+                }
+            })
 
         elif name == "shutdown_soda":
             if self.sio:

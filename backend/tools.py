@@ -981,7 +981,7 @@ web_builder_answer_tool = {
 
 show_agents_tool = {
     "name": "show_agents",
-    "description": "List all available SODA capabilities and tools.",
+    "description": "Show all available SODA sub-agents with their names, roles, status, capabilities, and task activity. Returns a structured list of agent identity cards. Use when the user asks 'what agents do you have', 'show me your agents', 'who are your helpers', 'list all agents', or wants to know about available sub-agents.",
     "parameters": {
         "type": "OBJECT",
         "properties": {},
