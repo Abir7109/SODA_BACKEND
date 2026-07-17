@@ -2725,15 +2725,24 @@ class AudioLoop:
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         elif name == "show_agents":
-            agents = self._orchestrator.get_agent_summary()
-            tasks = self._orchestrator.get_task_summary()
-            tools_count = len(self._orchestrator.get_agent_tools())
+            try:
+                agents = self._orchestrator.get_agent_summary()
+                tasks = self._orchestrator.get_task_summary()
+                tools_count = len(self._orchestrator.get_agent_tools())
+                debug = f"ok: {len(agents)} agents, {len(self._orchestrator._agents)} in dict"
+            except Exception as e:
+                log.error(f"[show_agents] orchestrator error: {e}")
+                agents = []
+                tasks = {}
+                tools_count = 0
+                debug = f"error: {e}"
             return types.FunctionResponse(id=fc.id, name=name, response={
                 "result": {
-                    "agents": agents,
-                    "tasks": tasks,
-                    "total_agents": len(agents),
-                    "total_tools": tools_count,
+                    "agents": agents or [],
+                    "tasks": tasks or {},
+                    "total_agents": len(agents or []),
+                    "total_tools": tools_count or 0,
+                    "_debug": debug,
                 }
             })
 
