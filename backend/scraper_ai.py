@@ -216,10 +216,10 @@ def _extract_readable(html: str) -> str:
 
 
 def _get_api_key() -> str:
-    key = os.getenv("SCRAPER_GEMINI_KEY") or os.getenv("GEMINI_API_KEY")
+    key = (os.getenv("SCRAPER_GEMINI_KEY") or os.getenv("SUB_AGENT_GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY"))
     if key:
         return key
-    raise ValueError("No Gemini API key found (set SCRAPER_GEMINI_KEY or GEMINI_API_KEY)")
+    raise ValueError("No Gemini API key found (set SCRAPER_GEMINI_KEY, SUB_AGENT_GEMINI_API_KEY, or GEMINI_API_KEY)")
 
 
 async def _ask_gemini(page_text: str, user_prompt: str) -> dict:
@@ -245,12 +245,41 @@ async def _ask_gemini(page_text: str, user_prompt: str) -> dict:
         }
     }
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        r = await client.post(f"{url}?key={key}", json=body)
+    import asyncio
+    max_retries = 3
+    retry_delay = 2
+    last_err = None
 
-    if r.status_code != 200:
-        err = r.json().get("error", {}).get("message", r.text[:200])
-        raise RuntimeError(f"Gemini API error ({r.status_code}): {err}")
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                r = await client.post(f"{url}?key={key}", json=body)
+
+            if r.status_code == 503:
+                last_err = RuntimeError(f"Gemini API error (503): Service unavailable")
+                logger.warning(f"Gemini 503 on attempt {attempt + 1}/{max_retries}, retrying in {retry_delay}s...")
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 10)
+                continue
+
+            if r.status_code != 200:
+                err = r.json().get("error", {}).get("message", r.text[:200])
+                raise RuntimeError(f"Gemini API error ({r.status_code}): {err}")
+
+            break
+        except RuntimeError:
+            raise
+        except Exception as e:
+            last_err = e
+            logger.warning(f"Gemini request failed on attempt {attempt + 1}/{max_retries}: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 10)
+            else:
+                raise
+    else:
+        if last_err:
+            raise RuntimeError(f"Gemini request failed after {max_retries} retries: {last_err}")
 
     raw = r.json()
     text = raw.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
