@@ -184,7 +184,7 @@ def list_facts(limit: int = 50) -> dict:
     db = _db()
     if db:
         try:
-            r = db.table("facts").select("*").order("created_at", desc=True).limit(limit).execute()
+            r = db.table("facts").select("*").limit(limit).execute()
             if r.data:
                 facts = []
                 for row in reversed(r.data):

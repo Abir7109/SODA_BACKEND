@@ -193,7 +193,7 @@ def list_people(limit=20):
     db = _db()
     if db:
         try:
-            r = db.table("people").select("*").order("created_at", desc=True).limit(limit).execute()
+            r = db.table("people").select("*").limit(limit).execute()
             if r.data:
                 entries = []
                 for row in reversed(r.data):
@@ -295,9 +295,7 @@ def recall_lessons(query="", limit=5):
     db = _db()
     if db:
         try:
-            r = (db.table("lessons").select("*")
-                 .order("created_at", desc=True)
-                 .limit(limit).execute())
+            r = db.table("lessons").select("*").limit(limit).execute()
             if r.data:
                 entries = []
                 for row in reversed(r.data):
@@ -432,9 +430,7 @@ def get_recent_summaries(limit=3):
     db = _db()
     if db:
         try:
-            r = (db.table("conversation_summaries").select("*")
-                 .order("created_at", desc=True)
-                 .limit(limit).execute())
+            r = db.table("conversation_summaries").select("*").limit(limit).execute()
             if r.data:
                 entries = []
                 for row in reversed(r.data):

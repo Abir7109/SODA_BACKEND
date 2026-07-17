@@ -100,7 +100,7 @@ def list_custom_schemas():
     db = _db()
     if db:
         try:
-            r = db.table("custom_schemas").select("*").order("created_at", desc=True).execute()
+            r = db.table("custom_schemas").select("*").execute()
             schemas = []
             for row in reversed(r.data or []):
                 schemas.append({
@@ -188,7 +188,7 @@ def query_custom_memory(schema_name, query="", limit=20):
             if q:
                 r = db.table("custom_entries").select("*").eq("schema_name", schema_name).limit(limit).execute()
             else:
-                r = db.table("custom_entries").select("*").eq("schema_name", schema_name).order("created_at", desc=True).limit(limit).execute()
+                r = db.table("custom_entries").select("*").eq("schema_name", schema_name).limit(limit).execute()
             entries = []
             for row in reversed(r.data or []):
                 d = row.get("data", {})
