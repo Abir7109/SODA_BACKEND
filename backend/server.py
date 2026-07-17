@@ -602,10 +602,11 @@ async def __debug_dispatch__(sid, data):
                 'output': f'Error: {e}',
                 'success': False,
             })
-    elif tool == 'web_search_live':
-        from external_apis import web_search_live
+    elif tool == 'web_search_live' or tool == 'agent_search':
+        from agents.web_search_agent import WebSearchAgent
+        agent = WebSearchAgent()
         query = args.get('query', 'python')
-        r = await web_search_live(query, args.get('num_results', 5))
+        r = await agent.execute(query=query, num_results=args.get('num_results', 5))
         await sio.emit('search_results', {
             'query': query,
             'results': r.get('results', []),
@@ -636,18 +637,20 @@ async def force_tool(sid, data):
                 'success': r.get('success', False), 'forced': True,
             })
             await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'web_search_live':
-            from external_apis import web_search_live
+        elif tool in ('web_search_live', 'agent_search'):
+            from agents.web_search_agent import WebSearchAgent
+            agent = WebSearchAgent()
             query = args.get('query', 'python')
-            r = await web_search_live(query, args.get('num_results', 5))
+            r = await agent.execute(query=query, num_results=args.get('num_results', 5))
             await sio.emit('search_results', {
                 'query': query, 'results': r.get('results', []), 'forced': True,
             })
             await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
         elif tool == 'browse_webpage':
-            from external_apis import fetch_webpage
+            from agents.webpage_agent import WebpageAgent
+            agent = WebpageAgent()
             url = args.get('url', '')
-            r = await fetch_webpage(url)
+            r = await agent.execute(url=url)
             await sio.emit('webpage_content', {
                 'url': url, 'content': r.get('content', ''),
                 'success': r.get('success', False),
@@ -655,14 +658,20 @@ async def force_tool(sid, data):
                 'forced': True,
             })
             await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
+        elif tool == 'agent_browse':
+            from agents.webpage_agent import WebpageAgent
+            agent = WebpageAgent()
+            url = args.get('url', '')
+            r = await agent.execute(url=url)
+            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
         elif tool == 'show_search_results':
-            if audio_loop and audio_loop._last_search_results:
+            if audio_loop and getattr(audio_loop, '_last_search_results', None):
                 await sio.emit('search_results', {
-                    'query': audio_loop._last_search_query,
+                    'query': getattr(audio_loop, '_last_search_query', ''),
                     'results': audio_loop._last_search_results,
                     'forced': True,
                 })
-            await sio.emit('tool_result', {'tool': tool, 'result': {'re Displayed': True}, 'forced': True})
+            await sio.emit('tool_result', {'tool': tool, 'result': {'displayed': True}, 'forced': True})
         elif tool == 'list_files':
             from external_apis import list_files
             r = await list_files(args.get('path', ''))
@@ -702,14 +711,25 @@ async def force_tool(sid, data):
             from external_apis import get_weather
             r = await get_weather(args.get('location', ''), args.get('units', 'celsius'))
             await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'get_news':
-            from external_apis import get_news
-            r = await get_news(args.get('query', ''), args.get('max_results', 5))
+        elif tool in ('get_news', 'agent_news'):
+            from agents.news_agent import NewsAgent
+            agent = NewsAgent()
+            r = await agent.execute(query=args.get('query', ''), max_results=args.get('max_results', 5))
             await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'get_wikipedia_summary':
-            from external_apis import get_wikipedia_summary
-            r = await get_wikipedia_summary(args.get('topic', ''))
+        elif tool in ('get_wikipedia_summary', 'agent_wikipedia'):
+            from agents.wikipedia_agent import WikipediaAgent
+            agent = WikipediaAgent()
+            r = await agent.execute(topic=args.get('topic', ''))
             await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
+        elif tool.startswith('agent_'):
+            from soda_agents import get_global_orchestrator
+            orch = get_global_orchestrator()
+            agent = orch.get_agent(tool)
+            if agent:
+                r = await agent.execute(**args)
+                await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
+            else:
+                await sio.emit('error', {'msg': f'force_tool: unknown agent {tool!r}'}, room=sid)
         elif tool == 'get_system_status':
             from external_apis import get_system_status
             r = await get_system_status()

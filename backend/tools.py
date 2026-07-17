@@ -131,15 +131,9 @@ from external_apis import (
     weather_tool,
     ip_info_tool,
     exchange_tool,
-    get_news_tool,
     get_bangladeshi_news_tool,
-    news_control_tool,
     define_word_tool,
-    wikipedia_tool,
-    web_search_live_tool,
-    browse_webpage_tool,
     open_browser_tool,
-    show_search_results_tool,
     list_files_tool,
     open_file_tool,
     close_panel_tool,
@@ -168,6 +162,7 @@ from external_apis import (
     export_data_tool,
     get_pagespeed_insights_tool,
 )
+from soda_agents import get_agent_tool_defs
 from workbase import (
     workbase_list_tool,
     workbase_get_tool,
@@ -380,7 +375,7 @@ show_memory_tool = {
         "HUD animation overlay. Call this ONLY when the user explicitly asks to see your "
         "memory/knowledge — e.g. 'show me what you know', 'show me your memory', "
         "'let me see what you remember'. "
-        "DO NOT call this for news, current events, or world happenings — use get_news instead. "
+        "DO NOT call this for news, current events, or world happenings — use agent_news instead. "
         "Opens a full-screen military HUD animation.\n\n"
         "IMPORTANT — SYNCHRONIZE YOUR NARRATION WITH THE ANIMATION TIMELINE:\n"
         "The animation shows 7 timed phases. Describe each section AS IT APPEARS:\n"
@@ -1920,15 +1915,10 @@ tools_list = [{"function_declarations": [
     weather_tool,
     ip_info_tool,
     exchange_tool,
-    get_news_tool,
     get_bangladeshi_news_tool,
-    news_control_tool,
     define_word_tool,
-    wikipedia_tool,
-    web_search_live_tool,
-    browse_webpage_tool,
     open_browser_tool,
-    show_search_results_tool,
+    *get_agent_tool_defs(),
     list_files_tool,
     open_file_tool,
     close_panel_tool,

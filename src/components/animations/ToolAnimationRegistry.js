@@ -129,7 +129,18 @@ export const TOOL_ANIMATIONS = {
   send_email:   { component: 'MessageAnimation', variant: 'email' },
   email_config: { component: 'DefaultAnimation', variant: 'default' },
 
-  // ── Navigation ────────────────────────────────────────────────
+  // ── Agent Sub-Agent Tools ────────────────────────────────────
+  agent_search:      { component: 'SearchAnimation', variant: 'radar' },
+  agent_news:        { component: 'DataAnim',        variant: 'news',    panel: 'NewsPanel',        panelDir: 'bottom' },
+  agent_wikipedia:   { component: 'DataAnim',        variant: 'search',  panel: 'WikipediaPanel',   panelDir: 'bottom' },
+  agent_browse:      { component: 'WebpageAnim',     variant: 'load' },
+  agent_code:        { component: 'CodeAnim',        variant: 'generate', panel: 'CodePanel',      panelDir: 'bottom' },
+  agent_data:        { component: 'DataAnim',        variant: 'analytics', panel: 'DataPanel',     panelDir: 'bottom' },
+  agent_research:    { component: 'SearchAnimation', variant: 'results',  panel: 'ResearchPanel',   panelDir: 'bottom' },
+  agent_translate:   { component: 'MessageAnimation', variant: 'message', panel: 'TranslatePanel', panelDir: 'bottom' },
+  agent_summarize:   { component: 'DataAnim',        variant: 'analytics', panel: 'SummarizePanel', panelDir: 'bottom' },
+  agent_monitor:     { component: 'SystemAnimation',  variant: 'control',  panel: 'MonitorPanel',   panelDir: 'bottom' },
+  agent_social:       { component: 'MessageAnimation', variant: 'message', panel: 'SocialPanel',    panelDir: 'bottom' },
 }
 
 /**

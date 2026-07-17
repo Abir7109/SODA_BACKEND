@@ -99,6 +99,15 @@ import IELTSReadingPanel from './components/panels/IELTSReadingPanel'
 import IELTSVocabPanel from './components/panels/IELTSVocabPanel'
 import IELTSProgressPanel from './components/panels/IELTSProgressPanel'
 import SpotifySearchPanel from './components/panels/SpotifySearchPanel'
+import WikipediaPanel from './components/panels/WikipediaPanel'
+import NewsPanel from './components/panels/NewsPanel'
+import CodePanel from './components/panels/CodePanel'
+import DataPanel from './components/panels/DataPanel'
+import TranslatePanel from './components/panels/TranslatePanel'
+import SummarizePanel from './components/panels/SummarizePanel'
+import MonitorPanel from './components/panels/MonitorPanel'
+import SocialPanel from './components/panels/SocialPanel'
+import ResearchPanel from './components/panels/ResearchPanel'
 import { PanelSpaceProvider } from './contexts/PanelSpaceContext'
 import WebviewActionService from './services/WebviewActionService'
 import SlidePanel from './components/SlidePanel'
@@ -218,6 +227,12 @@ const TOOLS_WITH_INFO_PANEL = new Set([
   'list_reminders', 'cancel_reminder',
   'create_memory_schema', 'list_custom_schemas',
   'store_custom_memory', 'query_custom_memory',
+])
+
+const TOOLS_WITH_AGENT = new Set([
+  'agent_wikipedia', 'agent_news', 'agent_code', 'agent_data',
+  'agent_translate', 'agent_summarize', 'agent_monitor',
+  'agent_social', 'agent_research', 'agent_browse',
 ])
 
 const AI_CARD_TOOLS = new Set([
@@ -590,6 +605,17 @@ export default function App() {
 
   // Tool output / confirmation panel (bottom)
   const [toolPanel, setToolPanel] = useState({ visible: false, toolName: '', status: 'running', output: null, args: null })
+
+  // Agent result panels
+  const [wikipediaPanel, setWikipediaPanel] = useState({ visible: false, data: null })
+  const [newsPanel, setNewsPanel] = useState({ visible: false, data: null })
+  const [codePanel, setCodePanel] = useState({ visible: false, data: null })
+  const [dataPanel, setDataPanel] = useState({ visible: false, data: null })
+  const [translatePanel, setTranslatePanel] = useState({ visible: false, data: null })
+  const [summarizePanel, setSummarizePanel] = useState({ visible: false, data: null })
+  const [monitorPanel, setMonitorPanel] = useState({ visible: false, data: null })
+  const [socialPanel, setSocialPanel] = useState({ visible: false, data: null })
+  const [researchPanel, setResearchPanel] = useState({ visible: false, data: null })
 
   // Webpage summary panel state (bottom)
   const [webpageSummary, setWebpageSummary] = useState({ visible: false, url: '', content: '', success: null, images: [] })
@@ -970,6 +996,27 @@ export default function App() {
             setEmailPanel({ visible: true, data: result.result || result })
             return
         }
+      }
+
+      // Route agent tools to dedicated panels
+      if (TOOLS_WITH_AGENT.has(toolName)) {
+        if (toolTimerRef.current) clearTimeout(toolTimerRef.current)
+        const agentData = data.result || result
+        const setters = {
+          agent_wikipedia: setWikipediaPanel,
+          agent_news: setNewsPanel,
+          agent_code: setCodePanel,
+          agent_data: setDataPanel,
+          agent_translate: setTranslatePanel,
+          agent_summarize: setSummarizePanel,
+          agent_monitor: setMonitorPanel,
+          agent_social: setSocialPanel,
+          agent_research: setResearchPanel,
+          agent_browse: setWikipediaPanel,
+        }
+        const setter = setters[toolName]
+        if (setter) setter({ visible: true, data: agentData })
+        return
       }
 
       // Route to appropriate panel based on tool type
@@ -1699,6 +1746,17 @@ export default function App() {
         data={infoPanel.data}
         onClose={closeInfoPanel}
       />
+
+      {/* Agent Result Panels */}
+      <WikipediaPanel visible={wikipediaPanel.visible} data={wikipediaPanel.data} onClose={() => setWikipediaPanel(prev => ({ ...prev, visible: false }))} />
+      <NewsPanel visible={newsPanel.visible} data={newsPanel.data} onClose={() => setNewsPanel(prev => ({ ...prev, visible: false }))} />
+      <CodePanel visible={codePanel.visible} data={codePanel.data} onClose={() => setCodePanel(prev => ({ ...prev, visible: false }))} />
+      <DataPanel visible={dataPanel.visible} data={dataPanel.data} onClose={() => setDataPanel(prev => ({ ...prev, visible: false }))} />
+      <TranslatePanel visible={translatePanel.visible} data={translatePanel.data} onClose={() => setTranslatePanel(prev => ({ ...prev, visible: false }))} />
+      <SummarizePanel visible={summarizePanel.visible} data={summarizePanel.data} onClose={() => setSummarizePanel(prev => ({ ...prev, visible: false }))} />
+      <MonitorPanel visible={monitorPanel.visible} data={monitorPanel.data} onClose={() => setMonitorPanel(prev => ({ ...prev, visible: false }))} />
+      <SocialPanel visible={socialPanel.visible} data={socialPanel.data} onClose={() => setSocialPanel(prev => ({ ...prev, visible: false }))} />
+      <ResearchPanel visible={researchPanel.visible} data={researchPanel.data} onClose={() => setResearchPanel(prev => ({ ...prev, visible: false }))} />
 
       {/* Tool Output / Confirmation Panel — slides from BOTTOM */}
       <ToolOutputPanel

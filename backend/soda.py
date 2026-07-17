@@ -166,14 +166,14 @@ except ImportError:
 import scheduler_service as scheduler
 from pentest import PentestOrchestrator
 from external_apis import (
-    get_weather, get_ip_info, get_exchange_rate, get_news_briefing,
+    get_weather, get_ip_info, get_exchange_rate,
     get_bangladeshi_news,
-    define_word, get_wikipedia_summary, web_search_live,
-    fetch_webpage, list_files, open_file,
+    define_word, list_files, open_file,
     get_system_status, close_window, create_folder,
     search_and_send_telegram,
     get_pagespeed_insights,
 )
+from soda_agents import AgentOrchestrator, get_global_orchestrator
 
 # ── Local Agent Routing ──
 # These tools MUST run on the local Windows desktop agent.
@@ -455,7 +455,7 @@ def _build_system_prompt():
         "Conversation comes first — talk naturally with your owner. "
         "When a tool is genuinely needed, call it smoothly without breaking the flow. "
         "If the request is clear, call the tool and respond naturally. "
-        "If you need information not covered by a dedicated tool, use web_search_live to find it. "
+        "If you need information not covered by a dedicated tool, use agent_search or agent_research to find it. "
         "FILE SELECTION — CRITICAL: When the user picks a file or folder by number (e.g. 'open number 3', 'open the third one', 'open file 7', "
         "'open the 12th folder'), look at the `number` field in each item from the most recent list_files result — NOT the array index. "
         "The `number` field is 1-indexed and matches the number the user sees on screen. "
@@ -494,13 +494,13 @@ def _build_system_prompt():
         "When all tasks are complete, call cancel_plan to dismiss the panel. "
         "If you resume after a reset and see an existing plan, use get_plan to recover the task list "
         "and continue from the first task that isn't 'done'.\n"
-        "SEARCH WORKFLOW — CRITICAL: When the user asks you to search the web:\n"
-        "1. Call web_search_live with their query — this displays the results visually to the user.\n"
+        "SEARCH WORKFLOW — When the user asks you to search the web:\n"
+        "1. Call agent_search with their query — this searches the web via a background sub-agent.\n"
         "2. Do NOT read the results aloud, do NOT summarize them, do NOT comment on them.\n"
         "3. Simply say 'I found X results, sir. Which one should I open?' and STOP talking.\n"
         "4. Wait for the user to pick a result by number (e.g. 'result 1', 'open the first one', 'number 3').\n"
         "5. When the user picks a result, call open_browser with that result's full URL to open it in the internal webview.\n"
-        "6. Then call browse_webpage with the same URL to fetch the page content.\n"
+        "6. Then call agent_browse with the same URL to fetch the page content via a background sub-agent.\n"
         "7. Finally, summarize the PAGE CONTENT (not the search results) in 2-3 sentences.\n"
         "8. After summarizing, offer to scrape: say 'Sir, would you like me to extract structured data from this page?'\n"
         "9. If user says yes → call scrape_site(url, prompt='extract all useful structured data from this page'). "
@@ -512,7 +512,7 @@ def _build_system_prompt():
         "also pass the path parameter set to the full save path including filename (e.g. '~/Downloads/report.json'). "
         "Use ~ for home directory. Supported formats: json, html, markdown, csv, docx. "
         "The exported file opens automatically in SODA's viewer.\n"
-         "12. If user declines scraping, move on. Do NOT ask repeatedly.\n"
+        "12. If user declines scraping, move on. Do NOT ask repeatedly.\n"
          "Never narrate the search results list. Only speak about the specific page the user asked you to open.\n"
          "Complete every task fully. Never refuse a valid request. "
         "CRITICAL — NEVER tell the user to do something themselves. When they ask you to check, read, open, or "
@@ -534,7 +534,7 @@ def _build_system_prompt():
          "3. Understand conversational context first — if your owner is chatting, chat back naturally. "
         "If he's clearly giving a command, call the appropriate tool. "
         "For example, 'it's hot' → call get_weather; "
-        "'what was that website' → call web_search_live; 'check that' → call browse_webpage. When the user says 'open', 'show', 'visit', 'go to' any link, result, or website — call open_browser with the full URL. Use judgment — not everything needs a tool call.\n"
+        "'what was that website' → call agent_search; 'check that' → call agent_browse. When the user says 'open', 'show', 'visit', 'go to' any link, result, or website — call open_browser with the full URL. Use judgment — not everything needs a tool call.\n"
         "4. When you see a transcription that includes words from other languages (Bengali, Hindi, "
         "Tamil, etc.), ignore those words and focus on the English words and context to determine "
         "what tool to call. Do NOT respond in those languages — ALWAYS respond in English only.\n"
@@ -607,11 +607,11 @@ def _build_system_prompt():
         "- Cost: live video on screen costs 0 API calls. Frame capture costs 1 call. Photo saves cost 1 call + database write."
 
         "\n\nNEWS — Two news tools available:\n"
-"- get_news: International news in English. Call when the user asks about world news, "
-"tech news, sports, or general current events. Opens the newsroom HUD.\n"
+"- agent_news: International news via background sub-agent. Call when the user asks about world news, "
+"tech news, sports, or general current events. Runs non-blocking — results appear when ready.\n"
 "- get_bangladeshi_news: Bengali news from BBC Bengali. Call when the user asks "
 "about Bangladesh, Bangladeshi news, or Bengali news. "
-"Returns articles in Bengali. Does NOT open the newsroom HUD — results appear in the info panel.\n"
+"Returns articles in Bengali. Results appear in the info panel.\n"
 "Only call news tools if the user EXPLICITLY asks for news or current events. "
 "Do NOT call them proactively during greetings or general conversation."
 "\n\nALL WHATSAPP TOOLS:\n"
@@ -928,6 +928,21 @@ class AudioLoop:
         self._pending_pastebox = None
         self._pastebox_content = ""
         self._pentest_background_task = None
+        self._orchestrator = get_global_orchestrator()
+        self._orchestrator.set_inject_callback(self._deliver_agent_result)
+
+
+    async def _deliver_agent_result(self, text: str):
+        """Callback for background agent results — injects into conversation."""
+        if not self.session:
+            return
+        if not text or not text.strip():
+            return
+        log.info(f"[AgentOrchestrator] Delivering result: {text[:60]}...")
+        try:
+            await self.session.send_realtime_input(text=text)
+        except Exception as e:
+            log.warning(f"[AgentOrchestrator] Failed to deliver: {e}")
 
 
     def _load_context_history(self):
@@ -2020,27 +2035,6 @@ class AudioLoop:
             self._last_scraped_url = url
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
-        elif name == "get_news":
-            now = time.time()
-            if getattr(self, '_last_news_briefing', 0) > now - 5:
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": {"articles": [], "message": "Already shown recently."}})
-            self._last_news_briefing = now
-            try:
-                query = args.get("query", "")
-                r = await get_news_briefing(query=query, max_per_category=3)
-                self._news_articles = r.get("articles", [])
-                log.info(f"get_news: query='{query}' returned {len(self._news_articles)} articles")
-                await asyncio.sleep(0.8)
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": {
-                    "type": "news_briefing",
-                    "articles": self._news_articles,
-                    "categories": r.get("categories", []),
-                    "query": query,
-                }})
-            except Exception as e:
-                log.error(f"get_news failed: {e}")
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": {"articles": [], "error": str(e)}})
-
         elif name == "get_bangladeshi_news":
             r = await get_bangladeshi_news(category=args.get("category", "main"))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
@@ -2049,44 +2043,31 @@ class AudioLoop:
             r = await define_word(args.get("word", ""))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
-        elif name == "get_wikipedia_summary":
-            r = await get_wikipedia_summary(args.get("topic", ""))
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
-
-        elif name == "web_search_live":
-            query = args.get("query", "")
-            r = await web_search_live(query, args.get("num_results", 5))
-            self._last_search_query = query
-            self._last_search_results = r.get("results", [])
-            if self.sio and self._last_search_results:
+        # ── Agent tool routing ──
+        elif name.startswith("agent_"):
+            agent = self._orchestrator.get_agent(name)
+            if not agent:
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"result": {"success": False, "error": f"Unknown agent: {name}"}}
+                )
+            if args.get("_background", False):
+                task_id = await self._orchestrator.dispatch_background(name, **args)
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"result": {
+                        "success": True, "task_id": task_id,
+                        "message": f"Agent {name} started in background. Results will be delivered when ready."
+                    }}
+                )
+            r = await self._orchestrator.dispatch(name, **args)
+            if self.sio and name == "agent_search" and r.get("results"):
                 loop = asyncio.get_event_loop()
                 loop.create_task(self.sio.emit("search_results", {
-                    "query": query,
-                    "results": self._last_search_results,
-                }))
-                await asyncio.sleep(1.0)
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
-
-        elif name == "browse_webpage":
-            url = args.get("url", "")
-            r = await fetch_webpage(url)
-            if self.sio:
-                loop = asyncio.get_event_loop()
-                loop.create_task(self.sio.emit("webpage_content", {
-                    "url": url,
-                    "content": r.get("content", "") if isinstance(r, dict) else str(r),
+                    "query": args.get("query", ""),
+                    "results": r["results"],
                 }))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
-
-        elif name == "show_search_results":
-            if self.sio:
-                loop = asyncio.get_event_loop()
-                loop.create_task(self.sio.emit("search_results", {
-                    "query": getattr(self, '_last_search_query', ''),
-                    "results": getattr(self, '_last_search_results', []),
-                    "forced": True,
-                }))
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": {"displayed": True}})
 
         elif name == "list_files":
             path = args.get("path", "")

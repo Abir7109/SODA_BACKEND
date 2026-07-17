@@ -165,197 +165,7 @@ async def get_exchange_rate(from_curr: str, to_curr: str):
     except Exception as e:
         return {"error": str(e)}
 
-# 4. News - Google News RSS (FREE, no API key)
-async def get_news(query: str = "", max_results: int = 5):
-    """
-    Get latest news for any topic using Google News RSS.
-    Completely free, no API key required.
-    """
-    try:
-        import xml.etree.ElementTree as ET
-        url = f"https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, timeout=10.0)
-            root = ET.fromstring(resp.text)
-            results = []
-            for item in root.findall('.//item')[:max_results]:
-                results.append({
-                    "title": item.findtext('title', ''),
-                    "description": item.findtext('description', ''),
-                    "url": item.findtext('link', ''),
-                    "published": item.findtext('pubDate', ''),
-                    "source": item.findtext('source', 'Google News'),
-                })
-            return {"results": results}
-    except Exception as e:
-        return {"error": str(e), "results": []}
 
-
-async def get_news_briefing(query: str = "", max_per_category: int = 3):
-    """
-    Fetch news across multiple categories for the news briefing HUD.
-    When query is provided, fetches only that topic (no defaults).
-    Runs category queries in parallel. Filters articles older than 7 days.
-    """
-    import re
-    from datetime import datetime, timezone
-
-    if query:
-        categories = [query]
-    else:
-        categories = ["Bangladesh", "world", "technology", "sports", "economy"]
-
-    def parse_pubdate(pub: str):
-        try:
-            return datetime.strptime(pub, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=timezone.utc)
-        except Exception:
-            return None
-
-    def strip_html(text: str):
-        return re.sub(r"<[^>]+>", "", text).strip()
-
-    async def fetch_category(cat):
-        try:
-            import xml.etree.ElementTree as ET
-            url = f"https://news.google.com/rss/search?q={cat}&hl=en-US&gl=US&ceid=US:en"
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(url, timeout=10.0)
-                root = ET.fromstring(resp.text)
-                items = []
-                now = datetime.now(timezone.utc)
-                for item in root.findall('.//item'):
-                    pub = item.findtext('pubDate', '')
-                    dt = parse_pubdate(pub)
-                    if dt:
-                        days_old = (now - dt).total_seconds() / 86400
-                        if days_old > 7:
-                            continue
-                    raw_desc = item.findtext('description', '')
-                    items.append({
-                        "title": item.findtext('title', ''),
-                        "description": strip_html(raw_desc),
-                        "url": item.findtext('link', ''),
-                        "published": pub,
-                        "source": item.findtext('source', 'Google News'),
-                        "category": cat,
-                    })
-                items.sort(key=lambda a: parse_pubdate(a["published"]) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
-                return {"category": cat, "articles": items[:max_per_category]}
-        except Exception:
-            pass
-        # Fallback: use DuckDuckGo search when RSS is unavailable
-        try:
-            fallback = await web_search_live(f"latest {cat} news", num_results=max_per_category)
-            farticles = []
-            for r in fallback.get("results", []):
-                farticles.append({
-                    "title": r.get("title", ""),
-                    "description": r.get("snippet", ""),
-                    "url": r.get("url", ""),
-                    "source": r.get("source", "Web"),
-                    "published": "",
-                    "category": cat,
-                })
-            return {"category": cat, "articles": farticles}
-        except Exception:
-            return {"category": cat, "articles": []}
-
-    category_results = await asyncio.gather(*[fetch_category(c) for c in categories])
-    all_articles = []
-    for cr in category_results:
-        all_articles.extend(cr["articles"])
-    seen_titles = set()
-    deduped = []
-    for a in all_articles:
-        key = a["title"].strip().lower()[:60]
-        if key and key not in seen_titles:
-            seen_titles.add(key)
-            deduped.append(a)
-    return {"articles": deduped, "categories": [cr["category"] for cr in category_results]}
-
-
-get_news_tool = {
-    "name": "get_news",
-    "description": (
-        "Fetch latest news for any topic and display them in the LIVE INTEL NEWSROOM "
-        "full-screen HUD. Call this when the user asks about news, current events, "
-        "what's happening in the world, or any specific topic/region (e.g. 'Bangladesh news', "
-        "'tech news'). This is the ONLY news tool — always use this for news queries. "
-        "Fetches categorized news and displays them in a multi-window news wall while "
-        "you narrate.\n\n"
-        "SYNCHRONIZE YOUR NARRATION WITH THE ANIMATION TIMELINE:\n"
-        "The animation shows 6 timed phases. Describe each section AS IT APPEARS:\n"
-        "1. 0–3s UPLINK INIT — newsroom grid appears. Welcome Abir sir and state the topic.\n"
-        "2. 3–7s REGION LOCK — map/globe appears. Mention the region or topic area.\n"
-        "3. 7–12s SOURCE UPLINK — source nodes link. Say which sources are contributing.\n"
-        "4. 12–20s NEWS WALL — cards populate the wall. Read the top headlines.\n"
-         "5. 20s+ SHOWCASE — spotlight each story one by one. For each article, "
-         "FIRST call news_control(next) to advance the built-in browser "
-         "to the article's page, THEN describe what the user sees on screen. "
-         "The webview fades in with the article's full web page. "
-         "Describe the article AFTER the webview has loaded. "
-         "Repeat for each article.\n"
-        "6. After the last article, call news_control(complete) to close the "
-        "showcase and show the digest. Wrap up with the overall situation summary.\n"
-        "IMPORTANT: This is NOT memory recall. Do NOT narrate profile info, stored facts, "
-        "people, or lessons from memory. Only narrate the news articles returned in the response.\n"
-        "Speak conversationally. Always address as 'sir'. "
-        "Stay aligned with each section's visible window."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "query": {
-                "type": "STRING",
-                "description": "Topic or region the user is asking about (e.g. 'Bangladesh', 'technology'). Leave empty for general top news."
-            }
-        },
-        "required": []
-    }
-}
-
-
-news_control_tool = {
-    "name": "news_control",
-    "description": (
-        "Navigate through news articles displayed in the newsroom HUD. "
-        "Call this AFTER get_news during phase 5 (SHOWCASE) to advance the "
-        "live article browser to the next story. Each call immediately switches "
-        "the embedded webview to the new article's actual web page — the user "
-        "sees the live site with a smooth fade transition.\n\n"
-         "USAGE PATTERN — FIRST advance, THEN narrate:\n"
-         "1. After get_news opens the newsroom, wait for phase 5 (SHOWCASE) at ~20s.\n"
-         "2. Call news_control(next) — the webview fades and loads the first article's page.\n"
-         "3. Describe the first article (headline, source, significance) AFTER webview loads.\n"
-         "4. Call news_control(next) — advance to the next article.\n"
-         "5. Describe the next article. Repeat 'next → describe → next → describe'.\n"
-         "6. After the LAST article, call news_control(complete) to close the "
-         "showcase and show the digest.\n\n"
-         "IMPORTANT: Always advance BEFORE describing. The webview needs time to load "
-         "the article page. Describe what's shown on screen, not ahead of it.\n\n"
-         "Actions: 'next' → advance one article, "
-         "'prev' → go back to previous, "
-         "'goto' → jump to a specific index, "
-         "'complete' → finish briefing and show summary, "
-         "'close' → immediately dismiss everything and return to clean UI.\n"
-         "Actions 'next', 'goto' automatically give you a 60s window to narrate "
-         "before the next safety auto-advance. Use that time to fully describe each article."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "action": {
-                "type": "STRING",
-                "description": "'next' → show next article, 'prev' → show previous, 'goto' → jump by index, 'complete' → finish briefing"
-            },
-            "index": {
-                "type": "INTEGER",
-                "description": "Article index (0-based). Required when action='goto'."
-            }
-        },
-        "required": ["action"]
-    }
-}
 
 
 # 4b. Bangladeshi News - BBC Bengali (via news-api-fs)
@@ -453,131 +263,9 @@ async def define_word(word: str):
     except Exception as e:
         return {"error": str(e)}
 
-# 6. Wikipedia Summary
-async def get_wikipedia_summary(topic: str):
-    """
-    Get Wikipedia summary for a topic.
-    """
-    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{topic}"
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, timeout=10.0)
-            
-            if resp.status_code == 404:
-                return {"error": f"Topic not found: {topic}"}
-            
-            data = resp.json()
-            
-            return {
-                "title": data.get('title'),
-                "description": data.get('description'),
-                "extract": data.get('extract'),
-                "url": data.get('content_urls', {}).get('desktop', {}).get('page')
-            }
-    except Exception as e:
-        return {"error": str(e)}
-
-# 7. Web Search (Brave Search primary, DuckDuckGo fallback - both free)
-BRAVE_KEY = os.getenv("BRAVE_SEARCH_API_KEY", "")
-
-async def web_search_live(query: str, num_results: int = 5) -> dict:
-    """Search the web. Uses Brave Search API if key available, else DuckDuckGo."""
-    if not query:
-        return {"results": []}
-    if BRAVE_KEY:
-        return await _brave_search(query, num_results)
-    return await _duckduckgo_search(query, num_results)
 
 
-async def _brave_search(query: str, num_results: int) -> dict:
-    url = "https://api.search.brave.com/res/v1/web/search"
-    headers = {"Accept": "application/json", "X-Subscription-Token": BRAVE_KEY}
-    params = {"q": query, "count": num_results}
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(url, headers=headers, params=params)
-            data = resp.json()
-            results = data.get("web", {}).get("results", [])
-            return {
-                "results": [
-                    {
-                        "title": r.get("title"),
-                        "url": r.get("url"),
-                        "snippet": r.get("description", "")
-                    }
-                    for r in results
-                ]
-            }
-    except Exception as e:
-        print(f"[web_search] Brave failed: {e}")
-        return {"results": []}
 
-
-async def _duckduckgo_search(query: str, num_results: int = 5) -> dict:
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    try:
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
-            resp = await client.post(
-                "https://html.duckduckgo.com/html/",
-                data={"q": query, "kl": ""},
-                headers=headers,
-            )
-            html = resp.text
-            results = _parse_ddg_html(html, num_results)
-            if results:
-                return {"results": results}
-    except Exception as e:
-        print(f"[web_search] DDG HTML failed: {e}")
-
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(
-                "https://api.duckduckgo.com/",
-                params={"q": query, "format": "json", "no_html": "1", "skip_disambig": "1"},
-            )
-            data = resp.json()
-            results = []
-            if data.get("AbstractText"):
-                results.append({
-                    "title": data.get("Heading", query),
-                    "url": data.get("AbstractURL", ""),
-                    "snippet": data.get("AbstractText", ""),
-                })
-            for r in data.get("RelatedTopics", [])[:num_results]:
-                if isinstance(r, dict) and "Text" in r:
-                    results.append({
-                        "title": r.get("Text", "")[:60],
-                        "url": r.get("FirstURL", ""),
-                        "snippet": r.get("Text", ""),
-                    })
-            return {"results": results}
-    except Exception as e:
-        print(f"[web_search] DDG instant-answer failed: {e}")
-        return {"results": []}
-    return {"results": []}
-
-
-def _parse_ddg_html(html: str, num_results: int) -> list:
-    import re
-    results = []
-    pattern = re.compile(
-        r'<div[^>]*class="[^"]*result__body[^"]*"[^>]*>'
-        r'.*?result__a[^>]*href="(?P<url>[^"]+)"[^>]*>(?P<title>.*?)</a>'
-        r'.*?result__snippet[^>]*>(?P<snippet>.*?)</a>',
-        re.DOTALL,
-    )
-    for m in pattern.finditer(html):
-        url = m.group("url")
-        title = re.sub(r"<[^>]+>", "", m.group("title")).strip()
-        snippet = re.sub(r"<[^>]+>", "", m.group("snippet")).strip()
-        if title and url and "duckduckgo.com" not in url:
-            results.append({"title": title, "url": url, "snippet": snippet})
-            if len(results) >= num_results:
-                break
-    return results
 
 
 # ============ TOOL DEFINITIONS FOR SODA ============
@@ -632,54 +320,6 @@ define_word_tool = {
     }
 }
 
-wikipedia_tool = {
-    "name": "get_wikipedia_summary",
-    "description": "Get Wikipedia summary for a topic. Use when user asks about information or facts.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "topic": {"type": "STRING", "description": "Topic to search on Wikipedia"}
-        },
-        "required": ["topic"]
-    }
-}
-
-web_search_live_tool = {
-    "name": "web_search_live",
-    "description": (
-        "Search the internet for real-time information. "
-        "IMPORTANT: After calling this tool, do NOT narrate, read aloud, or summarize the results. "
-        "The results are already displayed to the user visually. "
-        "Simply say 'I found X results' and ask which number they want to open. "
-        "Wait for the user to pick a result before taking further action."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "query": {"type": "STRING", "description": "The search query"},
-            "num_results": {"type": "INTEGER", "description": "Number of results (1-10). Default 5."}
-        },
-        "required": ["query"]
-    }
-}
-
-browse_webpage_tool = {
-    "name": "browse_webpage",
-    "description": (
-        "Fetch and read the content of a specific webpage. "
-        "Use AFTER the user picks a result from search and you have already "
-        "opened it via open_browser. Extract the page content and summarize "
-        "the PAGE CONTENT (not the search results) in 2-3 sentences."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "url": {"type": "STRING", "description": "The URL to fetch and read"}
-        },
-        "required": ["url"]
-    }
-}
-
 open_browser_tool = {
     "name": "open_browser",
     "description": (
@@ -701,18 +341,6 @@ open_browser_tool = {
             "browser": {"type": "STRING", "description": "Optional browser override (only used if external=true)"}
         },
         "required": ["url"]
-    }
-}
-
-show_search_results_tool = {
-    "name": "show_search_results",
-    "description": (
-        "Re-display the previous search results to the user. Use when they say "
-        "'go back' after browsing a webpage, so they can pick another result."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {}
     }
 }
 
@@ -958,52 +586,7 @@ async def close_window(window_name: str):
         return f"Error closing window: {str(e)}"
 
 
-# 8. Webpage Fetching (for interactive browsing from search results)
-
-async def fetch_webpage(url: str) -> dict:
-    """Fetch a webpage and extract clean text content + image URLs."""
-    import trafilatura
-    import re
-    try:
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-            resp = await client.get(
-                url,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-            )
-            html = resp.text
-
-        text = trafilatura.extract(html, include_links=False, include_images=False)
-
-        # Extract image URLs from HTML
-        images = []
-        img_pattern = re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', re.IGNORECASE)
-        base_url = url.split('/')[0] + '//' + url.split('/')[2]
-        for match in img_pattern.finditer(html):
-            img_url = match.group(1)
-            # Make absolute URL
-            if img_url.startswith('//'):
-                img_url = 'https:' + img_url
-            elif img_url.startswith('/'):
-                img_url = base_url + img_url
-            elif not img_url.startswith('http'):
-                continue
-            # Skip tiny tracking pixels and icons
-            if any(skip in img_url.lower() for skip in ['pixel', 'tracking', 'analytics', 'beacon', '1x1', 'spacer', 'blank', 'logo.ico', 'favicon']):
-                continue
-            if img_url not in images:
-                images.append(img_url)
-            if len(images) >= 8:
-                break
-
-        if not text:
-            return {"success": False, "error": "Could not extract content from this page", "content": "", "url": url, "images": []}
-        return {"success": True, "content": text[:8000], "url": url, "images": images}
-    except Exception as e:
-        print(f"[fetch_webpage] Failed: {e}")
-        return {"success": False, "error": str(e), "content": "", "url": url, "images": []}
-
-
-# 9. File Browser Tools (interactive file navigation)
+# 8. File Browser Tools (interactive file navigation)
 
 async def list_files(path: str = "", search: str = "") -> dict:
     """List directory contents with structured metadata (name, type, size)."""
@@ -1239,10 +822,12 @@ search_and_send_telegram_tool = {
 async def search_and_send_telegram(query: str, num_results: int = 8) -> dict:
     """Search the web, save results as markdown, send via Telegram."""
     from telegram_bot import telegram_bot
+    from agents.web_search_agent import WebSearchAgent
     import os, time
 
     # Search
-    search_result = await web_search_live(query, num_results)
+    agent = WebSearchAgent()
+    search_result = await agent.execute(query=query, num_results=num_results)
     results = search_result.get("results", [])
     if not results:
         return {"success": False, "result": "No search results found for that query."}
