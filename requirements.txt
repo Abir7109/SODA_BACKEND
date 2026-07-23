@@ -12,6 +12,7 @@ httpx>=0.28.0
 python-dotenv
 trafilatura
 python-docx
+psutil
 numpy
 elevenlabs
 supabase>=2.0.0

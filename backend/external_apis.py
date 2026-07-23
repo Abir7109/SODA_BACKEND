@@ -54,7 +54,10 @@ async def get_system_status():
                 info["battery_percent"] = battery.percent
                 info["battery_charging"] = battery.power_plugged
         except ImportError:
-            pass
+            # ponytail: fallback CPU% from loadavg (Linux-only)
+            if info.get("cpu_load_1m") is not None and info.get("cpu_count"):
+                info["cpu_percent"] = round((info["cpu_load_1m"] / info["cpu_count"]) * 100, 1)
+            info["ram_percent"] = 0
         except Exception as e:
             info["metrics_error"] = str(e)
 
