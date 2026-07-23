@@ -129,6 +129,13 @@ export const TOOL_ANIMATIONS = {
   send_email:   { component: 'MessageAnimation', variant: 'email' },
   email_config: { component: 'DefaultAnimation', variant: 'default' },
 
+  // ── Project Registry ──────────────────────────────────────────
+  register_project:   { component: 'DefaultAnimation', variant: 'default' },
+  list_projects:      { component: 'DefaultAnimation', variant: 'default', panel: 'ProjectStatsPanel', panelDir: 'right' },
+  query_project:      { component: 'DefaultAnimation', variant: 'default', panel: 'ProjectStatsPanel', panelDir: 'right' },
+  query_all_projects: { component: 'DefaultAnimation', variant: 'default', panel: 'ProjectStatsPanel', panelDir: 'right' },
+  remove_project:     { component: 'DefaultAnimation', variant: 'default' },
+
   // ── Agent Sub-Agent Tools ────────────────────────────────────
   show_agents:       { component: 'DataAnim',        variant: 'analytics', panel: 'AgentsPanel',    panelDir: 'bottom' },
   agent_search:      { component: 'SearchAnimation', variant: 'radar' },

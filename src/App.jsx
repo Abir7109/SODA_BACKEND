@@ -91,6 +91,7 @@ import GitHubPanel from './components/panels/GitHubPanel'
 import DeployPanel from './components/panels/DeployPanel'
 import PageSpeedPanel from './components/panels/PageSpeedPanel'
 import EmailPanel from './components/panels/EmailPanel'
+import ProjectStatsPanel from './components/panels/ProjectStatsPanel'
 import MemoryPanel from './components/panels/MemoryPanel'
 import IELTSDashboardPanel from './components/panels/IELTSDashboardPanel'
 import IELTSWritingPanel from './components/panels/IELTSWritingPanel'
@@ -653,6 +654,7 @@ export default function App() {
   const [deployPanel, setDeployPanel] = useState({ visible: false, data: null })
   const [pageSpeedPanel, setPageSpeedPanel] = useState({ visible: false, data: null })
   const [emailPanel, setEmailPanel] = useState({ visible: false, data: null })
+  const [projectStatsPanel, setProjectStatsPanel] = useState({ visible: false, data: null })
   const [ieltsDashboard, setIeltsDashboard] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsWriting, setIeltsWriting] = useState({ visible: false, data: null, direction: 'right' })
   const [ieltsSpeaking, setIeltsSpeaking] = useState({ visible: false, data: null, direction: 'right' })
@@ -1001,6 +1003,9 @@ export default function App() {
           case 'EmailPanel':
             setEmailPanel({ visible: true, data: result.result || result })
             return
+          case 'ProjectStatsPanel':
+            setProjectStatsPanel({ visible: true, data: result })
+            return
         }
       }
 
@@ -1180,6 +1185,7 @@ export default function App() {
           setDeployPanel(prev => ({ ...prev, visible: false }))
           setPageSpeedPanel(prev => ({ ...prev, visible: false }))
           setEmailPanel(prev => ({ ...prev, visible: false }))
+          setProjectStatsPanel(prev => ({ ...prev, visible: false }))
           setNavigation(prev => ({ ...prev, visible: false }))
           setIeltsDashboard(prev => ({ ...prev, visible: false }))
           setIeltsWriting(prev => ({ ...prev, visible: false }))
@@ -1847,6 +1853,8 @@ export default function App() {
         onClose={() => setPageSpeedPanel(prev => ({ ...prev, visible: false }))} />
       <EmailPanel visible={emailPanel.visible} data={emailPanel.data}
         onClose={() => setEmailPanel(prev => ({ ...prev, visible: false }))} />
+      <ProjectStatsPanel visible={projectStatsPanel.visible} data={projectStatsPanel.data}
+        onClose={() => setProjectStatsPanel(prev => ({ ...prev, visible: false }))} />
 
 
 

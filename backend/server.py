@@ -250,6 +250,35 @@ async def root():
 async def status():
     return {"status": "running", "service": "S.O.D.A Backend"}
 
+# ── Project Registry HTTP API ──
+
+@app.post("/api/projects/register")
+async def http_register_project(data: dict):
+    import project_registry
+    name = data.get("name", "")
+    endpoint = data.get("endpoint", "")
+    if not name or not endpoint:
+        return {"success": False, "error": "name and endpoint required"}
+    r = project_registry.register(name=name, endpoint=endpoint)
+    return {"success": True, "project": r}
+
+@app.get("/api/projects")
+async def http_list_projects():
+    import project_registry
+    return {"success": True, "projects": project_registry.list_projects()}
+
+@app.post("/api/projects/{project_id}/query")
+async def http_query_project(project_id: str):
+    import project_registry
+    r = await project_registry.query(project_id=project_id)
+    return r
+
+@app.post("/api/projects/{project_id}/remove")
+async def http_remove_project(project_id: str):
+    import project_registry
+    r = project_registry.remove(project_id=project_id)
+    return r
+
 @sio.event
 async def connect(sid, environ):
     _client_addresses[sid] = environ.get('REMOTE_ADDR', environ.get('HTTP_X_FORWARDED_FOR', 'unknown'))

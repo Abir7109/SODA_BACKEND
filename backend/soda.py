@@ -3801,6 +3801,49 @@ TEXT: {text}"""
             )
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
+        # ── Project Registry ───────────────────────────────────────
+        elif name == "register_project":
+            import project_registry
+            r = project_registry.register(
+                name=args.get("name", ""),
+                endpoint=args.get("endpoint", ""),
+            )
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "list_projects":
+            import project_registry
+            r = project_registry.list_projects()
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "query_project":
+            import project_registry
+            r = await project_registry.query(project_id=args.get("project_id", ""))
+            if self.sio and r.get("success"):
+                await self.sio.emit("tool_result", {
+                    "tool": "query_project",
+                    "result": r,
+                    "panel": "ProjectStatsPanel",
+                    "forced": True,
+                })
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "query_all_projects":
+            import project_registry
+            r = await project_registry.query_all()
+            if self.sio:
+                await self.sio.emit("tool_result", {
+                    "tool": "query_all_projects",
+                    "result": r,
+                    "panel": "ProjectStatsPanel",
+                    "forced": True,
+                })
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "remove_project":
+            import project_registry
+            r = project_registry.remove(project_id=args.get("project_id", ""))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
         # ── Navigation ────────────────────────────────────────────
         log.warning(f"Unknown tool: {name}")
         return types.FunctionResponse(

@@ -1905,6 +1905,64 @@ query_custom_memory_tool = {
     }
 }
 
+# ── Project Registry ──
+
+register_project_tool = {
+    "name": "register_project",
+    "description": "Register an external project with SODA. Generates a unique API key and stores the project endpoint. Use when the user says 'add my project', 'register my site', 'connect my app'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "name": {"type": "STRING", "description": "Project name (e.g. 'Guardian Lock'"}
+        },
+        "required": ["name"]
+    }
+}
+
+list_projects_tool = {
+    "name": "list_projects",
+    "description": "List all registered external projects with their status. Use when the user asks 'show my projects', 'what projects are connected'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
+query_project_tool = {
+    "name": "query_project",
+    "description": "Query a specific registered project for its latest stats and analytics by calling its endpoint with the API key. Use when the user says 'check my project stats', 'how is project X doing'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "project_id": {"type": "STRING", "description": "Project ID to query"}
+        },
+        "required": ["project_id"]
+    }
+}
+
+query_all_projects_tool = {
+    "name": "query_all_projects",
+    "description": "Query ALL registered projects at once for their latest stats and analytics. Use when the user says 'check all my projects', 'how are all my sites doing'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
+remove_project_tool = {
+    "name": "remove_project",
+    "description": "Remove a registered project from SODA. Use when the user says 'remove project', 'delete my project'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "project_id": {"type": "STRING", "description": "Project ID to remove"}
+        },
+        "required": ["project_id"]
+    }
+}
+
 
 tools_list = [{"function_declarations": [
     write_file_tool,
@@ -2053,6 +2111,13 @@ tools_list = [{"function_declarations": [
     list_custom_schemas_tool,
     store_custom_memory_tool,
     query_custom_memory_tool,
+
+    # ── Project Registry ──
+    register_project_tool,
+    list_projects_tool,
+    query_project_tool,
+    query_all_projects_tool,
+    remove_project_tool,
 
     
 ]}]
