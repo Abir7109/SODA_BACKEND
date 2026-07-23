@@ -782,6 +782,33 @@ def _build_system_prompt():
 "- Schedule formats: 'every day at 9am', 'every monday at 14:30', "
 "'every 30 minutes', 'tomorrow at 8am', 'in 10 minutes', 'at 3pm'.\n"
     )
+    # ── Project Registry ────────────────────────────────────────────
+    _project_registry_block = (
+        "\n\nPROJECT REGISTRY:\n"
+        "- SODA can register, query, and manage external projects via API keys.\n"
+        "- Each project exposes GET /api/soda-stats with Bearer token auth.\n"
+        "\nWHEN USER ASKS ABOUT THEIR PROJECTS:\n"
+        "- 'check [project name]', 'how is [project]', '[project] stats', "
+        "'show [project] analytics' → call list_projects() first, then "
+        "call query_project(project_id='<id_from_list>') for detailed stats.\n"
+        "- 'check all my projects', 'how are all my sites', 'show all stats', "
+        "'project overview' → call query_all_projects() to query every registered project.\n"
+        "- 'show my projects', 'what projects are connected', 'list projects' → "
+        "call list_projects() to see all registered projects.\n"
+        "\nWHEN USER WANTS TO ADD A PROJECT:\n"
+        "- 'add [name]', 'register [name]', 'connect [name]' → ask for the project's "
+        "endpoint URL, then call register_project(name='...', endpoint='...'). "
+        "The endpoint should be the base URL of their deployed admin/server. "
+        "SODA generates an API key and stores it. The user must set this key "
+        "as SODA_API_KEY env var on their server.\n"
+        "\nWHEN USER WANTS TO REMOVE:\n"
+        "- 'remove project [name/id]', 'delete [project]' → "
+        "call list_projects() to get ID, then remove_project(project_id='...').\n"
+        "\nREGISTERED PROJECTS:\n"
+        "There are already some registered projects in the local registry. "
+        "You can call list_projects() anytime to see them.\n"
+    )
+    base += _project_registry_block
     try:
         ctx = memory_store.build_context_block()
         if ctx:
