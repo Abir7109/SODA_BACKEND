@@ -26,16 +26,16 @@ function formatJSON(data) {
 }
 
 function formatMarkdown(data) {
-  const { scores, vitals, opportunities = [], passed_audits = [], url, strategy } = data
+  const { scores = {}, vitals = {}, opportunities = [], passed_audits = [], url, strategy } = data
   let md = `# PageSpeed Insights Report\n\n`
   md += `**URL:** ${url}\n`
   md += `**Strategy:** ${strategy || 'desktop'}\n\n`
   md += `## Scores\n\n`
   md += `| Category | Score |\n| --- | ---: |\n`
-  md += `| SEO | ${scores.seo}% |\n`
-  md += `| Performance | ${scores.performance}% |\n`
-  md += `| Accessibility | ${scores.accessibility}% |\n`
-  md += `| Best Practices | ${scores.best_practices}% |\n\n`
+  md += `| SEO | ${scores.seo ?? 0}% |\n`
+  md += `| Performance | ${scores.performance ?? 0}% |\n`
+  md += `| Accessibility | ${scores.accessibility ?? 0}% |\n`
+  md += `| Best Practices | ${scores.best_practices ?? 0}% |\n\n`
   md += `## Core Web Vitals\n\n`
   md += `| Metric | Value |\n| --- | ---: |\n`
   for (const [k, v] of Object.entries(vitals)) {
@@ -228,7 +228,7 @@ export default function PageSpeedPanel({ visible, data, onClose }) {
     )
   }
 
-  const { scores, vitals, opportunities = [], passed_audits = [], total_audits = 0, strategy, url } = data
+  const { scores = {}, vitals = {}, opportunities = [], passed_audits = [], total_audits = 0, strategy, url } = data
   const totalOpportunities = opportunities.length
   const totalPassed = passed_audits.length
   const totalAudited = total_audits || totalOpportunities + totalPassed

@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 import httpx
 
-_REGISTRY_FILE = Path(__file__).resolve().parent.parent / "projects_registry.json"
+_REGISTRY_FILE = Path(__file__).resolve().parent / "projects_registry.json"
 
 def _load():
     if not _REGISTRY_FILE.exists():
