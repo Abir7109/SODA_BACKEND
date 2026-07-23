@@ -57,7 +57,8 @@ function ProjectCard({ project, onQuery }) {
 }
 
 export default function ProjectStatsPanel({ visible, data, onClose }) {
-  const projects = Array.isArray(data) ? data : (data?.result ? (Array.isArray(data.result) ? data.result : [data.result]) : [])
+  const raw = data?.result ?? data
+  const projects = Array.isArray(raw) ? raw : (raw ? [raw] : [])
 
   return (
     <SlidePanel visible={visible} direction="right" title="PROJECTS" icon={<Activity size={11} />}
