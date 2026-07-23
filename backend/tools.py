@@ -895,7 +895,7 @@ go_to_sleep_tool = {
 
 wake_up_tool = {
     "name": "wake_up",
-    "description": "Wake SODA from sleep mode. Restores the window and resumes monitoring. Use when the user says 'wake up', 'come back'.",
+    "description": "Wake SODA from sleep mode. Restores the window, maximizes the Chrome tab running the HUD via the local agent, gathers system status (CPU, RAM, disk), and checks configured websites (guardianlock.netlify.app, hajjkafela.vercel.app) for uptime. Use when the user says 'wake up', 'come back'.",
     "parameters": {
         "type": "OBJECT",
         "properties": {},

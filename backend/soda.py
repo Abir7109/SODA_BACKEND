@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 import sys
 import websockets
+import httpx
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -218,7 +219,7 @@ LOCAL_AGENT_TOOLS = {
     "send_telegram_message", "send_telegram_file",
     # System info / agent control
     "get_system_status",
-    "go_to_sleep", "wake_up", "go_background", "come_back",
+    "go_to_sleep", "go_background", "come_back",
     # Other
     "send_keys_window",
     # Browser / web app control
@@ -2625,7 +2626,70 @@ class AudioLoop:
             asyncio.create_task(self._emit_personality("greeting"))
             if self.sio:
                 await self.sio.emit("window_restore")
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": "Waking up."})
+
+            # Step 1: Maximize Chrome tab via local agent
+            if _connected_agents:
+                import uuid as _uuid
+                cid = str(_uuid.uuid4())
+                fut = asyncio.Future()
+                _pending_agent_results[cid] = fut
+                agent_sid = max(_connected_agents, key=lambda s: len(_connected_agents[s].get('tools', [])))
+                await self.sio.emit('agent_execute', {
+                    'callback_id': cid,
+                    'tool': 'window_manage',
+                    'args': {'title': 'Chrome', 'action': 'maximize'},
+                }, room=agent_sid)
+                try:
+                    await asyncio.wait_for(fut, timeout=10.0)
+                except asyncio.TimeoutError:
+                    pass
+                finally:
+                    _pending_agent_results.pop(cid, None)
+
+            # Step 2: Gather system status
+            sys_status = await get_system_status()
+
+            # Step 3: Check websites
+            websites = {
+                "guardianlock.netlify.app": "https://guardianlock.netlify.app/",
+                "hajjkafela.vercel.app": "https://hajjkafela.vercel.app/",
+            }
+            web_status = {}
+            async with httpx.AsyncClient(timeout=15) as client:
+                for label, url in websites.items():
+                    try:
+                        start = time.time()
+                        resp = await client.get(url)
+                        elapsed = round(time.time() - start, 2)
+                        web_status[label] = {
+                            "status_code": resp.status_code,
+                            "response_time_ms": int(elapsed * 1000),
+                            "online": resp.status_code < 500,
+                        }
+                    except Exception as e:
+                        web_status[label] = {"online": False, "error": str(e)}
+
+            # Emit system status panel to frontend
+            if self.sio:
+                await self.sio.emit("tool_result", {
+                    "tool": "get_system_status",
+                    "result": {**sys_status, "_websites": web_status},
+                    "panel": "SystemStatusPanel",
+                    "forced": True,
+                })
+
+            # Build spoken summary for Gemini
+            cpu = sys_status.get("cpu_percent", "?")
+            ram = sys_status.get("ram_percent", "?")
+            parts = [f"System is up. CPU at {cpu}%, RAM at {ram}%."]
+            for label, w in web_status.items():
+                if w.get("online"):
+                    parts.append(f"{label} responded {w['status_code']} in {w.get('response_time_ms', '?')}ms.")
+                else:
+                    parts.append(f"{label} appears offline: {w.get('error', 'no response')}.")
+            summary = " ".join(parts)
+
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": summary})
 
         elif name == "go_background":
             self._background_mode = True

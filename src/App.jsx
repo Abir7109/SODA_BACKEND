@@ -108,6 +108,7 @@ import SummarizePanel from './components/panels/SummarizePanel'
 import MonitorPanel from './components/panels/MonitorPanel'
 import SocialPanel from './components/panels/SocialPanel'
 import ResearchPanel from './components/panels/ResearchPanel'
+import AgentsPanel from './components/panels/AgentsPanel'
 import { PanelSpaceProvider } from './contexts/PanelSpaceContext'
 import WebviewActionService from './services/WebviewActionService'
 import SlidePanel from './components/SlidePanel'
@@ -230,9 +231,11 @@ const TOOLS_WITH_INFO_PANEL = new Set([
 ])
 
 const TOOLS_WITH_AGENT = new Set([
+  'show_agents',
   'agent_wikipedia', 'agent_news', 'agent_code', 'agent_data',
   'agent_translate', 'agent_summarize', 'agent_monitor',
   'agent_social', 'agent_research', 'agent_browse',
+  'agent_security', 'agent_database', 'agent_devops',
 ])
 
 const AI_CARD_TOOLS = new Set([
@@ -616,6 +619,7 @@ export default function App() {
   const [monitorPanel, setMonitorPanel] = useState({ visible: false, data: null })
   const [socialPanel, setSocialPanel] = useState({ visible: false, data: null })
   const [researchPanel, setResearchPanel] = useState({ visible: false, data: null })
+  const [agentsPanel, setAgentsPanel] = useState({ visible: false, data: null })
 
   // Webpage summary panel state (bottom)
   const [webpageSummary, setWebpageSummary] = useState({ visible: false, url: '', content: '', success: null, images: [] })
@@ -1003,6 +1007,7 @@ export default function App() {
         if (toolTimerRef.current) clearTimeout(toolTimerRef.current)
         const agentData = data.result || result
         const setters = {
+          show_agents: setAgentsPanel,
           agent_wikipedia: setWikipediaPanel,
           agent_news: setNewsPanel,
           agent_code: setCodePanel,
@@ -1013,6 +1018,9 @@ export default function App() {
           agent_social: setSocialPanel,
           agent_research: setResearchPanel,
           agent_browse: setWikipediaPanel,
+          agent_security: setCodePanel,
+          agent_database: setDataPanel,
+          agent_devops: setMonitorPanel,
         }
         const setter = setters[toolName]
         if (setter) setter({ visible: true, data: agentData })
@@ -1177,6 +1185,16 @@ export default function App() {
           setIeltsReading(prev => ({ ...prev, visible: false }))
           setIeltsVocab(prev => ({ ...prev, visible: false }))
           setIeltsProgress(prev => ({ ...prev, visible: false }))
+          setWikipediaPanel(prev => ({ ...prev, visible: false }))
+          setNewsPanel(prev => ({ ...prev, visible: false }))
+          setCodePanel(prev => ({ ...prev, visible: false }))
+          setDataPanel(prev => ({ ...prev, visible: false }))
+          setTranslatePanel(prev => ({ ...prev, visible: false }))
+          setSummarizePanel(prev => ({ ...prev, visible: false }))
+          setMonitorPanel(prev => ({ ...prev, visible: false }))
+          setSocialPanel(prev => ({ ...prev, visible: false }))
+          setResearchPanel(prev => ({ ...prev, visible: false }))
+          setAgentsPanel(prev => ({ ...prev, visible: false }))
           setFloatingWindows([])
           break
       }
@@ -1757,6 +1775,7 @@ export default function App() {
       <MonitorPanel visible={monitorPanel.visible} data={monitorPanel.data} onClose={() => setMonitorPanel(prev => ({ ...prev, visible: false }))} />
       <SocialPanel visible={socialPanel.visible} data={socialPanel.data} onClose={() => setSocialPanel(prev => ({ ...prev, visible: false }))} />
       <ResearchPanel visible={researchPanel.visible} data={researchPanel.data} onClose={() => setResearchPanel(prev => ({ ...prev, visible: false }))} />
+      <AgentsPanel visible={agentsPanel.visible} data={agentsPanel.data} onClose={() => setAgentsPanel(prev => ({ ...prev, visible: false }))} />
 
       {/* Tool Output / Confirmation Panel — slides from BOTTOM */}
       <ToolOutputPanel

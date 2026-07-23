@@ -89,7 +89,7 @@ export const TOOL_ANIMATIONS = {
   get_news:              { component: 'DataAnim', variant: 'news' },
   get_bangladeshi_news:  { component: 'DataAnim', variant: 'news' },
   get_exchange_rate:     { component: 'DataAnim', variant: 'currency', panel: 'CurrencyPanel',     panelDir: 'top' },
-  get_system_status:     { component: 'AiSystemMonitor',   variant: 'default' },
+  get_system_status:     { component: 'AiSystemMonitor',   variant: 'default', panel: 'SystemStatusPanel', panelDir: 'right' },
   list_processes:        { component: 'DataAnim', variant: 'processes',panel: 'ProcessListPanel',  panelDir: 'right' },
   get_ip_info:           { component: 'DataAnim', variant: 'network',  panel: 'NetworkInfoPanel',  panelDir: 'top' },
   define_word:           { component: 'DataAnim', variant: 'define' },
@@ -130,6 +130,7 @@ export const TOOL_ANIMATIONS = {
   email_config: { component: 'DefaultAnimation', variant: 'default' },
 
   // ── Agent Sub-Agent Tools ────────────────────────────────────
+  show_agents:       { component: 'DataAnim',        variant: 'analytics', panel: 'AgentsPanel',    panelDir: 'bottom' },
   agent_search:      { component: 'SearchAnimation', variant: 'radar' },
   agent_news:        { component: 'DataAnim',        variant: 'news',    panel: 'NewsPanel',        panelDir: 'bottom' },
   agent_wikipedia:   { component: 'DataAnim',        variant: 'search',  panel: 'WikipediaPanel',   panelDir: 'bottom' },
@@ -141,6 +142,9 @@ export const TOOL_ANIMATIONS = {
   agent_summarize:   { component: 'DataAnim',        variant: 'analytics', panel: 'SummarizePanel', panelDir: 'bottom' },
   agent_monitor:     { component: 'SystemAnimation',  variant: 'control',  panel: 'MonitorPanel',   panelDir: 'bottom' },
   agent_social:       { component: 'MessageAnimation', variant: 'message', panel: 'SocialPanel',    panelDir: 'bottom' },
+  agent_security:     { component: 'SystemAnimation',  variant: 'control',  panel: 'CodePanel',     panelDir: 'bottom' },
+  agent_database:     { component: 'DataAnim',         variant: 'analytics', panel: 'DataPanel',    panelDir: 'bottom' },
+  agent_devops:       { component: 'BackgroundCommandAnim', variant: 'exec', panel: 'MonitorPanel', panelDir: 'bottom' },
 }
 
 /**

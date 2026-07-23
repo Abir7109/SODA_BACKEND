@@ -2206,6 +2206,32 @@ body.widget-mode #root {
 .agent-research-topic-tag { padding: 2px 8px; background: rgba(96,165,250,0.06); border: 1px solid rgba(96,165,250,0.12); border-radius: 10px; font-size: 10px; color: #93c5fd; }
 .agent-research-page-url { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ── Agent Card (show_agents panel) ─────────────────────── */
+.agent-card { background: rgba(167,139,250,0.03); border: 1px solid rgba(167,139,250,0.1); border-radius: 4px; margin-bottom: 6px; cursor: pointer; transition: all 0.15s ease; }
+.agent-card:hover { border-color: rgba(167,139,250,0.25); background: rgba(167,139,250,0.06); }
+.agent-card-header { padding: 10px 10px 4px; }
+.agent-card-name-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.agent-card-icon { flex-shrink: 0; color: #a78bfa; }
+.agent-card-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.agent-card-status { margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: 9px; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.06em; }
+.agent-card-status.active { color: #22c55e; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.15); }
+.agent-card-status.idle { color: var(--text-dim); background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); }
+.agent-card-desc { font-size: 10px; color: var(--text-dim); line-height: 1.5; margin-bottom: 6px; }
+.agent-card-stats-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-top: 1px solid rgba(167,139,250,0.06); }
+.agent-card-stat { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+.agent-card-stat.error { color: #ef4444; }
+.agent-card-stat svg { flex-shrink: 0; }
+
+/* ── Agent Task Items ────────────────────────────────────── */
+.agent-task-group { margin-bottom: 6px; }
+.agent-task-group-label { font-size: 9px; color: #f59e0b; letter-spacing: 0.08em; margin-bottom: 4px; text-transform: uppercase; }
+.agent-task-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; margin-bottom: 2px; border-radius: 3px; background: rgba(255,255,255,0.01); }
+.agent-task-item.active { background: rgba(34,197,94,0.04); border-left: 2px solid #22c55e; }
+.agent-task-tool { font-size: 10px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; }
+.agent-task-agent { font-size: 9px; color: #a78bfa; padding: 1px 4px; background: rgba(167,139,250,0.08); border-radius: 2px; }
+.agent-task-status { margin-left: auto; font-size: 9px; color: var(--text-dim); text-transform: capitalize; }
+.agent-task-time { font-size: 8px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+
 /* ── Enhanced Mobile Responsive ─────────────────────────── */
 @media (max-width: 768px) {
   .slide-panel-left, .slide-panel-right {
