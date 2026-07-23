@@ -1,0 +1,14 @@
+{
+  "projects": [
+    {
+      "id": "proj_77c12f9c5cf01c6f",
+      "name": "Guardian Anti-Thief",
+      "api_key": "sk-soda-Dq8QxEXZGtDsdeVjcLtHCfralyyRC4Sqg95im42y5yg",
+      "endpoint": "https://guardian-admin.onrender.com",
+      "created_at": 1784834492.7475445,
+      "last_status": "unknown",
+      "last_data": null,
+      "last_error": null
+    }
+  ]
+}
