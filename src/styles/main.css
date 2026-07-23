@@ -2312,6 +2312,50 @@ body.widget-mode #root {
   }
 }
 
+/* ── Wake Sequence ──────────────────────────────────────── */
+@keyframes ws-scan {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(100vh); }
+}
+@keyframes ws-splash-ring {
+  from { r: 30; stroke-opacity: 0.5; stroke-width: 2; }
+  to   { r: 120; stroke-opacity: 0; stroke-width: 0.5; }
+}
+@keyframes ws-glitch-slice {
+  0%   { clip-path: inset(0 0 92% 0); transform: translate(-2px, 0); }
+  10%  { clip-path: inset(40% 0 0 0); transform: translate(2px, 0); }
+  20%  { clip-path: inset(60% 0 18% 0); transform: translate(-1px, 0); }
+  30%  { clip-path: inset(8% 0 70% 0); transform: translate(1px, 0); }
+  40%  { clip-path: inset(30% 0 50% 0); transform: translate(-3px, 0); }
+  50%  { clip-path: inset(75% 0 5% 0); transform: translate(2px, 0); }
+  60%  { clip-path: inset(15% 0 65% 0); transform: translate(-1px, 0); }
+  70%  { clip-path: inset(50% 0 25% 0); transform: translate(3px, 0); }
+  80%  { clip-path: inset(85% 0 0 0); transform: translate(-2px, 0); }
+  90%  { clip-path: inset(25% 0 55% 0); transform: translate(1px, 0); }
+  100% { clip-path: inset(0 0 0 0); transform: translate(0, 0); }
+}
+@keyframes ws-glitch-flicker {
+  0%, 100% { opacity: 1; text-shadow: 0 0 8px #0ff, 0 0 20px #0ff, 0 0 40px #06f; }
+  3%       { opacity: 0.7; text-shadow: -3px 0 #ff0040, 3px 0 #00f5ff, 0 0 10px #0ff; }
+  6%       { opacity: 1; text-shadow: 0 0 8px #0ff, 0 0 20px #0ff, 0 0 40px #06f; }
+  25%      { opacity: 0.9; text-shadow: 2px 0 #ff0040, -2px 0 #00f5ff, 0 0 15px #0ff; }
+  27%      { opacity: 1; text-shadow: 0 0 8px #0ff, 0 0 20px #0ff, 0 0 40px #06f; }
+  55%      { opacity: 0.85; text-shadow: -1px 0 #ff0040, 1px 0 #0ff, 0 0 12px #0ff; }
+  57%      { opacity: 1; text-shadow: 0 0 8px #0ff, 0 0 20px #0ff, 0 0 40px #06f; }
+}
+@keyframes ws-bracket-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes ws-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes ws-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 /* ── Reduced motion ─────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .slide-panel {

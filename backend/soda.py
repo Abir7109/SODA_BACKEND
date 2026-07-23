@@ -2626,6 +2626,7 @@ class AudioLoop:
             asyncio.create_task(self._emit_personality("greeting"))
             if self.sio:
                 await self.sio.emit("window_restore")
+                await self.sio.emit("wake_sequence", {"active": True})
 
             # Step 1: Maximize Chrome tab via local agent
             if _connected_agents:

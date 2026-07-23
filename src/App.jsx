@@ -114,6 +114,7 @@ import WebviewActionService from './services/WebviewActionService'
 import SlidePanel from './components/SlidePanel'
 import CameraCapture from './components/CameraCapture'
 import HolographicOrb from './components/HolographicOrb'
+import WakeSequence from './components/WakeSequence'
 import Notepad from './components/Notepad'
 import BackgroundWidget from './components/BackgroundWidget'
 import PasteBox from './components/pastebox/PasteBox'
@@ -667,6 +668,7 @@ export default function App() {
   const [idleMode, setIdleMode] = useState(false)
   const [backgroundMode, setBackgroundMode] = useState(false)
   const [speakingState, setSpeakingState] = useState('idle')
+  const [waking, setWaking] = useState(false)
   const personalityTimerRef = useRef(null)
 
   // ── Browser mic capture (web) ──
@@ -1452,6 +1454,12 @@ export default function App() {
       }
     }
     socket.on('speaking_state', onSpeakingState)
+    const onWakeSequence = (data) => {
+      if (data && data.active) {
+        setWaking(true)
+      }
+    }
+    socket.on('wake_sequence', onWakeSequence)
     socket.on('personality', onPersonality)
     socket.on('shutdown', onShutdown)
     socket.on('stop_audio', stopAudio)
@@ -1934,7 +1942,7 @@ export default function App() {
                   transition: 'opacity 0.6s ease',
                 }}
               >
-                <HolographicOrb size={orbSize} micLevel={orbMicLevel} mood={personalityMood} idle={idleMode} />
+                <HolographicOrb size={orbSize} micLevel={orbMicLevel} mood={personalityMood} idle={idleMode} waking={waking} />
               </div>
               {idleMode && (
                 <div className="idle-label">SODA is in Idle Mode</div>
@@ -2009,6 +2017,7 @@ export default function App() {
     </PanelSpaceProvider>
     </AnimationErrorBoundary>
     {task && VISION_TOOLS.has(task.tool) && <CameraCapture />}
+    <WakeSequence active={waking} onComplete={() => setWaking(false)} />
     </>
     </RootErrorBoundary>
   )

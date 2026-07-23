@@ -142,6 +142,7 @@ export default function HolographicOrb({
   lang = 'en',
   mood = 'neutral',
   idle = false,
+  waking = false,
 }) {
   const canvasRef = useRef(null)
 
@@ -155,11 +156,11 @@ export default function HolographicOrb({
     lastTime: 0,
   })
 
-  const propsRef = useRef({ size, micLevel, isSpeaking, isListening, lang, mood, idle })
+  const propsRef = useRef({ size, micLevel, isSpeaking, isListening, lang, mood, idle, waking })
 
   useEffect(() => {
-    propsRef.current = { size, micLevel, isSpeaking, isListening, lang, mood, idle }
-  }, [size, micLevel, isSpeaking, isListening, lang, mood, idle])
+    propsRef.current = { size, micLevel, isSpeaking, isListening, lang, mood, idle, waking }
+  }, [size, micLevel, isSpeaking, isListening, lang, mood, idle, waking])
 
   useEffect(() => {
     const inwardFlows = []
@@ -409,15 +410,18 @@ export default function HolographicOrb({
   return (
     <div className="flex flex-col items-center justify-center select-none">
       <div
-        className="relative flex items-center justify-center transition-all duration-300"
+        className="relative flex items-center justify-center"
         style={{
           width: `${size}px`,
           height: `${size}px`,
-          filter: idle
-            ? 'grayscale(100%) drop-shadow(0 0 15px rgba(128,128,128,0.2))'
-            : (isSpeaking
-              ? SPEAKING_PALETTE.dropShadow
-              : (MOOD_COLORS[mood] || MOOD_COLORS.neutral).dropShadow),
+          transition: 'filter 0.8s ease',
+          filter: waking
+            ? (MOOD_COLORS[mood] || MOOD_COLORS.neutral).dropShadow
+            : idle
+              ? 'grayscale(100%) drop-shadow(0 0 15px rgba(128,128,128,0.2))'
+              : (isSpeaking
+                ? SPEAKING_PALETTE.dropShadow
+                : (MOOD_COLORS[mood] || MOOD_COLORS.neutral).dropShadow),
         }}
       >
         <canvas ref={canvasRef} className="block z-10" style={{ pointerEvents: 'none' }} />
