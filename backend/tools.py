@@ -1913,9 +1913,10 @@ register_project_tool = {
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "name": {"type": "STRING", "description": "Project name (e.g. 'Guardian Lock'"}
+            "name": {"type": "STRING", "description": "Project name (e.g. 'Guardian Lock')"},
+            "endpoint": {"type": "STRING", "description": "Base URL of the project's SODA stats endpoint (e.g. 'https://guardian-admin.onrender.com')"}
         },
-        "required": ["name"]
+        "required": ["name", "endpoint"]
     }
 }
 
