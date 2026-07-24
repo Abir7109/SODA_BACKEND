@@ -68,7 +68,7 @@ async def query(project_id: str) -> dict:
         return {"success": False, "error": "Project not found"}
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=45) as client:
             resp = await client.get(
                 f"{entry['endpoint']}/api/soda-stats",
                 headers={"Authorization": f"Bearer {entry['api_key']}"},

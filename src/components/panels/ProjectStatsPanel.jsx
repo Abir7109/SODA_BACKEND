@@ -4,16 +4,21 @@ import { Activity, Globe, Zap, CheckCircle, XCircle, Clock, ExternalLink } from 
 
 function ProjectCard({ project, onQuery }) {
   const [expanded, setExpanded] = useState(false)
-  const data = project.data || project
+  const body = project.data || project
   const isOnline = project.success !== false
-  const stats = data.stats || {}
+  const statFields = body.stats || Object.fromEntries(
+    Object.entries(body).filter(([k]) => !['project','status','uptime','recentEvents'].includes(k))
+  )
 
   return (
     <div className="sp-result-card" style={{ cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Globe size={12} style={{ color: isOnline ? '#22c55e' : '#ef4444' }} />
-          <span className="font-semibold text-xs" style={{ color: 'var(--text-primary)' }}>{data.project || project.name || 'Project'}</span>
+          <span className="font-semibold text-xs" style={{ color: 'var(--text-primary)' }}>{body.project || project.name || 'Project'}</span>
+          {body.status && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(0,251,251,0.1)', color: 'var(--accent)' }}>{body.status}</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {isOnline
@@ -30,13 +35,31 @@ function ProjectCard({ project, onQuery }) {
         </div>
       </div>
 
-      {expanded && stats && Object.keys(stats).length > 0 && (
+      {expanded && Object.keys(statFields).length > 0 && (
         <div className="grid grid-cols-2 gap-1 mt-2">
-          {Object.entries(stats).map(([key, val]) => (
+          {Object.entries(statFields).map(([key, val]) => (
             <div key={key} className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-dim)' }}>
               <Zap size={8} />
               <span className="capitalize">{key.replace(/_/g, ' ')}:</span>
               <span style={{ color: 'var(--text-primary)' }}>{String(val)}</span>
+            </div>
+          ))}
+          {body.uptime != null && (
+            <div className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-dim)' }}>
+              <Clock size={8} />
+              <span>uptime:</span>
+              <span style={{ color: 'var(--text-primary)' }}>{Math.round(body.uptime)}s</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {expanded && body.recentEvents?.length > 0 && (
+        <div className="mt-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+          <div className="text-[9px] mb-1" style={{ color: 'var(--text-dim)' }}>Recent Events</div>
+          {body.recentEvents.slice(0, 3).map((e, i) => (
+            <div key={i} className="text-[9px] truncate" style={{ color: 'var(--text-dim)' }}>
+              {e.type}: {e.details || e.timestamp?.slice(0, 10)}
             </div>
           ))}
         </div>
@@ -44,13 +67,6 @@ function ProjectCard({ project, onQuery }) {
 
       {project.error && (
         <div className="text-[10px] mt-1" style={{ color: '#ef4444' }}>{project.error}</div>
-      )}
-
-      {project.response_time_ms != null && (
-        <div className="flex items-center gap-1 mt-1 text-[10px]" style={{ color: 'var(--text-dim)' }}>
-          <Clock size={8} />
-          {project.response_time_ms}ms
-        </div>
       )}
     </div>
   )
