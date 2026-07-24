@@ -783,30 +783,32 @@ def _build_system_prompt():
 "'every 30 minutes', 'tomorrow at 8am', 'in 10 minutes', 'at 3pm'.\n"
     )
     # ── Project Registry ────────────────────────────────────────────
+    _registered_names = []
+    try:
+        import project_registry as _pr
+        _registered_names = [p["name"] for p in _pr.list_projects()]
+    except Exception:
+        pass
     _project_registry_block = (
         "\n\nPROJECT REGISTRY:\n"
         "- SODA can register, query, and manage external projects via API keys.\n"
         "- Each project exposes GET /api/soda-stats with Bearer token auth.\n"
-        "\nWHEN USER ASKS ABOUT THEIR PROJECTS:\n"
-        "- 'check [project name]', 'how is [project]', '[project] stats', "
-        "'show [project] analytics' → call list_projects() first, then "
-        "call query_project(project_id='<id_from_list>') for detailed stats.\n"
-        "- 'check all my projects', 'how are all my sites', 'show all stats', "
-        "'project overview' → call query_all_projects() to query every registered project.\n"
-        "- 'show my projects', 'what projects are connected', 'list projects' → "
-        "call list_projects() to see all registered projects.\n"
-        "\nWHEN USER WANTS TO ADD A PROJECT:\n"
-        "- 'add [name]', 'register [name]', 'connect [name]' → ask for the project's "
-        "endpoint URL, then call register_project(name='...', endpoint='...'). "
-        "The endpoint should be the base URL of their deployed admin/server. "
-        "SODA generates an API key and stores it. The user must set this key "
-        "as SODA_API_KEY env var on their server.\n"
-        "\nWHEN USER WANTS TO REMOVE:\n"
-        "- 'remove project [name/id]', 'delete [project]' → "
-        "call list_projects() to get ID, then remove_project(project_id='...').\n"
-        "\nREGISTERED PROJECTS:\n"
-        "There are already some registered projects in the local registry. "
-        "You can call list_projects() anytime to see them.\n"
+        "\nCRITICAL WORKFLOW — ALWAYS FOLLOW THESE EXACT STEPS:\n"
+        "When user says anything about projects — 'check projects', 'project stats', "
+        "'how is [name]', 'show projects', 'list projects', 'registered projects', "
+        "'my projects', 'Guardian', 'website stats', any project name — "
+        "ALWAYS call list_projects() IMMEDIATELY. Do NOT guess project IDs or names.\n"
+        "1. Call list_projects() FIRST — it returns all registered projects with their IDs.\n"
+        "2. Read the returned list. If the user's project IS in the list, "
+        "call query_project(project_id='<the_exact_id>') to get live stats.\n"
+        "3. If query_project returns success:true, read the stats aloud to the user.\n"
+        "4. If user says 'check all' or no specific project — call query_all_projects().\n"
+        f"\nCURRENTLY REGISTERED PROJECTS: {_registered_names}\n"
+        "\nIMPORTANT: query_project accepts both project IDs AND project names. "
+        "You can pass a project name (e.g. 'Guardian Anti-Thief' or even 'Guardian') "
+        "instead of the ID. The backend will find the matching project.\n"
+        "\nALWAYS call list_projects() first to confirm the project exists "
+        "before telling the user it's not found. Do NOT guess or hallucinate.\n"
     )
     base += _project_registry_block
     try:
@@ -3840,12 +3842,19 @@ TEXT: {text}"""
         elif name == "list_projects":
             import project_registry
             r = project_registry.list_projects()
+            if self.sio:
+                await self.sio.emit("tool_result", {
+                    "tool": "list_projects",
+                    "result": r,
+                    "panel": "ProjectStatsPanel",
+                    "forced": True,
+                })
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         elif name == "query_project":
             import project_registry
             r = await project_registry.query(project_id=args.get("project_id", ""))
-            if self.sio and r.get("success"):
+            if self.sio:
                 await self.sio.emit("tool_result", {
                     "tool": "query_project",
                     "result": r,

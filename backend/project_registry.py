@@ -61,9 +61,12 @@ def remove(project_id: str) -> dict:
 
 async def query(project_id: str) -> dict:
     data = _load()
+    pid = project_id.lower().strip()
     entry = next((p for p in data["projects"] if p["id"] == project_id), None)
     if not entry:
-        entry = next((p for p in data["projects"] if p["name"].lower() == project_id.lower()), None)
+        entry = next((p for p in data["projects"] if p["name"].lower() == pid), None)
+    if not entry:
+        entry = next((p for p in data["projects"] if pid in p["name"].lower()), None)
     if not entry:
         return {"success": False, "error": "Project not found"}
 
