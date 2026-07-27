@@ -91,6 +91,9 @@ import GitHubPanel from './components/panels/GitHubPanel'
 import DeployPanel from './components/panels/DeployPanel'
 import PageSpeedPanel from './components/panels/PageSpeedPanel'
 import BrowserPanel from './components/panels/BrowserPanel'
+import LeadFinderPanel from './components/panels/LeadFinderPanel'
+import ResearchResultsPanel from './components/panels/ResearchResultsPanel'
+import BackgroundTaskPanel from './components/panels/BackgroundTaskPanel'
 import EmailPanel from './components/panels/EmailPanel'
 import ProjectStatsPanel from './components/panels/ProjectStatsPanel'
 import MemoryPanel from './components/panels/MemoryPanel'
@@ -655,6 +658,9 @@ export default function App() {
   const [deployPanel, setDeployPanel] = useState({ visible: false, data: null })
   const [pageSpeedPanel, setPageSpeedPanel] = useState({ visible: false, data: null })
   const [browserPanel, setBrowserPanel] = useState({ visible: false, data: null })
+  const [leadFinderPanel, setLeadFinderPanel] = useState({ visible: false, data: null })
+  const [researchResultsPanel, setResearchResultsPanel] = useState({ visible: false, data: null })
+  const [backgroundTaskPanel, setBackgroundTaskPanel] = useState({ visible: false, data: null })
   const [emailPanel, setEmailPanel] = useState({ visible: false, data: null })
   const [projectStatsPanel, setProjectStatsPanel] = useState({ visible: false, data: null })
   const [ieltsDashboard, setIeltsDashboard] = useState({ visible: false, data: null, direction: 'right' })
@@ -1005,6 +1011,15 @@ export default function App() {
           case 'BrowserPanel':
             setBrowserPanel({ visible: true, data: result })
             return
+          case 'LeadFinderPanel':
+            setLeadFinderPanel({ visible: true, data: result })
+            return
+          case 'ResearchResultsPanel':
+            setResearchResultsPanel({ visible: true, data: result })
+            return
+          case 'BackgroundTaskPanel':
+            setBackgroundTaskPanel({ visible: true, data: result })
+            return
           case 'EmailPanel':
             setEmailPanel({ visible: true, data: result.result || result })
             return
@@ -1313,6 +1328,18 @@ export default function App() {
       if (data) setEmailPanel({ visible: true, data })
     }
     socket.on('email_data', onEmailData)
+    const onLeadData = (data) => {
+      if (data) setLeadFinderPanel({ visible: true, data })
+    }
+    socket.on('lead_data', onLeadData)
+    const onResearchData = (data) => {
+      if (data) setResearchResultsPanel({ visible: true, data })
+    }
+    socket.on('research_data', onResearchData)
+    const onBgTaskStatus = (data) => {
+      if (data) setBackgroundTaskPanel(prev => ({ visible: true, data: prev.data ? { ...prev.data, tasks: [...(prev.data.tasks || []).filter(t => t.task_id !== data.task_id), data] } : data }))
+    }
+    socket.on('bg_task_status', onBgTaskStatus)
     const onOpenUrl = (data) => {
       if (data && data.url) openUrlInFloatingWindow(data.url, data.webview_id)
     }
@@ -1534,6 +1561,9 @@ export default function App() {
       socket.off('pentest_scan_progress', onPentestProgress)
       socket.off('pentest_output', onPentestOutput)
       socket.off('email_data', onEmailData)
+      socket.off('lead_data', onLeadData)
+      socket.off('research_data', onResearchData)
+      socket.off('bg_task_status', onBgTaskStatus)
       if (clearTaskTimeoutRef.current) clearTimeout(clearTaskTimeoutRef.current)
     }
   }, [])
@@ -1858,6 +1888,18 @@ export default function App() {
         onClose={() => setPageSpeedPanel(prev => ({ ...prev, visible: false }))} />
       <BrowserPanel visible={browserPanel.visible} data={browserPanel.data}
         onClose={() => setBrowserPanel(prev => ({ ...prev, visible: false }))} />
+      <LeadFinderPanel visible={leadFinderPanel.visible} data={leadFinderPanel.data}
+        onClose={() => setLeadFinderPanel(prev => ({ ...prev, visible: false }))}
+        onBuildWebsite={(leads) => {
+          setLeadFinderPanel(prev => ({ ...prev, visible: false }))
+          const prompt = `Build professional single-page websites for these businesses that don't have one: ${leads.map(l => l.name).join(', ')}. Generate HTML/CSS/JS for each.`
+          setBackgroundTaskPanel({ visible: true, data: {} })
+          // ponytail: socket emit handled by backend bg_spawn — this just opens the panel
+        }} />
+      <ResearchResultsPanel visible={researchResultsPanel.visible} data={researchResultsPanel.data}
+        onClose={() => setResearchResultsPanel(prev => ({ ...prev, visible: false }))} />
+      <BackgroundTaskPanel visible={backgroundTaskPanel.visible} data={backgroundTaskPanel.data}
+        onClose={() => setBackgroundTaskPanel(prev => ({ ...prev, visible: false }))} />
       <EmailPanel visible={emailPanel.visible} data={emailPanel.data}
         onClose={() => setEmailPanel(prev => ({ ...prev, visible: false }))} />
       <ProjectStatsPanel visible={projectStatsPanel.visible} data={projectStatsPanel.data}

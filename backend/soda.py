@@ -3051,6 +3051,101 @@ class AudioLoop:
                     }))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
+        # ── Lead Finder ──────────────────────────────────────────
+        elif name == "find_leads":
+            from lead_finder import find_leads
+            query = args.get("query", "")
+            location = args.get("location", "")
+            min_rating = args.get("min_rating", 0)
+            max_results = min(args.get("max_results", 20), 100)
+            r = find_leads(query, location, min_rating, max_results)
+            if self.sio and r.get("success"):
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("lead_data", r))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "enrich_leads":
+            from lead_finder import enrich_lead
+            r = enrich_lead(args.get("place_id", ""))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "export_leads":
+            from lead_finder import export_leads_csv, export_leads_json
+            import json as _json
+            data_str = args.get("data", "[]")
+            fmt = args.get("format", "csv")
+            try:
+                data = _json.loads(data_str) if isinstance(data_str, str) else data_str
+            except (_json.JSONDecodeError, TypeError):
+                data = []
+            if fmt == "csv":
+                content = export_leads_csv(data)
+            else:
+                content = export_leads_json(data)
+            return types.FunctionResponse(id=fc.id, name=name, response={
+                "result": {"success": True, "format": fmt, "content": content}
+            })
+
+        # ── Research Engine V2 ───────────────────────────────────
+        elif name == "deep_research":
+            from research_engine import deep_research
+            topic = args.get("topic", "")
+            depth = args.get("depth", "normal")
+            r = await deep_research(topic, depth)
+            if self.sio and r.get("success"):
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("research_data", r))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "export_research":
+            from research_engine import export_research
+            data_str = args.get("research_data", "{}")
+            fmt = args.get("format", "json")
+            import json as _json
+            try:
+                data = _json.loads(data_str) if isinstance(data_str, str) else data_str
+            except (_json.JSONDecodeError, TypeError):
+                data = {}
+            r = await export_research(data, fmt)
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        # ── Background Agent Management ─────────────────────────
+        elif name == "bg_spawn":
+            from background_agent_manager import BackgroundAgentManager
+            prompt = args.get("prompt", "")
+            workdir = args.get("workdir", "")
+            sio_ref = self.sio
+            async def _on_done(status):
+                if sio_ref:
+                    await sio_ref.emit("bg_task_status", {**status, "phase": status["phase"]})
+            r = await BackgroundAgentManager.spawn(prompt, workdir, on_complete=_on_done)
+            if self.sio:
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("bg_task_status", r))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "bg_status":
+            from background_agent_manager import BackgroundAgentManager
+            r = BackgroundAgentManager.get_status(args.get("task_id", ""))
+            if r is None:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": {"success": False, "error": "Task not found"}})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "bg_kill":
+            from background_agent_manager import BackgroundAgentManager
+            r = await BackgroundAgentManager.kill(args.get("task_id", ""))
+            if r is None:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": {"success": False, "error": "Task not found"}})
+            if self.sio:
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("bg_task_status", r))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "bg_list":
+            from background_agent_manager import BackgroundAgentManager
+            r = BackgroundAgentManager.list_tasks()
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": {"success": True, "tasks": r}})
+
         elif name == "open_app":
             app_name = args.get("app_name", "")
             app_lower = app_name.lower().strip()

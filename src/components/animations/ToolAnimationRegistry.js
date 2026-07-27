@@ -113,6 +113,21 @@ export const TOOL_ANIMATIONS = {
   browser_dialog:       { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
   browser_cdp:          { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
 
+  // ── Lead Finder ──────────────────────────────────────────────
+  find_leads:      { component: 'DataAnim', variant: 'search', panel: 'LeadFinderPanel', panelDir: 'right' },
+  enrich_leads:    { component: 'DataAnim', variant: 'search' },
+  export_leads:    { component: 'DataAnim', variant: 'search' },
+
+  // ── Research Engine V2 ───────────────────────────────────────
+  deep_research:   { component: 'SearchAnimation', variant: 'results', panel: 'ResearchResultsPanel', panelDir: 'right' },
+  export_research: { component: 'DataAnim', variant: 'search' },
+
+  // ── Background Agent Management ──────────────────────────────
+  bg_spawn:        { component: 'BackgroundCommandAnim', variant: 'exec', panel: 'BackgroundTaskPanel', panelDir: 'right' },
+  bg_status:       { component: 'DefaultAnimation', variant: 'default' },
+  bg_kill:         { component: 'CloseAnim', variant: 'panel' },
+  bg_list:         { component: 'DefaultAnimation', variant: 'default', panel: 'BackgroundTaskPanel', panelDir: 'right' },
+
   // ── Task Planning ────────────────────────────────────────────
   plan_tasks:  { component: 'AiTerminalCompiler', variant: 'default' },
   update_task: { component: 'AiTerminalCompiler', variant: 'default' },

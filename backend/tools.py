@@ -1906,6 +1906,122 @@ pentest_browser_target_tool = {
     }
 }
 
+# ── Lead Finder ──────────────────────────────────────────────
+find_leads_tool = {
+    "name": "find_leads",
+    "description": "Search Google Places for local businesses. Returns name, address, phone, website, rating. Use to find prospects, find businesses without websites, or build a lead list for outreach.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "query": {"type": "STRING", "description": "Business type or category to search (e.g. 'plumber', 'bakery', 'auto repair')"},
+            "location": {"type": "STRING", "description": "City and state or region (e.g. 'Austin, TX', 'Berlin, Germany')"},
+            "min_rating": {"type": "NUMBER", "description": "Minimum rating filter (0-5, default 0 for no filter)"},
+            "max_results": {"type": "INTEGER", "description": "Maximum leads to return (default 20, max 100)"},
+        },
+        "required": ["query", "location"]
+    }
+}
+
+enrich_leads_tool = {
+    "name": "enrich_leads",
+    "description": "Get detailed info for a single business from Google Places by place_id. Includes full address, hours, price level.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "place_id": {"type": "STRING", "description": "The place_id from find_leads results"}
+        },
+        "required": ["place_id"]
+    }
+}
+
+export_leads_tool = {
+    "name": "export_leads",
+    "description": "Export a list of business leads to CSV, JSON, or Markdown format. Use after find_leads to save results.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "data": {"type": "STRING", "description": "JSON string of the leads array from find_leads"},
+            "format": {"type": "STRING", "description": "Export format: 'csv', 'json', or 'markdown'"}
+        },
+        "required": ["data", "format"]
+    }
+}
+
+# ── Research Engine V2 ──────────────────────────────────────
+deep_research_tool = {
+    "name": "deep_research",
+    "description": "Perform deep multi-source research on a topic. Searches web, scrapes pages, and synthesizes findings with charts and statistics. Use for market research, competitive analysis, topic investigation.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "topic": {"type": "STRING", "description": "Research topic or question"},
+            "depth": {"type": "STRING", "description": "'quick' (search only), 'normal' (search + top pages), or 'deep' (full synthesis with charts)"},
+        },
+        "required": ["topic"]
+    }
+}
+
+export_research_tool = {
+    "name": "export_research",
+    "description": "Export research results from deep_research to JSON or Markdown format.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "research_data": {"type": "STRING", "description": "The full result JSON string from deep_research"},
+            "format": {"type": "STRING", "description": "Export format: 'json' or 'markdown'"}
+        },
+        "required": ["research_data", "format"]
+    }
+}
+
+# ── Background Agent Management ─────────────────────────────
+bg_spawn_tool = {
+    "name": "bg_spawn",
+    "description": "Run a task in the background using OpenCode CLI. Returns immediately with a task_id. Use for long-running tasks like building a website, code generation, or any task that takes more than 30 seconds. The task runs asynchronously and the frontend will notify when complete.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "prompt": {"type": "STRING", "description": "The full prompt to give OpenCode for the background task"},
+            "workdir": {"type": "STRING", "description": "Working directory for the task (optional, defaults to project root)"},
+        },
+        "required": ["prompt"]
+    }
+}
+
+bg_status_tool = {
+    "name": "bg_status",
+    "description": "Check the status of a background task by task_id. Returns phase, output, elapsed time, and exit code.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "task_id": {"type": "STRING", "description": "The task_id returned by bg_spawn"}
+        },
+        "required": ["task_id"]
+    }
+}
+
+bg_kill_tool = {
+    "name": "bg_kill",
+    "description": "Terminate a running background task by task_id.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "task_id": {"type": "STRING", "description": "The task_id of the task to kill"}
+        },
+        "required": ["task_id"]
+    }
+}
+
+bg_list_tool = {
+    "name": "bg_list",
+    "description": "List all background tasks with their status, elapsed time, and output preview.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
 read_emails_tool = {
     "name": "read_emails",
     "description": (
@@ -2260,6 +2376,21 @@ tools_list = [{"function_declarations": [
     browser_get_images_tool,
     browser_dialog_tool,
     browser_cdp_tool,
+
+    # ── Lead Finder ──
+    find_leads_tool,
+    enrich_leads_tool,
+    export_leads_tool,
+
+    # ── Research Engine V2 ──
+    deep_research_tool,
+    export_research_tool,
+
+    # ── Background Agent Management ──
+    bg_spawn_tool,
+    bg_status_tool,
+    bg_kill_tool,
+    bg_list_tool,
 
     read_emails_tool,
     send_email_tool,
