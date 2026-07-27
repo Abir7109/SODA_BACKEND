@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Search, Download, Globe, MapPin, Star, X, ExternalLink, Monitor } from 'lucide-react'
 import SlidePanel from '../SlidePanel'
 
@@ -8,6 +8,7 @@ export default function LeadFinderPanel({ visible, data, onClose, onBuildWebsite
   const [searchQuery, setSearchQuery] = useState('')
 
   if (!data) return null
+
   if (data.error) {
     return (
       <SlidePanel visible={visible} direction="right" title="LEADS" icon={<Search size={11} />}
@@ -18,21 +19,17 @@ export default function LeadFinderPanel({ visible, data, onClose, onBuildWebsite
   }
 
   const { query, location, total, without_website, leads = [] } = data
-
-  const filtered = useMemo(() => {
-    let items = [...leads]
-    if (filterSite === 'no_website') items = items.filter(l => !l.website)
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase()
-      items = items.filter(l => (l.name || '').toLowerCase().includes(q) || (l.address || '').toLowerCase().includes(q))
-    }
-    items.sort((a, b) => {
-      if (sortKey === 'rating') return (b.rating || 0) - (a.rating || 0)
-      if (sortKey === 'name') return (a.name || '').localeCompare(b.name || '')
-      return 0
-    })
-    return items
-  }, [leads, filterSite, searchQuery, sortKey])
+  let filtered = [...leads]
+  if (filterSite === 'no_website') filtered = filtered.filter(l => !l.website)
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase()
+    filtered = filtered.filter(l => (l.name || '').toLowerCase().includes(q) || (l.address || '').toLowerCase().includes(q))
+  }
+  filtered.sort((a, b) => {
+    if (sortKey === 'rating') return (b.rating || 0) - (a.rating || 0)
+    if (sortKey === 'name') return (a.name || '').localeCompare(b.name || '')
+    return 0
+  })
 
   function downloadCSV() {
     const header = 'name,phone,address,website,email,rating,review_count,types\n'
