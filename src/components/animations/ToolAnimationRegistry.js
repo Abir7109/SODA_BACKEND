@@ -114,13 +114,13 @@ export const TOOL_ANIMATIONS = {
   browser_cdp:          { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
 
   // ── Lead Finder ──────────────────────────────────────────────
-  find_leads:      { component: 'DataAnim', variant: 'search', panel: 'LeadFinderPanel', panelDir: 'right' },
-  enrich_leads:    { component: 'DataAnim', variant: 'search' },
-  export_leads:    { component: 'DataAnim', variant: 'search' },
+  find_leads:      { component: 'SearchAnimation', variant: 'radar', panel: 'LeadFinderPanel', panelDir: 'right' },
+  enrich_leads:    { component: 'DefaultAnimation', variant: 'default' },
+  export_leads:    { component: 'DefaultAnimation', variant: 'default' },
 
   // ── Research Engine V2 ───────────────────────────────────────
   deep_research:   { component: 'SearchAnimation', variant: 'results', panel: 'ResearchResultsPanel', panelDir: 'right' },
-  export_research: { component: 'DataAnim', variant: 'search' },
+  export_research: { component: 'DefaultAnimation', variant: 'default' },
 
   // ── Background Agent Management ──────────────────────────────
   bg_spawn:        { component: 'BackgroundCommandAnim', variant: 'exec', panel: 'BackgroundTaskPanel', panelDir: 'right' },
