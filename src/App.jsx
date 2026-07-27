@@ -90,6 +90,7 @@ import PentestProgressIndicator from './components/PentestProgressIndicator'
 import GitHubPanel from './components/panels/GitHubPanel'
 import DeployPanel from './components/panels/DeployPanel'
 import PageSpeedPanel from './components/panels/PageSpeedPanel'
+import BrowserPanel from './components/panels/BrowserPanel'
 import EmailPanel from './components/panels/EmailPanel'
 import ProjectStatsPanel from './components/panels/ProjectStatsPanel'
 import MemoryPanel from './components/panels/MemoryPanel'
@@ -653,6 +654,7 @@ export default function App() {
   const [gitHubPanel, setGitHubPanel] = useState({ visible: false, data: null })
   const [deployPanel, setDeployPanel] = useState({ visible: false, data: null })
   const [pageSpeedPanel, setPageSpeedPanel] = useState({ visible: false, data: null })
+  const [browserPanel, setBrowserPanel] = useState({ visible: false, data: null })
   const [emailPanel, setEmailPanel] = useState({ visible: false, data: null })
   const [projectStatsPanel, setProjectStatsPanel] = useState({ visible: false, data: null })
   const [ieltsDashboard, setIeltsDashboard] = useState({ visible: false, data: null, direction: 'right' })
@@ -999,6 +1001,9 @@ export default function App() {
             return
           case 'PageSpeedPanel':
             setPageSpeedPanel({ visible: true, data: result })
+            return
+          case 'BrowserPanel':
+            setBrowserPanel({ visible: true, data: result })
             return
           case 'EmailPanel':
             setEmailPanel({ visible: true, data: result.result || result })
@@ -1851,6 +1856,8 @@ export default function App() {
         onClose={() => setDeployPanel(prev => ({ ...prev, visible: false }))} />
       <PageSpeedPanel visible={pageSpeedPanel.visible} data={pageSpeedPanel.data}
         onClose={() => setPageSpeedPanel(prev => ({ ...prev, visible: false }))} />
+      <BrowserPanel visible={browserPanel.visible} data={browserPanel.data}
+        onClose={() => setBrowserPanel(prev => ({ ...prev, visible: false }))} />
       <EmailPanel visible={emailPanel.visible} data={emailPanel.data}
         onClose={() => setEmailPanel(prev => ({ ...prev, visible: false }))} />
       <ProjectStatsPanel visible={projectStatsPanel.visible} data={projectStatsPanel.data}

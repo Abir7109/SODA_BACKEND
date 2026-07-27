@@ -101,6 +101,10 @@ LOCAL_TOOLS = [
     "browser_command",
     "app_search", "app_scroll",
     "browser_automate",
+    # Hermes-style browser automation (Playwright-based)
+    "browser_navigate", "browser_snapshot", "browser_click", "browser_type",
+    "browser_scroll", "browser_back", "browser_press", "browser_vision",
+    "browser_console", "browser_get_images", "browser_dialog", "browser_cdp",
     "credential_save", "credential_get", "credential_list", "credential_delete",
 ]
 
@@ -2399,6 +2403,21 @@ def _dispatch(tool, args):
             "steps_executed": len(results),
             "results": results
         }
+
+    # ── Hermes-Style Browser Automation ────────────────────────────
+    elif tool.startswith("browser_") and tool in (
+        "browser_navigate", "browser_snapshot", "browser_click", "browser_type",
+        "browser_scroll", "browser_back", "browser_press", "browser_vision",
+        "browser_console", "browser_get_images", "browser_dialog", "browser_cdp",
+    ):
+        try:
+            from browser_automation import dispatch as browser_dispatch
+            result = browser_dispatch(tool, args)
+            return result
+        except ImportError as e:
+            return {"success": False, "error": f"Browser automation module not available: {e}. Run install_browser_deps.ps1 first."}
+        except Exception as e:
+            return {"success": False, "error": f"Browser automation error: {e}"}
 
     # ── Fallback ──────────────────────────────────────────────────
     return {"error": f"Tool '{tool}' not implemented in local agent"}

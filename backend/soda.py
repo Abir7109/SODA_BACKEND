@@ -224,8 +224,12 @@ LOCAL_AGENT_TOOLS = {
     "send_keys_window",
     # Browser / web app control
     "browser_command", "app_search", "app_scroll",
-    # Browser automation
+    # Browser automation (legacy vision-based)
     "browser_automate",
+    # Hermes-style browser automation (Playwright-based)
+    "browser_navigate", "browser_snapshot", "browser_click", "browser_type",
+    "browser_scroll", "browser_back", "browser_press", "browser_vision",
+    "browser_console", "browser_get_images", "browser_dialog", "browser_cdp",
     # Credential manager
     "credential_save", "credential_get", "credential_list", "credential_delete",
     # Agent control
@@ -1938,6 +1942,19 @@ class AudioLoop:
                 "list_installed_apps": 15.0,
                 "refresh_app_registry": 30.0,
                 "browser_automate": 120.0,
+                # Hermes-style browser automation timeouts
+                "browser_navigate": 30.0,
+                "browser_snapshot": 15.0,
+                "browser_click": 15.0,
+                "browser_type": 15.0,
+                "browser_scroll": 10.0,
+                "browser_back": 15.0,
+                "browser_press": 10.0,
+                "browser_vision": 45.0,
+                "browser_console": 10.0,
+                "browser_get_images": 10.0,
+                "browser_dialog": 15.0,
+                "browser_cdp": 30.0,
                 "credential_save": 10.0,
                 "credential_get": 10.0,
                 "credential_list": 10.0,

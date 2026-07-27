@@ -1416,6 +1416,149 @@ browser_automate_tool = {
     }
 }
 
+# ── Hermes-Style Browser Automation (12 tools) ──
+
+browser_navigate_tool = {
+    "name": "browser_navigate",
+    "description": "Open a URL in the automated browser. Initializes a new browser session on first call (launches Chrome). Returns the page title and accessibility snapshot with element ref IDs (like @e0, @e1) that you use with browser_click and browser_type. Call this first before using any other browser_* tool.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "url": {"type": "STRING", "description": "Full URL to navigate to (must include protocol, e.g. https://example.com)"}
+        },
+        "required": ["url"]
+    }
+}
+
+browser_snapshot_tool = {
+    "name": "browser_snapshot",
+    "description": "Get the current page's interactive elements as an accessibility tree. Each interactive element has a ref ID like @e0, @e1, @e2. Use these ref IDs with browser_click and browser_type to interact with the page. The snapshot includes element roles (button, link, textbox, heading, etc.), names, values, and states (disabled, focused, required). Call this after any navigation or page change to get fresh refs.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "full": {"type": "BOOLEAN", "description": "If True, returns the full page accessibility tree including non-interactive elements. If False (default), only interactive/meaningful elements.", "default": False}
+        },
+        "required": []
+    }
+}
+
+browser_click_tool = {
+    "name": "browser_click",
+    "description": "Click an element on the page identified by its ref ID from browser_snapshot (e.g. @e3). The ref ID is the @eN identifier shown in the snapshot output. Do NOT use this for typing into text fields — use browser_type for that.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "ref": {"type": "STRING", "description": "Element ref ID from snapshot, e.g. @e3"}
+        },
+        "required": ["ref"]
+    }
+}
+
+browser_type_tool = {
+    "name": "browser_type",
+    "description": "Type text into an input field or textbox identified by its ref ID from browser_snapshot. Clears any existing content in the field first before typing the new text. Use for filling form fields, search boxes, text areas. Do NOT use for pressing keyboard keys — use browser_press for that.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "ref": {"type": "STRING", "description": "Element ref ID from snapshot to type into, e.g. @e1"},
+            "text": {"type": "STRING", "description": "The text to type into the field"}
+        },
+        "required": ["ref", "text"]
+    }
+}
+
+browser_scroll_tool = {
+    "name": "browser_scroll",
+    "description": "Scroll the current page in a direction. Use 'down' or 'up' to scroll by about one viewport height. Use 'top' to jump to the very top of the page, 'bottom' to jump to the very bottom.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "direction": {"type": "STRING", "enum": ["down", "up", "top", "bottom"], "description": "Direction to scroll: 'down', 'up', 'top', or 'bottom'"}
+        },
+        "required": ["direction"]
+    }
+}
+
+browser_back_tool = {
+    "name": "browser_back",
+    "description": "Navigate back one page in the browser's history. Equivalent to clicking the browser's back button.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
+browser_press_tool = {
+    "name": "browser_press",
+    "description": "Press a keyboard key by name. Common keys: Enter, Tab, Escape, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Backspace, Delete, Home, End. Use for submitting forms (Enter), moving between fields (Tab), dismissing dialogs (Escape), or navigating dropdowns (ArrowDown/ArrowUp). Do NOT use for typing text into fields — use browser_type for that.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "key": {"type": "STRING", "description": "Key name: Enter, Tab, Escape, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Backspace, Delete, Home, End"}
+        },
+        "required": ["key"]
+    }
+}
+
+browser_vision_tool = {
+    "name": "browser_vision",
+    "description": "Take a screenshot of the current page and analyze it with AI vision. Use this ONLY when you need to see visual content that the accessibility tree doesn't capture: images, CAPTCHAs, visual layouts, charts, graphs, visual styling, colors, complex UI layouts. For text content and interactive elements, use browser_snapshot instead (faster, cheaper, more detailed).",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "question": {"type": "STRING", "description": "What to look for in the screenshot. Be specific about what you want to identify or describe."}
+        },
+        "required": ["question"]
+    }
+}
+
+browser_console_tool = {
+    "name": "browser_console",
+    "description": "Get recent JavaScript console output from the page, including errors, warnings, and log messages. Useful for debugging why a page isn't working correctly, detecting JavaScript errors, or checking if an action succeeded.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
+browser_get_images_tool = {
+    "name": "browser_get_images",
+    "description": "List all images on the current page with their URLs, alt text, and dimensions. Useful for finding image sources, checking if images loaded, or getting information about media on the page.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
+browser_dialog_tool = {
+    "name": "browser_dialog",
+    "description": "Respond to a JavaScript dialog (alert, confirm, or prompt) that appeared on the page. Check browser_snapshot for 'pending_dialogs' to see if there are any active dialogs. Use action='accept' to click OK/Yes, or action='dismiss' to click Cancel/No. For prompt dialogs, provide the text to type in the 'text' parameter.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {"type": "STRING", "enum": ["accept", "dismiss"], "description": "'accept' for OK/Yes, 'dismiss' for Cancel/No"},
+            "text": {"type": "STRING", "description": "Text to type for prompt() dialogs (optional, only used for prompt dialogs)"}
+        },
+        "required": ["action"]
+    }
+}
+
+browser_cdp_tool = {
+    "name": "browser_cdp",
+    "description": "Send a raw Chrome DevTools Protocol command to the browser for advanced control. Only use this when the other browser tools don't support what you need. The method is a CDP method name like Page.captureScreenshot, Runtime.evaluate, Network.getCookies, etc. Params is a JSON string of method parameters. Requires CDP supervisor to be active.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "method": {"type": "STRING", "description": "CDP method name, e.g. Page.captureScreenshot, Runtime.evaluate, DOM.getDocument, Network.getCookies, Input.dispatchMouseEvent"},
+            "params": {"type": "STRING", "description": "JSON string of method parameters (optional, default '{}')"}
+        },
+        "required": ["method"]
+    }
+}
+
 # ── Scheduled Tasks ──
 
 create_scheduled_task_tool = {
@@ -2103,6 +2246,21 @@ tools_list = [{"function_declarations": [
     credential_list_tool,
     credential_delete_tool,
     browser_automate_tool,
+
+    # ── Hermes-Style Browser Automation ──
+    browser_navigate_tool,
+    browser_snapshot_tool,
+    browser_click_tool,
+    browser_type_tool,
+    browser_scroll_tool,
+    browser_back_tool,
+    browser_press_tool,
+    browser_vision_tool,
+    browser_console_tool,
+    browser_get_images_tool,
+    browser_dialog_tool,
+    browser_cdp_tool,
+
     read_emails_tool,
     send_email_tool,
     email_config_tool,

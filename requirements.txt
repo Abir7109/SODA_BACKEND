@@ -16,3 +16,4 @@ psutil
 numpy
 elevenlabs
 supabase>=2.0.0
+playwright>=1.50.0

@@ -99,6 +99,20 @@ export const TOOL_ANIMATIONS = {
   // ── Webview ──────────────────────────────────────────────────
   webview_action: { component: 'WebpageAnim', variant: 'open' },
 
+  // ── Browser Automation (Hermes-style) ────────────────────────
+  browser_navigate:     { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+  browser_snapshot:     { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+  browser_click:        { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+  browser_type:         { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+  browser_scroll:       { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+  browser_back:         { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+  browser_press:        { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+  browser_vision:       { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+  browser_console:      { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+  browser_get_images:   { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+  browser_dialog:       { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+  browser_cdp:          { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
+
   // ── Task Planning ────────────────────────────────────────────
   plan_tasks:  { component: 'AiTerminalCompiler', variant: 'default' },
   update_task: { component: 'AiTerminalCompiler', variant: 'default' },
