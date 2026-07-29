@@ -543,7 +543,7 @@ def _search_youtube(query, max_results=10):
     return results
 
 
-def search_youtube(query, browser=None, play_number=None):
+def search_youtube(query):
     if not query:
         return {"success": False, "error": "No search query provided."}
 
@@ -556,22 +556,7 @@ def search_youtube(query, browser=None, play_number=None):
     results = _search_youtube(query)
 
     if not results:
-        fallback_url = (
-            f"https://www.youtube.com/results"
-            f"?search_query={quote_plus(query)}"
-            f"&sp={_YT_VIDEO_FILTER}"
-        )
-        print(f"[YouTube] No results, opening search page")
-        return {"success": False, "error": "No results found", "fallback_url": fallback_url}
-
-    if play_number is not None:
-        idx = play_number - 1
-        if 0 <= idx < len(results):
-            video = results[idx]
-            print(f"[YouTube] Playing result {play_number}: {video['title']}")
-            open_url(video['url'], browser)
-            return {"success": True, "opened": video['url'], "title": video['title'], "number": play_number}
-        return {"success": False, "error": f"Result number {play_number} not found (have {len(results)} results)"}
+        return {"success": False, "error": "No results found"}
 
     return {"success": True, "results": results, "count": len(results)}
 

@@ -1230,11 +1230,11 @@ search_youtube_tool = {
         "WORKFLOW:\n"
         "1. Call search_youtube(query='...') to search — returns numbered results.\n"
         "2. Present the results to the user: 'I found: 1. Title, 2. Title...'\n"
-        "3. When user says 'play number N', call search_youtube(query='...', play_number=N) "
-        "to open that specific video directly in the browser.\n"
+        "3. When user says 'play number N' or 'open the Nth video', find the URL from the results "
+        "and call browser_command(action='open', url=result_url) to open it — this routes to your local agent.\n"
         "Examples:\n"
         "- search_youtube(query='python tutorial') → returns results list\n"
-        "- search_youtube(query='python tutorial', play_number=3) → opens the 3rd video"
+        "- Then: browser_command(action='open', url='https://youtube.com/watch?v=VIDEO_ID') → plays video"
     ),
     "parameters": {
         "type": "OBJECT",
@@ -1242,10 +1242,6 @@ search_youtube_tool = {
             "query": {
                 "type": "STRING",
                 "description": "Search query for YouTube"
-            },
-            "play_number": {
-                "type": "INTEGER",
-                "description": "Optional: open the Nth result (1-indexed). Use when user says 'play number N' or 'open the Nth video'."
             }
         },
         "required": ["query"]

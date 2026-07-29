@@ -702,11 +702,12 @@ def _build_system_prompt():
 "- WORKFLOW:\n"
 "  User: 'search Python tutorials on YouTube'\n"
 "  → search_youtube(query='Python tutorials')\n"
-"  → returns: {results: [{title, url, number}...]}\n"
+"  → returns: {results: [{title, url}...]}\n"
 "  → Read the titles to the user: 'I found: 1. Python for Beginners, 2. Advanced Python, 3. Python Projects...'\n"
 "  User: 'play number 3'\n"
-"  → search_youtube(query='Python tutorials', play_number=3)\n"
-"  → opens the video directly in browser (NO clicking needed)\n"
+"  → browser_command(action='open', url='https://youtube.com/watch?v=VIDEO_ID')\n"
+"  → This ROUTES TO YOUR LOCAL AGENT and opens Chrome on the user's PC. "
+"It actually works — just call it.\n"
 "\nCHECK EMAIL / GMAIL:\n"
 "- When user says 'check my email', 'check my Gmail', 'read my emails', 'any new emails', "
 "'what's in my inbox', 'check gmail' — ALWAYS use read_emails(query='UNSEEN', max_results=10). "
@@ -3186,8 +3187,7 @@ class AudioLoop:
 
         elif name == "search_youtube":
             query = args.get("query", "")
-            play_number = args.get("play_number")
-            result = system_app.search_youtube(query, play_number=play_number)
+            result = system_app.search_youtube(query)
             return types.FunctionResponse(id=fc.id, name=name, response=result)
 
         elif name == "whatsapp_find_and_call":
