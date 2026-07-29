@@ -465,61 +465,115 @@ def search_web(query, engine="google", browser=None):
     
     return open_url(url, browser)
 
-def _scrape_youtube_video(query):
+def _search_youtube(query, max_results=10):
+    """Search YouTube and return structured results.
+    Returns list of {number, title, videoId, url} or empty list."""
     if not _REQUESTS_OK:
-        return None
-    
+        return []
+
     search_url = (
         f"https://www.youtube.com/results"
         f"?search_query={quote_plus(query)}"
         f"&sp={_YT_VIDEO_FILTER}"
     )
-    
+
     try:
         r = requests.get(search_url, headers=_YT_HEADERS, timeout=10)
         html = r.text
-        
-        video_ids = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', html)
-        
-        seen = set()
-        for vid in video_ids:
-            if vid in seen:
-                continue
-            seen.add(vid)
-            
-            if f'/shorts/{vid}' in html:
-                continue
-            return f"https://www.youtube.com/watch?v={vid}"
-    
     except Exception as e:
-        print(f"[YouTube] scrape failed: {e}")
-    
-    return None
+        print(f"[YouTube] search failed: {e}")
+        return []
 
-def search_youtube(query, browser=None):
+    # Try ytInitialData JSON (has titles + videoIds)
+    try:
+        match = re.search(r'ytInitialData\s*=\s*({.*?});\s*</script>', html, re.DOTALL)
+        if match:
+            data = json.loads(match.group(1))
+            results = []
+            contents = (data.get('contents', {})
+                       .get('twoColumnSearchResultsRenderer', {})
+                       .get('primaryContents', {})
+                       .get('sectionListRenderer', {})
+                       .get('contents', []))
+            for section in contents:
+                items = (section.get('itemSectionRenderer', {})
+                        .get('contents', []))
+                for item in items:
+                    video = item.get('videoRenderer', {})
+                    if not video:
+                        continue
+                    vid = video.get('videoId', '')
+                    if not vid:
+                        continue
+                    title_runs = video.get('title', {}).get('runs', [])
+                    title = ''.join(r.get('text', '') for r in title_runs)
+                    if title:
+                        results.append({
+                            'videoId': vid,
+                            'title': title,
+                            'url': f'https://www.youtube.com/watch?v={vid}',
+                        })
+                        if len(results) >= max_results:
+                            break
+                if len(results) >= max_results:
+                    break
+            if results:
+                return results[:max_results]
+    except Exception as e:
+        print(f"[YouTube] ytInitialData parse failed: {e}")
+
+    # Fallback: regex videoId extraction
+    video_ids = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', html)
+    seen = set()
+    results = []
+    for vid in video_ids:
+        if vid in seen:
+            continue
+        seen.add(vid)
+        if f'/shorts/{vid}' in html:
+            continue
+        results.append({
+            'videoId': vid,
+            'title': f'Result {len(results) + 1}',
+            'url': f'https://www.youtube.com/watch?v={vid}',
+        })
+        if len(results) >= max_results:
+            break
+
+    return results
+
+
+def search_youtube(query, browser=None, play_number=None):
     if not query:
-        return "No search query provided."
-    
+        return {"success": False, "error": "No search query provided."}
+
     query_lower = query.lower().strip()
-    
     if "youtube" in query_lower:
         search_term = query_lower.replace("youtube", "").strip()
         if search_term:
             query = search_term
-    
-    video_url = _scrape_youtube_video(query)
-    
-    if video_url:
-        print(f"[YouTube] Playing: {video_url}")
-        return open_url(video_url, browser)
-    
-    fallback_url = (
-        f"https://www.youtube.com/results"
-        f"?search_query={quote_plus(query)}"
-        f"&sp={_YT_VIDEO_FILTER}"
-    )
-    print(f"[YouTube] Fallback to search page")
-    return open_url(fallback_url, browser)
+
+    results = _search_youtube(query)
+
+    if not results:
+        fallback_url = (
+            f"https://www.youtube.com/results"
+            f"?search_query={quote_plus(query)}"
+            f"&sp={_YT_VIDEO_FILTER}"
+        )
+        print(f"[YouTube] No results, opening search page")
+        return {"success": False, "error": "No results found", "fallback_url": fallback_url}
+
+    if play_number is not None:
+        idx = play_number - 1
+        if 0 <= idx < len(results):
+            video = results[idx]
+            print(f"[YouTube] Playing result {play_number}: {video['title']}")
+            open_url(video['url'], browser)
+            return {"success": True, "opened": video['url'], "title": video['title'], "number": play_number}
+        return {"success": False, "error": f"Result number {play_number} not found (have {len(results)} results)"}
+
+    return {"success": True, "results": results, "count": len(results)}
 
 def _paste_text(text):
     if not _PYAUTOGUI:

@@ -694,27 +694,19 @@ def _build_system_prompt():
 "- Examples:\n"
 "  User: 'search cat videos in Chrome' → browser_command(action='search', query='cat videos')\n"
 "  User: 'open youtube in Chrome' → browser_command(action='open', url='https://youtube.com')\n"
-"\nYOUTUBE / APP SEARCH:\n"
-"- app_search(app_name, query, search_key) — searches inside ANY desktop app "
-"(YouTube, Spotify, etc.) using keyboard automation.\n"
-"- Focuses the app, types the search_key (default '/' for YouTube search bar), "
-"types the query, presses Enter, waits for results, screenshots the window, "
-"and returns AI Vision analysis of what's visible.\n"
-"- Use when user says 'search [query] on YouTube', 'find [query] in [app]', "
-"'look up [query] on YouTube'. \n"
-"- app_scroll(app_name, direction, amount) — scrolls up/down inside the app, "
-"then screenshots and returns what's visible.\n"
-"- Use app_scroll AFTER app_search when user says 'scroll down', 'scroll up', "
-"'show more', 'go down', 'see more results'.\n"
-"- WORKFLOW for YouTube search:\n"
+"\nYOUTUBE SEARCH (USE THIS — NOT app_search for YouTube):\n"
+"- search_youtube(query) — searches YouTube and returns structured results "
+"with titles and video URLs. Use this INSTEAD of app_search for YouTube.\n"
+"- app_search is for apps like Spotify, not YouTube. "
+"For YouTube, ALWAYS use search_youtube.\n"
+"- WORKFLOW:\n"
 "  User: 'search Python tutorials on YouTube'\n"
-"  → app_search(app_name='YouTube', query='Python tutorials')\n"
-"  → 'I found these results: [list from analysis]. Which one should I open?'\n"
-"  User: 'scroll down'\n"
-"  → app_scroll(app_name='YouTube', direction='down')\n"
-"  → 'Now showing: [new results]. Which one?'\n"
-"  User: 'the third one'\n"
-"  → browser_command(action='open', url='https://youtube.com/watch?v=...') or click to open\n"
+"  → search_youtube(query='Python tutorials')\n"
+"  → returns: {results: [{title, url, number}...]}\n"
+"  → Read the titles to the user: 'I found: 1. Python for Beginners, 2. Advanced Python, 3. Python Projects...'\n"
+"  User: 'play number 3'\n"
+"  → search_youtube(query='Python tutorials', play_number=3)\n"
+"  → opens the video directly in browser (NO clicking needed)\n"
 "\nCHECK EMAIL / GMAIL:\n"
 "- When user says 'check my email', 'check my Gmail', 'read my emails', 'any new emails', "
 "'what's in my inbox', 'check gmail' — ALWAYS use read_emails(query='UNSEEN', max_results=10). "
@@ -3193,8 +3185,10 @@ class AudioLoop:
             return types.FunctionResponse(id=fc.id, name=name, response={"result": "Searching."})
 
         elif name == "search_youtube":
-            system_app.search_youtube(args.get("query", ""))
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": "Searching YouTube."})
+            query = args.get("query", "")
+            play_number = args.get("play_number")
+            result = system_app.search_youtube(query, play_number=play_number)
+            return types.FunctionResponse(id=fc.id, name=name, response=result)
 
         elif name == "whatsapp_find_and_call":
             return types.FunctionResponse(

@@ -1221,29 +1221,59 @@ browser_command_tool = {
     }
 }
 
-app_search_tool = {
-    "name": "app_search",
+search_youtube_tool = {
+    "name": "search_youtube",
     "description": (
-        "Search inside ANY desktop app (YouTube, Spotify, browser, etc.) using keyboard automation. "
-        "Opens or focuses the app, types a keyboard shortcut to activate the search bar, "
-        "types the query, presses Enter, then takes a screenshot and uses AI Vision "
-        "to read and describe the search results. "
-        "Use when the user says 'search [query] on YouTube', 'find [query] in Spotify', "
-        "'look up [query] in [app]'. "
-        "For YouTube specifically, the search key is '/' (presses slash to focus search bar). "
-        "For most other apps, the search key is 'Ctrl+F'. "
-        "If no search_key is provided, defaults to '/'. "
-        "The result includes an 'analysis' field with what AI Vision saw on screen. "
-        "After returning, the user may ask to scroll or open a specific result. "
-        "Examples: app_search(app_name='YouTube', query='python tutorial'), "
-        "app_search(app_name='Spotify', search_key='Ctrl+F', query='lofi beats')"
+        "Search YouTube for videos and return structured results with titles and video URLs. "
+        "Use this INSTEAD of app_search for YouTube — it returns actual video data "
+        "(titles, URLs), not AI vision descriptions. "
+        "WORKFLOW:\n"
+        "1. Call search_youtube(query='...') to search — returns numbered results.\n"
+        "2. Present the results to the user: 'I found: 1. Title, 2. Title...'\n"
+        "3. When user says 'play number N', call search_youtube(query='...', play_number=N) "
+        "to open that specific video directly in the browser.\n"
+        "Examples:\n"
+        "- search_youtube(query='python tutorial') → returns results list\n"
+        "- search_youtube(query='python tutorial', play_number=3) → opens the 3rd video"
     ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "app_name": {"type": "STRING", "description": "Name of the app to search in (e.g. 'YouTube', 'Spotify')"},
+            "query": {
+                "type": "STRING",
+                "description": "Search query for YouTube"
+            },
+            "play_number": {
+                "type": "INTEGER",
+                "description": "Optional: open the Nth result (1-indexed). Use when user says 'play number N' or 'open the Nth video'."
+            }
+        },
+        "required": ["query"]
+    }
+}
+
+app_search_tool = {
+    "name": "app_search",
+    "description": (
+        "Search inside a NON-YOUTUBE desktop app (Spotify, browser, etc.) using keyboard automation. "
+        "DO NOT use this for YouTube — use search_youtube instead for YouTube searches. "
+        "Opens or focuses the app, types a keyboard shortcut to activate the search bar, "
+        "types the query, presses Enter, then takes a screenshot and uses AI Vision "
+        "to read and describe the search results. "
+        "Use when the user says 'search [query] in Spotify', "
+        "'look up [query] in [app]'. "
+        "For most apps, the search key is 'Ctrl+F'. "
+        "If no search_key is provided, defaults to '/'. "
+        "The result includes an 'analysis' field with what AI Vision saw on screen. "
+        "After returning, the user may ask to scroll or open a specific result. "
+        "Examples: app_search(app_name='Spotify', search_key='Ctrl+F', query='lofi beats')"
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "app_name": {"type": "STRING", "description": "Name of the app to search in (e.g. 'Spotify', 'Chrome')"},
             "query": {"type": "STRING", "description": "The search query text"},
-            "search_key": {"type": "STRING", "description": "Keyboard shortcut to activate search bar. Default '/' for YouTube. Can be 'Ctrl+F' for other apps."}
+            "search_key": {"type": "STRING", "description": "Keyboard shortcut to activate search bar. Default '/'."}
         },
         "required": ["app_name", "query"]
     }
@@ -2355,6 +2385,7 @@ tools_list = [{"function_declarations": [
     pentest_browser_target_tool,
     open_pastebox_tool,
     browser_command_tool,
+    search_youtube_tool,
     app_search_tool,
     app_scroll_tool,
     credential_save_tool,
