@@ -821,7 +821,10 @@ netlify_list_deploys_tool = {
 
 notepad_open_tool = {
     "name": "notepad_open",
-    "description": "Open the notepad with optional pre-populated tabs. Each tab is an object with 'name' and 'content'.",
+    "description": "Open SODA's INTERNAL floating notepad widget (a tabbed notes panel inside the SODA HUD window). "
+                   "Use ONLY for storing notes, links, numbers, and progress during multi-step workflows. "
+                   "This is NOT the Windows Notepad app. To open the real Windows Notepad app on the desktop, "
+                   "use open_app(app_name='notepad') instead.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
@@ -843,7 +846,11 @@ notepad_open_tool = {
 
 notepad_write_tool = {
     "name": "notepad_write",
-    "description": "Write content to a notepad tab. If the tab doesn't exist, it will be created.",
+    "description": "Write content to a tab of SODA's INTERNAL floating notepad widget (NOT the Windows Notepad app). "
+                   "If the tab doesn't exist, it will be created. "
+                   "Use ONLY for storing notes/links/progress in the HUD during workflows. "
+                   "To type text into a real desktop app window (e.g. Windows Notepad, a browser, Word), "
+                   "use type_into or keyboard_type instead.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
@@ -857,7 +864,7 @@ notepad_write_tool = {
 
 notepad_read_tool = {
     "name": "notepad_read",
-    "description": "Read the content of a notepad tab.",
+    "description": "Read the content of a tab of SODA's INTERNAL floating notepad widget (NOT the Windows Notepad app).",
     "parameters": {
         "type": "OBJECT",
         "properties": {
