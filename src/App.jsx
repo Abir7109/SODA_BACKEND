@@ -120,6 +120,8 @@ import SlidePanel from './components/SlidePanel'
 import CameraCapture from './components/CameraCapture'
 import HolographicOrb from './components/HolographicOrb'
 import WakeSequence from './components/WakeSequence'
+import NightWinddown from './components/NightWinddown'
+import DailyBriefingPanel from './components/panels/DailyBriefingPanel'
 import Notepad from './components/Notepad'
 import BackgroundWidget from './components/BackgroundWidget'
 import PasteBox from './components/pastebox/PasteBox'
@@ -599,6 +601,10 @@ export default function App() {
   // Search results panel state (right)
   const [search, setSearch] = useState({ visible: false, query: '', results: [] })
   const searchTimerRef = useRef(null)
+
+  // Daily routine briefing panel (right)
+  const [dailyBrief, setDailyBrief] = useState({ visible: false, data: null })
+  const [nightWinddown, setNightWinddown] = useState(false)
 
   // Spotify search results panel state (right)
   const [spotifySearch, setSpotifySearch] = useState({ visible: false, query: '', results: [] })
@@ -1498,6 +1504,14 @@ export default function App() {
       }
     }
     socket.on('wake_sequence', onWakeSequence)
+    const onDailyBrief = (data) => {
+      if (data) setDailyBrief({ visible: true, data })
+    }
+    socket.on('daily_brief', onDailyBrief)
+    const onNightWinddown = () => {
+      setNightWinddown(true)
+    }
+    socket.on('night_winddown', onNightWinddown)
     socket.on('personality', onPersonality)
     socket.on('shutdown', onShutdown)
     socket.on('stop_audio', stopAudio)
@@ -1786,6 +1800,19 @@ export default function App() {
         results={search.results}
         onClose={closeSearch}
         onOpenUrl={openUrlInFloatingWindow}
+      />
+
+      {/* Daily Routine Briefing Panel — slides from RIGHT */}
+      <DailyBriefingPanel
+        visible={dailyBrief.visible}
+        data={dailyBrief.data}
+        onClose={() => setDailyBrief(prev => ({ ...prev, visible: false }))}
+      />
+
+      {/* Night Wind-down Overlay */}
+      <NightWinddown
+        active={nightWinddown}
+        onComplete={() => setNightWinddown(false)}
       />
 
       {/* Spotify Search Results Panel — slides from RIGHT */}

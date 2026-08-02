@@ -148,6 +148,7 @@ import task_planner
 import screen_vision
 import screen_control
 import reminders
+import daily_routine
 import system_app
 import system_control
 import system_local
@@ -333,6 +334,53 @@ def _get_client():
             pass
     return _client_instance
 
+def _format_brief_spoken(payload: dict) -> str:
+    """Turn a briefing payload into a concise spoken summary for Gemini."""
+    phase = payload.get("phase", "morning")
+    lines = [payload.get("greeting", "")]
+    for sec in payload.get("sections", []):
+        stype = sec.get("type")
+        data = sec.get("data") or []
+        if stype == "weather" and isinstance(data, dict) and data.get("temperature") is not None:
+            lines.append(
+                f"Weather in {data.get('location', 'Dhaka')}: {data['temperature']}°C, "
+                f"feels like {data.get('feels_like', '?')}°C, humidity {data.get('humidity', '?')}%."
+            )
+        elif stype == "schedule" and isinstance(data, list) and data:
+            parts = []
+            for s in data[:3]:
+                t = s.get("time") or "--:--"
+                parts.append(f"{t} {s.get('title', '')}")
+            lines.append(("Upcoming today: " if phase != "night" else "First tomorrow: ") + "; ".join(parts) + ".")
+        elif stype == "reminders" and isinstance(data, list) and data:
+            parts = [f"{r.get('message', '')} (in {_fmt_delta(r.get('seconds_until_fire', 0))})" for r in data[:3]]
+            lines.append("Reminders: " + "; ".join(parts) + ".")
+        elif stype == "emails" and isinstance(data, list) and data:
+            lines.append(f"You have {len(data)} unread email(s). Latest: {data[0].get('subject', '')}.")
+        elif stype == "news" and isinstance(data, list) and data:
+            lines.append("Top headline: " + data[0].get("title", "").strip())
+        elif stype == "activity" and isinstance(data, list) and data:
+            labels = [e.get("label", "") for e in data[-4:]]
+            if labels:
+                lines.append("So far today: " + "; ".join(labels) + ".")
+        elif stype == "memory" and isinstance(data, dict) and data.get("facts"):
+            facts = data.get("facts", [])
+            parts = [f.get("value", "") for f in facts[:2]]
+            if parts:
+                lines.append("Remembered: " + "; ".join(parts) + ".")
+    return "\n".join(x for x in lines if x)
+
+
+def _fmt_delta(seconds) -> str:
+    seconds = int(seconds or 0)
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+    return f"{minutes // 60}h {minutes % 60}m"
+
+
 def _build_system_prompt():
     from zoneinfo import ZoneInfo
     try:
@@ -500,8 +548,22 @@ def _build_system_prompt():
            "open it with open_app(app_name='notepad'), wait for it to open, then type the text with "
            "keyboard_type(text='...') or type_into — do NOT call notepad_write (that only writes to SODA's internal HUD widget). "
            "After typing, say 'Done, sir. I typed it into Notepad.'\n"
-           "  • If the user says 'open notepad' with no other context, open the real Windows Notepad app on the desktop with open_app(app_name='notepad').\n"
-         "TASK PLANNING — When the user gives 2+ commands or a multi-step request "
+          "  • If the user says 'open notepad' with no other context, open the real Windows Notepad app on the desktop with open_app(app_name='notepad').\n"
+          "DAILY ROUTINE — You are the user's Jarvis-style assistant. Three orchestrated daily briefings exist:\n"
+          "  • MORNING (brief_me_day): Whenever the user greets you in the morning, says 'good morning', "
+          "'brief me my day', 'brief me today', 'what's on my schedule today', or the scheduled 09:00 briefing fires — "
+          "call brief_me_day. It gathers today's weather, schedule, reminders, unread emails, top news, and memory. "
+          "After it returns, SPEAK a concise warm summary (schedule first, then weather, then anything urgent), 3-6 sentences.\n"
+          "  • DAYTIME (day_recap): When the user says 'recap my day', 'what have we done today', 'catch me up', "
+          "or the scheduled 13:00 recap fires — call day_recap, then speak a 2-4 sentence summary of what happened today "
+          "and what's still coming.\n"
+          "  • NIGHT (good_night): When the user says 'good night', 'wind down', 'recap and sleep', 'let's sleep', "
+          "or the scheduled 22:00 wind-down fires — call good_night. It recaps the day, shows tomorrow's schedule, "
+          "triggers a calm night overlay, then puts SODA to sleep. After it returns, speak a gentle 2-4 sentence "
+          "goodnight before going quiet.\n"
+          "  • Auto-fire: The 09:00 / 13:00 / 22:00 briefings are injected as text into the session. "
+          "When you see one, call the matching tool immediately — do not ask permission for the scheduled ones.\n"
+          "TASK PLANNING — When the user gives 2+ commands or a multi-step request "
         "(e.g. 'do X, then Y, then Z', 'first... then... after that...'), "
         "call plan_tasks to break it down into TODO items immediately. "
         "A panel slides from the left showing the plan. "
@@ -1714,6 +1776,7 @@ class AudioLoop:
                                     else:
                                         self.personality.mood.record_success()
                                         await self._emit_personality("tool_success", tool_name=result.name)
+                                        daily_routine.log_tool_result(result.name, True)
                                     if self.sio:
                                         result_data = result.response
                                         loop = asyncio.get_event_loop()
@@ -2657,6 +2720,31 @@ class AudioLoop:
                 loop = asyncio.get_event_loop()
                 loop.create_task(self.sio.emit("view_file_content", {"path": args.get("path", "")}))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": "Viewer opened."})
+
+        elif name == "brief_me_day":
+            payload = await daily_routine.run_briefing(self.sio, "morning")
+            summary = _format_brief_spoken(payload)
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": summary})
+
+        elif name == "day_recap":
+            payload = await daily_routine.run_briefing(self.sio, "day")
+            summary = _format_brief_spoken(payload)
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": summary})
+
+        elif name == "good_night":
+            payload = await daily_routine.run_briefing(self.sio, "night")
+            await daily_routine.emit_night_winddown(self.sio)
+            summary = _format_brief_spoken(payload)
+            if self.sio:
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("window_minimize"))
+            async def _delayed_sleep():
+                await asyncio.sleep(6.0)
+                if self._background_mode:
+                    return
+                await self._enter_idle_mode()
+            asyncio.create_task(_delayed_sleep())
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": summary})
 
         elif name == "go_to_sleep":
             self._background_mode = True

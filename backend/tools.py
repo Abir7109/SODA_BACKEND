@@ -507,6 +507,55 @@ show_calendar_tool = {
     }
 }
 
+brief_me_day_tool = {
+    "name": "brief_me_day",
+    "description": (
+        "Run the Jarvis-style MORNING BRIEFING: gather today's date, weather (Dhaka), "
+        "today's schedule, reminders, unread emails, top news, and memory highlights, "
+        "open a beautiful briefing panel in the HUD, and speak a concise summary. "
+        "Use when the user greets in the morning, says 'good morning', 'brief me my day', "
+        "'brief me today', 'what's on my schedule today', 'morning report', "
+        "or when the scheduled 09:00 morning briefing fires."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
+day_recap_tool = {
+    "name": "day_recap",
+    "description": (
+        "Run the DAYTIME RECAP: summarize what has happened so far today (from the daily "
+        "activity log), show remaining schedule and pending reminders, open a recap panel "
+        "in the HUD, and speak a short summary. Use when the user says 'recap my day', "
+        "'what have we done today', 'mid-day report', 'catch me up', "
+        "or when the scheduled 13:00 recap fires."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
+good_night_tool = {
+    "name": "good_night",
+    "description": (
+        "Run the NIGHT WIND-DOWN: recap the full day (daily activity log), show tomorrow's "
+        "first schedule and pending reminders, open a calm night overlay with breathing "
+        "rings, then gracefully put SODA to sleep (minimize + idle). Use when the user "
+        "says 'good night', 'wind down', 'recap and sleep', 'let's sleep', "
+        "or when the scheduled 22:00 night recap fires."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
 window_focus_tool = {
     "name": "window_focus",
     "description": "Bring a window to the front and give it focus by searching its title. Use to switch between apps before interacting with them. Examples: 'Chrome', 'Notepad', 'Visual Studio Code', 'Spotify'.",
@@ -2299,6 +2348,9 @@ tools_list = [{"function_declarations": [
     list_schedules_tool,
     delete_schedule_tool,
     show_calendar_tool,
+    brief_me_day_tool,
+    day_recap_tool,
+    good_night_tool,
     list_reminders_tool,
     cancel_reminder_tool,
     recognize_face_tool,

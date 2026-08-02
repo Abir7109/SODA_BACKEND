@@ -516,6 +516,12 @@ async def start_audio(sid, data=None):
             scheduler.scheduler_loop(sio, audio_loop, interval=30)
         )
 
+        # Start daily routine auto-brief background task (09:00 / 13:00 / 22:00)
+        import daily_routine
+        _daily_brief_task = asyncio.create_task(
+            daily_routine.daily_brief_loop(sio, audio_loop, interval=30)
+        )
+
         # Add a done callback to catch silent failures in the loop
         def handle_loop_exit(task):
             global _scheduler_task
