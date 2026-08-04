@@ -11,6 +11,7 @@ const { spawn, execSync } = require('child_process');
 let mainWindow;
 let widgetWindow;
 let pythonProcess;
+let agentProcess;
 let viteProcess;
 
 function createWindow() {
@@ -186,6 +187,40 @@ function startPythonBackend() {
     });
 }
 
+function startLocalAgent() {
+    const agentPath = path.join(__dirname, '../backend/local_agent.py');
+    console.log(`[SODA] Starting local agent: ${agentPath}`);
+
+    try {
+        agentProcess = spawn('py', ['-3.11', agentPath], {
+            cwd: path.join(__dirname, '../backend'),
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        agentProcess.stdout.on('data', (data) => {
+            console.log(`[Agent]: ${data}`);
+        });
+
+        agentProcess.stderr.on('data', (data) => {
+            console.error(`[Agent Error]: ${data}`);
+        });
+
+        agentProcess.on('close', (code) => {
+            console.log(`[SODA] Local agent exited with code ${code}`);
+            agentProcess = null;
+        });
+
+        agentProcess.on('error', (err) => {
+            console.error(`[SODA] Failed to start local agent: ${err.message}`);
+            agentProcess = null;
+        });
+
+        console.log('[SODA] Local agent started');
+    } catch (err) {
+        console.error(`[SODA] Local agent start failed: ${err.message}`);
+    }
+}
+
 app.whenReady().then(() => {
     // Grant camera & microphone permission
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -241,7 +276,10 @@ app.whenReady().then(() => {
                 mainWindow.maximize();
             }
         } else if (action === 'close') {
-            // Kill backend before closing
+            // Kill agent + backend before closing
+            if (agentProcess) {
+                try { agentProcess.kill(); } catch (e) {}
+            }
             if (pythonProcess) {
                 pythonProcess.kill();
             }
@@ -284,6 +322,9 @@ app.whenReady().then(() => {
 
     // Create window first — it detects dev vs production mode
     createWindow();
+
+    // Auto-start local agent for desktop control (Spotify, apps, etc.)
+    startLocalAgent();
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -369,6 +410,13 @@ app.on('will-quit', () => {
     if (widgetWindow && !widgetWindow.isDestroyed()) {
         widgetWindow.close();
         widgetWindow = null;
+    }
+    
+    // Kill local agent
+    if (agentProcess) {
+        try {
+            agentProcess.kill();
+        } catch (e) {}
     }
     
     // Kill Python backend
