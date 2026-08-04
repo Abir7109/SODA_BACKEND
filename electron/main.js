@@ -171,11 +171,12 @@ function createWidgetWindow() {
 }
 
 function startPythonBackend() {
-    const scriptPath = path.join(__dirname, '../backend/server.py');
+    const scriptPath = path.join(__dirname, '..', 'backend', 'server.py');
     console.log(`[SODA] Starting Python backend: ${scriptPath}`);
 
     pythonProcess = spawn('py', ['-3.11', scriptPath], {
-        cwd: path.join(__dirname, '../backend'),
+        cwd: path.join(__dirname, '..', 'backend'),
+        shell: true,
     });
 
     pythonProcess.stdout.on('data', (data) => {
@@ -188,38 +189,63 @@ function startPythonBackend() {
 }
 
 function startLocalAgent() {
-    const agentPath = path.join(__dirname, '../backend/local_agent.py');
+    const agentPath = path.join(__dirname, '..', 'backend', 'local_agent.py');
     console.log(`[SODA] Starting local agent: ${agentPath}`);
 
-    try {
-        agentProcess = spawn('py', ['-3.11', agentPath], {
-            cwd: path.join(__dirname, '../backend'),
-            stdio: ['ignore', 'pipe', 'pipe'],
-        });
+    const tryStart = (pythonCmd) => {
+        try {
+            agentProcess = spawn(pythonCmd, [agentPath], {
+                cwd: path.join(__dirname, '..', 'backend'),
+                stdio: ['ignore', 'pipe', 'pipe'],
+                shell: true,
+                env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+            });
 
-        agentProcess.stdout.on('data', (data) => {
-            console.log(`[Agent]: ${data}`);
-        });
+            agentProcess.stdout.on('data', (data) => {
+                const msg = data.toString().trim();
+                if (msg) console.log(`[Agent]: ${msg}`);
+            });
 
-        agentProcess.stderr.on('data', (data) => {
-            console.error(`[Agent Error]: ${data}`);
-        });
+            agentProcess.stderr.on('data', (data) => {
+                const msg = data.toString().trim();
+                if (msg) console.log(`[Agent]: ${msg}`);
+            });
 
-        agentProcess.on('close', (code) => {
-            console.log(`[SODA] Local agent exited with code ${code}`);
-            agentProcess = null;
-        });
+            agentProcess.on('close', (code) => {
+                console.log(`[SODA] Local agent exited (code ${code})`);
+                agentProcess = null;
+                // Auto-restart after 5 seconds
+                if (!agentRestarting) {
+                    agentRestarting = true;
+                    setTimeout(() => {
+                        agentRestarting = false;
+                        if (!agentProcess) {
+                            console.log('[SODA] Auto-restarting local agent...');
+                            startLocalAgent();
+                        }
+                    }, 5000);
+                }
+            });
 
-        agentProcess.on('error', (err) => {
-            console.error(`[SODA] Failed to start local agent: ${err.message}`);
-            agentProcess = null;
-        });
+            agentProcess.on('error', (err) => {
+                console.error(`[SODA] Agent error (${pythonCmd}): ${err.message}`);
+                agentProcess = null;
+            });
 
-        console.log('[SODA] Local agent started');
-    } catch (err) {
-        console.error(`[SODA] Local agent start failed: ${err.message}`);
+            console.log(`[SODA] Local agent spawned with ${pythonCmd}`);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    };
+
+    // Try py -3.11 first, then python, then py
+    if (!tryStart('py') && !tryStart('python')) {
+        console.error('[SODA] Could not start local agent — Python not found');
     }
 }
+
+let agentRestarting = false;
 
 app.whenReady().then(() => {
     // Grant camera & microphone permission
