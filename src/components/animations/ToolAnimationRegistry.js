@@ -122,6 +122,12 @@ export const TOOL_ANIMATIONS = {
   deep_research:   { component: 'SearchAnimation', variant: 'results', panel: 'ResearchResultsPanel', panelDir: 'right' },
   export_research: { component: 'DefaultAnimation', variant: 'default' },
 
+  // ── Spotify Music Control ───────────────────────────────────
+  spotify_search:      { component: 'SpotifyAnim', variant: 'search' },
+  spotify_play:        { component: 'SpotifyAnim', variant: 'play' },
+  spotify_control:     { component: 'SpotifyAnim', variant: 'control' },
+  spotify_now_playing: { component: 'SpotifyAnim', variant: 'info' },
+
   // ── Background Agent Management ──────────────────────────────
   bg_spawn:        { component: 'BackgroundCommandAnim', variant: 'exec', panel: 'BackgroundTaskPanel', panelDir: 'right' },
   bg_status:       { component: 'DefaultAnimation', variant: 'default' },

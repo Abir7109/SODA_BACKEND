@@ -4085,6 +4085,46 @@ TEXT: {text}"""
             r = project_registry.remove(project_id=args.get("project_id", ""))
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
+        # ── Spotify Music Control ──────────────────────────────────
+        elif name == "spotify_search":
+            from spotify_controller import search as spotify_search
+            r = spotify_search(
+                query=args.get("query", ""),
+                search_type=args.get("search_type", "track"),
+                limit=args.get("limit", 5),
+            )
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "spotify_play":
+            from spotify_controller import play as spotify_play
+            uri = args.get("uri", "")
+            query = args.get("query", "")
+
+            if uri:
+                r = spotify_play(uri=uri)
+            elif query:
+                r = spotify_play(query=query)
+            else:
+                r = spotify_play()
+
+            if self.sio:
+                await self.sio.emit("tool_result", {
+                    "tool": "spotify_play",
+                    "result": r,
+                    "forced": True,
+                })
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "spotify_control":
+            from spotify_controller import control as spotify_control
+            r = spotify_control(action=args.get("action", "toggle"))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "spotify_now_playing":
+            from spotify_controller import now_playing
+            r = now_playing()
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
         # ── Navigation ────────────────────────────────────────────
         log.warning(f"Unknown tool: {name}")
         return types.FunctionResponse(

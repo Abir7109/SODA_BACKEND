@@ -2306,6 +2306,61 @@ remove_project_tool = {
 }
 
 
+# ── Spotify Tools ──────────────────────────────────────────────────
+
+spotify_search_tool = {
+    "name": "spotify_search",
+    "description": "Search Spotify for tracks, albums, playlists, or artists. Returns results with IDs, names, URIs, and artist info. Use this BEFORE spotify_play when the user wants to find specific music.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "query": {"type": "STRING", "description": "Search query (e.g. 'lofi hip hop', 'Daft Punk', 'chill playlist')"},
+            "search_type": {"type": "STRING", "description": "Type of search: 'track' (default), 'album', 'playlist', 'artist'"},
+            "limit": {"type": "INTEGER", "description": "Number of results (1-20, default 5)"}
+        },
+        "required": ["query"]
+    }
+}
+
+spotify_play_tool = {
+    "name": "spotify_play",
+    "description": "Play music on Spotify Free. Search and auto-play first result, or play a specific URI. Just say what to play — SODA handles the rest. Works in background while user codes.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "query": {"type": "STRING", "description": "What to play (e.g. 'lofi hip hop', 'Daft Punk', 'chill beats'). SODA searches Spotify and plays the first result."},
+            "uri": {"type": "STRING", "description": "Direct Spotify URI (e.g. 'spotify:track:6rqhFgbbKwnb9MLmUQDhG6'). Overrides query."}
+        },
+        "required": []
+    }
+}
+
+spotify_control_tool = {
+    "name": "spotify_control",
+    "description": "Control Spotify playback: play/pause, skip, previous, volume. Use when the user says 'skip song', 'pause music', 'next track', 'volume up'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "Control action: 'play', 'pause', 'toggle', 'skip', 'next', 'previous', 'prev', 'volume_up', 'volume_down', 'volume_mute'"
+            }
+        },
+        "required": ["action"]
+    }
+}
+
+spotify_now_playing_tool = {
+    "name": "spotify_now_playing",
+    "description": "Get current Spotify playback status. Use when user asks 'what's playing', 'what song is this'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+    }
+}
+
+
 tools_list = [{"function_declarations": [
     write_file_tool,
     read_file_tool,
@@ -2494,6 +2549,12 @@ tools_list = [{"function_declarations": [
     query_project_tool,
     query_all_projects_tool,
     remove_project_tool,
+
+    # ── Spotify Music Control ──
+    spotify_search_tool,
+    spotify_play_tool,
+    spotify_control_tool,
+    spotify_now_playing_tool,
 
     
 ]}]

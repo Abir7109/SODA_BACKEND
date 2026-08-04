@@ -32,6 +32,11 @@
 - `read_emails` — reads Gmail inbox via IMAP (Python stdlib `imaplib`), returns subject/sender/date/body. Emits `email_data` to frontend. Panel: `EmailPanel` (slide-right). Configured via `GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD` env vars or `email_config` tool.
 - `send_email` — sends email via Gmail SMTP (Python stdlib `smtplib`). Gemini must ask user confirmation before calling.
 - `email_config` — stores Gmail address and app password in memory for the session. Guides user through App Password setup.
+- `spotify_search` — opens Spotify search via URI protocol (`spotify:search:query`). No API keys needed.
+- `spotify_play` — searches and auto-plays first result, or plays a direct URI. Uses keyboard automation to select from search results. Spotify Free compatible.
+- `spotify_control` — controls Spotify playback via Windows media keys: play/pause/skip/previous/volume. 
+- `spotify_now_playing` — gets current playback status.
+- **Spotify env vars**: None required. Works with Spotify Free via URI protocol + media keys.
 
 ### Webview Action Service (`src/services/WebviewActionService.js`)
 Singleton managing webview instances. Actions:

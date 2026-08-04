@@ -106,6 +106,8 @@ LOCAL_TOOLS = [
     "browser_scroll", "browser_back", "browser_press", "browser_vision",
     "browser_console", "browser_get_images", "browser_dialog", "browser_cdp",
     "credential_save", "credential_get", "credential_list", "credential_delete",
+    # Spotify music control
+    "spotify_search", "spotify_play", "spotify_control", "spotify_now_playing",
 ]
 
 HAS_PYAUTOGUI = False
@@ -2418,6 +2420,34 @@ def _dispatch(tool, args):
             return {"success": False, "error": f"Browser automation module not available: {e}. Run install_browser_deps.ps1 first."}
         except Exception as e:
             return {"success": False, "error": f"Browser automation error: {e}"}
+
+    # ── Spotify Music Control ──────────────────────────────────────
+    elif tool in ("spotify_search", "spotify_play", "spotify_control", "spotify_now_playing"):
+        try:
+            from spotify_controller import search as sp_search, play as sp_play, control as sp_control, now_playing as sp_now
+            if tool == "spotify_search":
+                return sp_search(
+                    query=args.get("query", ""),
+                    search_type=args.get("search_type", "track"),
+                    limit=args.get("limit", 5),
+                )
+            elif tool == "spotify_play":
+                uri = args.get("uri", "")
+                query = args.get("query", "")
+                if uri:
+                    return sp_play(uri=uri)
+                elif query:
+                    return sp_play(query=query)
+                else:
+                    return sp_play()
+            elif tool == "spotify_control":
+                return sp_control(action=args.get("action", "toggle"))
+            elif tool == "spotify_now_playing":
+                return sp_now()
+        except ImportError as e:
+            return {"success": False, "error": f"Spotify module not available: {e}"}
+        except Exception as e:
+            return {"success": False, "error": f"Spotify error: {e}"}
 
     # ── Fallback ──────────────────────────────────────────────────
     return {"error": f"Tool '{tool}' not implemented in local agent"}
