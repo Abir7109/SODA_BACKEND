@@ -925,11 +925,12 @@ def _dispatch(tool, args):
             "whatsapp": "whatsapp://", "telegram": "tg://", "discord": "discord://",
             "zoom": "zoommtg://", "teams": "msteams://", "skype": "skype://",
             "signal": "signal://",
+            "spotify": "spotify:",  # Launches Spotify Desktop, not browser
         }
         # ── Web apps: open in default browser via https ────────────
         _WEB_APPS = {
             "youtube": "https://youtube.com", "yt": "https://youtube.com",
-            "spotify": "https://open.spotify.com", "twitter": "https://twitter.com",
+            "twitter": "https://twitter.com",
             "x": "https://x.com", "facebook": "https://facebook.com",
             "instagram": "https://instagram.com", "linkedin": "https://linkedin.com",
             "reddit": "https://reddit.com", "github": "https://github.com",
@@ -939,6 +940,8 @@ def _dispatch(tool, args):
             "twitch": "https://twitch.com", "chatgpt": "https://chat.openai.com",
             "gpt": "https://chat.openai.com", "claude": "https://claude.ai",
             "gemini": "https://gemini.google.com",
+            # NOTE: Spotify is NOT here — use spotify_play/spotify_search tools instead
+            # Those tools launch Spotify.exe directly, not the browser.
         }
         if app_lower in _URI_APPS:
             try:
