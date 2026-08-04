@@ -1,8 +1,8 @@
 """
 Spotify Free Controller for SODA
-===================================
-Search, play from results, play/pause — no API keys, no Premium.
-Uses Spotify URI protocol + keyboard automation + media keys.
+==================================
+Launches Spotify Desktop directly, searches inside the app,
+plays from results, controls playback — no API keys, no Premium.
 """
 
 import os
@@ -10,6 +10,8 @@ import subprocess
 import sys
 import time
 import json
+import getpass
+import shutil
 from pathlib import Path
 
 
@@ -21,7 +23,6 @@ _SPOTIFY_EXE_PATHS = [
 
 
 def _find_spotify_exe() -> str | None:
-    import getpass, shutil
     username = getpass.getuser()
     for p in _SPOTIFY_EXE_PATHS:
         path = p.replace("{username}", username)
@@ -30,33 +31,26 @@ def _find_spotify_exe() -> str | None:
     return shutil.which("spotify")
 
 
-def _ensure_running(spotify_exe: str):
+def _is_running() -> bool:
     try:
         result = subprocess.run(
             ["tasklist", "/FI", "IMAGENAME eq Spotify.exe"],
             capture_output=True, text=True, timeout=5
         )
-        if "Spotify.exe" not in result.stdout:
-            subprocess.Popen([spotify_exe], shell=False)
-            time.sleep(4.0)
+        return "Spotify.exe" in result.stdout
+    except Exception:
+        return False
+
+
+def _launch_spotify(spotify_exe: str):
+    """Launch Spotify Desktop if not already running."""
+    if _is_running():
+        return
+    try:
+        subprocess.Popen([spotify_exe], shell=False)
+        time.sleep(5.0)  # Wait for full startup
     except Exception:
         pass
-
-
-def _open_uri(uri: str) -> dict:
-    spotify_exe = _find_spotify_exe()
-    if not spotify_exe:
-        return {"success": False, "error": "Spotify not installed. Download from spotify.com"}
-
-    _ensure_running(spotify_exe)
-    time.sleep(1.0)
-
-    try:
-        subprocess.Popen([spotify_exe, uri], shell=False)
-        time.sleep(2.5)
-        return {"success": True, "uri": uri}
-    except Exception as e:
-        return {"success": False, "error": f"Failed to open Spotify: {e}"}
 
 
 def _focus_spotify() -> bool:
@@ -73,31 +67,35 @@ def _focus_spotify() -> bool:
             return True
     except Exception:
         pass
-
-    # Fallback: use pyautogui to Alt+Tab or find window
-    try:
-        import pyautogui
-        # Try to find Spotify via taskbar
-        pyautogui.hotkey("alt", "tab")
-        time.sleep(0.3)
-    except Exception:
-        pass
     return False
 
 
-def _key_press(keys: list[str], interval: float = 0.1):
-    """Press a sequence of keys."""
+def _type_text(text: str, interval: float = 0.03):
+    """Type text character by character."""
     try:
         import pyautogui
-        for key in keys:
-            pyautogui.press(key)
-            time.sleep(interval)
+        pyautogui.typewrite(text, interval=interval)
+    except Exception:
+        # fallback: use clipboard
+        try:
+            import pyperclip
+            pyperclip.copy(text)
+            import pyautogui
+            pyautogui.hotkey("ctrl", "v")
+        except Exception:
+            pass
+
+
+def _key_press(key: str, interval: float = 0.1):
+    try:
+        import pyautogui
+        pyautogui.press(key)
+        time.sleep(interval)
     except Exception:
         pass
 
 
-def _key_hotkey(*keys: str):
-    """Press a hotkey combination."""
+def _hotkey(*keys: str):
     try:
         import pyautogui
         pyautogui.hotkey(*keys)
@@ -115,41 +113,21 @@ def _media_key(key: str) -> bool:
         return False
 
 
-# ── Search ─────────────────────────────────────────────────────────
-
-def search(query: str, search_type: str = "track", limit: int = 10) -> dict:
-    """Open Spotify search. Returns URI for playback."""
-    uri = f"spotify:search:{query}"
-    r = _open_uri(uri)
-
-    if r.get("success"):
-        return {
-            "success": True,
-            "query": query,
-            "uri": uri,
-            "message": f"Opened Spotify search for '{query}'",
-            "actions": [
-                {"action": "play", "description": "Play first result"},
-                {"action": "play", "query": "<song name>", "description": "Play specific song"},
-            ],
-        }
-    return r
-
-
 # ── Play ───────────────────────────────────────────────────────────
 
 def play(uri: str = "", query: str = "", play_first: bool = True) -> dict:
     """
     Play music on Spotify Free.
     - uri: Direct Spotify URI (spotify:track:xxx, spotify:playlist:xxx)
-    - query: Search term — opens search then auto-plays first result
+    - query: Search term — searches inside Spotify Desktop, plays first result
     - play_first: If True, auto-selects first result from search
     """
     spotify_exe = _find_spotify_exe()
     if not spotify_exe:
-        return {"success": False, "error": "Spotify not installed"}
+        return {"success": False, "error": "Spotify not installed. Download from spotify.com"}
 
-    _ensure_running(spotify_exe)
+    # Launch Spotify Desktop
+    _launch_spotify(spotify_exe)
     time.sleep(1.0)
 
     target = ""
@@ -162,46 +140,124 @@ def play(uri: str = "", query: str = "", play_first: bool = True) -> dict:
         _media_key("playpause")
         return {"success": True, "action": "playpause", "message": "Toggled playback"}
 
-    # Open the URI
-    try:
-        subprocess.Popen([spotify_exe, target], shell=False)
-        time.sleep(3.0)
-
-        # If it's a direct track URI, just play it
-        if target.startswith("spotify:track:"):
+    # Direct URI: open via executable (not browser)
+    if uri:
+        try:
+            subprocess.Popen([spotify_exe, uri], shell=False)
+            time.sleep(2.0)
             _media_key("playpause")
             time.sleep(0.5)
-            return {"success": True, "action": "play", "uri": target, "message": "Playing track"}
+            return {"success": True, "action": "play", "uri": uri, "message": "Playing from URI"}
+        except Exception as e:
+            return {"success": False, "error": f"Failed: {e}"}
 
-        # If it's a playlist/album/artist URI, just play it
-        if target.startswith("spotify:playlist:") or target.startswith("spotify:album:") or target.startswith("spotify:artist:"):
-            _media_key("playpause")
-            time.sleep(0.5)
-            return {"success": True, "action": "play", "uri": target, "message": "Playing collection"}
+    # Search: open search in Spotify Desktop via keyboard
+    _focus_spotify()
+    time.sleep(0.5)
 
-        # Search result — auto-play first item
-        if play_first and query:
-            time.sleep(1.5)  # Wait for search results to load
-            _focus_spotify()
-            time.sleep(0.5)
+    # Ctrl+L = focus search bar in Spotify Desktop
+    _hotkey("ctrl", "l")
+    time.sleep(0.3)
 
-            # Navigate to first result and play
-            # In Spotify search: results are listed, first one is usually focused
-            # Press Enter to play the first result
-            _key_press(["enter"], interval=0.2)
-            time.sleep(1.0)
+    # Clear existing search
+    _hotkey("ctrl", "a")
+    time.sleep(0.1)
 
-            return {
-                "success": True,
-                "action": "play",
-                "query": query,
-                "message": f"Playing first result for '{query}'",
-            }
+    # Type the search query
+    _type_text(query)
+    time.sleep(2.0)  # Wait for search results to load
 
-        return {"success": True, "action": "open", "uri": target, "message": "Opened in Spotify"}
+    if play_first:
+        # Navigate down to first result and play
+        _key_press("down")
+        time.sleep(0.2)
+        _key_press("enter")
+        time.sleep(1.0)
 
-    except Exception as e:
-        return {"success": False, "error": f"Failed: {e}"}
+        return {
+            "success": True,
+            "action": "play",
+            "query": query,
+            "message": f"Playing '{query}' in Spotify",
+        }
+
+    return {"success": True, "action": "search", "query": query, "message": f"Searched for '{query}'"}
+
+
+# ── Search ─────────────────────────────────────────────────────────
+
+def search(query: str, search_type: str = "track", limit: int = 10) -> dict:
+    """Open Spotify and search. Returns results for user selection."""
+    spotify_exe = _find_spotify_exe()
+    if not spotify_exe:
+        return {"success": False, "error": "Spotify not installed"}
+
+    _launch_spotify(spotify_exe)
+    time.sleep(1.0)
+    _focus_spotify()
+    time.sleep(0.5)
+
+    # Ctrl+L = focus search bar
+    _hotkey("ctrl", "l")
+    time.sleep(0.3)
+    _hotkey("ctrl", "a")
+    time.sleep(0.1)
+    _type_text(query)
+    time.sleep(2.0)
+
+    return {
+        "success": True,
+        "query": query,
+        "message": f"Searched for '{query}' in Spotify Desktop",
+        "actions": [
+            {"action": "play", "query": query, "description": "Play first result"},
+        ],
+    }
+
+
+# ── Play Playlist ──────────────────────────────────────────────────
+
+def play_playlist(playlist_name: str) -> dict:
+    """Search for a playlist and play it."""
+    spotify_exe = _find_spotify_exe()
+    if not spotify_exe:
+        return {"success": False, "error": "Spotify not installed"}
+
+    _launch_spotify(spotify_exe)
+    time.sleep(1.0)
+    _focus_spotify()
+    time.sleep(0.5)
+
+    # Search for the playlist
+    _hotkey("ctrl", "l")
+    time.sleep(0.3)
+    _hotkey("ctrl", "a")
+    time.sleep(0.1)
+    _type_text(playlist_name)
+    time.sleep(2.0)
+
+    # Navigate to Playlists tab
+    _key_press("tab")
+    time.sleep(0.2)
+    _key_press("tab")
+    time.sleep(0.2)
+    _key_press("tab")
+    time.sleep(0.2)
+    _key_press("enter")
+    time.sleep(1.0)
+
+    # Play the first playlist
+    _key_press("down")
+    time.sleep(0.2)
+    _key_press("enter")
+    time.sleep(1.0)
+
+    return {
+        "success": True,
+        "action": "play_playlist",
+        "query": playlist_name,
+        "message": f"Playing playlist '{playlist_name}'",
+    }
 
 
 # ── Control ────────────────────────────────────────────────────────

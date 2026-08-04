@@ -2360,6 +2360,21 @@ spotify_now_playing_tool = {
     }
 }
 
+spotify_play_playlist_tool = {
+    "name": "spotify_play_playlist",
+    "description": "Search for and play a playlist in Spotify Desktop. Use when user says 'play playlist X', 'play my Y playlist'.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "playlist_name": {
+                "type": "STRING",
+                "description": "Name of the playlist to search for and play"
+            }
+        },
+        "required": ["playlist_name"]
+    }
+}
+
 
 tools_list = [{"function_declarations": [
     write_file_tool,
@@ -2553,6 +2568,7 @@ tools_list = [{"function_declarations": [
     # ── Spotify Music Control ──
     spotify_search_tool,
     spotify_play_tool,
+    spotify_play_playlist_tool,
     spotify_control_tool,
     spotify_now_playing_tool,
 

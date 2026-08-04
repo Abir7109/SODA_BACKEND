@@ -107,7 +107,7 @@ LOCAL_TOOLS = [
     "browser_console", "browser_get_images", "browser_dialog", "browser_cdp",
     "credential_save", "credential_get", "credential_list", "credential_delete",
     # Spotify music control
-    "spotify_search", "spotify_play", "spotify_control", "spotify_now_playing",
+    "spotify_search", "spotify_play", "spotify_play_playlist", "spotify_control", "spotify_now_playing",
 ]
 
 HAS_PYAUTOGUI = False
@@ -2422,9 +2422,9 @@ def _dispatch(tool, args):
             return {"success": False, "error": f"Browser automation error: {e}"}
 
     # ── Spotify Music Control ──────────────────────────────────────
-    elif tool in ("spotify_search", "spotify_play", "spotify_control", "spotify_now_playing"):
+    elif tool in ("spotify_search", "spotify_play", "spotify_play_playlist", "spotify_control", "spotify_now_playing"):
         try:
-            from spotify_controller import search as sp_search, play as sp_play, control as sp_control, now_playing as sp_now
+            from spotify_controller import search as sp_search, play as sp_play, play_playlist as sp_playlist, control as sp_control, now_playing as sp_now
             if tool == "spotify_search":
                 return sp_search(
                     query=args.get("query", ""),
@@ -2440,6 +2440,8 @@ def _dispatch(tool, args):
                     return sp_play(query=query)
                 else:
                     return sp_play()
+            elif tool == "spotify_play_playlist":
+                return sp_playlist(playlist_name=args.get("playlist_name", ""))
             elif tool == "spotify_control":
                 return sp_control(action=args.get("action", "toggle"))
             elif tool == "spotify_now_playing":

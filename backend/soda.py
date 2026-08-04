@@ -234,7 +234,7 @@ LOCAL_AGENT_TOOLS = {
     # Credential manager
     "credential_save", "credential_get", "credential_list", "credential_delete",
     # Spotify (runs locally — desktop app required)
-    "spotify_search", "spotify_play", "spotify_control", "spotify_now_playing",
+    "spotify_search", "spotify_play", "spotify_play_playlist", "spotify_control", "spotify_now_playing",
     # Agent control
     "reconnect",
 }
