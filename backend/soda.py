@@ -20,12 +20,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Init Supabase client on startup (if configured)
-from supabase_client import get_supabase, is_configured
+from supabase_client import get_supabase, is_configured, get_db, ensure_tables
 _SUPABASE_AVAILABLE = is_configured()
 if _SUPABASE_AVAILABLE:
     print("[Supabase] Connected — using database memory")
 else:
     print("[Supabase] Not configured — using file-based memory")
+try:
+    if ensure_tables():
+        _SUPABASE_AVAILABLE = True
+        print("[Supabase] Memory tables ensured")
+except Exception:
+    pass
 
 # IELTS lazy singletons (created on first tool call)
 _ielts_engine = None
@@ -648,6 +654,15 @@ def _build_system_prompt():
         "add a useful suggestion: if cold, suggest a jacket; if rainy, suggest an umbrella; "
         "if late, suggest resting."
         "\n\nMEMORY SYSTEM — You have memory tools. Use them PROACTIVELY — NEVER wait to be asked:\n"
+        "- YOUR MEMORY IS A REAL DATABASE: Everything you remember (facts, people, lessons, "
+        "custom schemas, photos, session summaries) is written to a PostgreSQL database in the cloud "
+        "(Supabase session pooler) the moment you save it. It survives restarts, crashes, redeploys, "
+        "and new sessions — it is PERMANENT. Never say 'I'll forget after you close me' — you will not.\n"
+        "- YOU CREATE YOUR OWN TABLES: When you call create_memory_schema, you are literally creating "
+        "a new table in the database with the columns you choose. Every store_custom_memory call inserts "
+        "a row into that table. Design columns freely for any recurring topic — you own your schema.\n"
+        "- MEMORY FOLLOWS YOU: Because your backend runs in the cloud, the same database backs you "
+        "everywhere — this PC, another device, after a redeploy. Nothing is ever lost.\n"
         "- When the user shares personal info (name, preferences, habits, projects, birthdays, allergies, addresses), "
         "call remember_fact immediately — silently in the background, keep talking naturally.\n"
         "- When someone new is mentioned with relationship context (e.g. 'my sister Rubab', 'my friend John'), "
@@ -1068,6 +1083,24 @@ class AudioLoop:
 
     def _load_context_history(self):
         try:
+            from supabase_client import get_db, db_fetch, db_execute
+            if get_db():
+                rows = db_fetch(
+                    "SELECT exchange_history FROM sessions "
+                    "WHERE jsonb_array_length(COALESCE(exchange_history, '[]'::jsonb)) > 0 "
+                    "ORDER BY updated_at DESC LIMIT 1"
+                )
+                if rows:
+                    hist = rows[0].get("exchange_history")
+                    if isinstance(hist, str):
+                        hist = json.loads(hist)
+                    if isinstance(hist, list) and hist:
+                        self._exchange_history = hist[-30:]
+                        log.info(f"Loaded {len(self._exchange_history)} context history entries (DB)")
+                        return
+        except Exception as e:
+            log.warning(f"Failed to load context history from DB: {e}")
+        try:
             p = self._context_history_path
             if os.path.exists(p):
                 with open(p) as f:
@@ -1079,6 +1112,18 @@ class AudioLoop:
             log.warning(f"Failed to load context history: {e}")
 
     def _save_context_history(self):
+        try:
+            from supabase_client import get_db, db_execute
+            if get_db():
+                db_execute(
+                    "INSERT INTO sessions (id, exchange_history, turn_count, updated_at) "
+                    "VALUES (%s,%s,%s,now()) "
+                    "ON CONFLICT (id) DO UPDATE SET exchange_history=EXCLUDED.exchange_history, "
+                    "turn_count=EXCLUDED.turn_count, updated_at=now()",
+                    (self._session_id, json.dumps(self._exchange_history), self._turn_count),
+                )
+        except Exception as e:
+            log.warning(f"Failed to save context history to DB: {e}")
         try:
             p = self._context_history_path
             d = os.path.dirname(p)

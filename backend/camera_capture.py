@@ -28,6 +28,14 @@ def save_photo(base64_data, description="", facing="user"):
 
     record = {"ts": ts, "file_path": str(file_path), "description": description, "facing": facing}
 
+    from supabase_client import get_db, db_execute
+    if get_db():
+        if db_execute(
+            "INSERT INTO camera_photos (ts, file_path, description, facing) VALUES (%s,%s,%s,%s)",
+            (ts, str(file_path), description, facing),
+        ):
+            return {"success": True, "record": record}
+
     db = _db()
     if db:
         try:
@@ -42,6 +50,14 @@ def save_photo(base64_data, description="", facing="user"):
     return {"success": True, "record": record}
 
 def query_photos(limit=10):
+    from supabase_client import get_db, db_fetch
+    if get_db():
+        rows = db_fetch(
+            "SELECT ts, file_path, description, facing FROM camera_photos "
+            "ORDER BY id DESC LIMIT %s", (limit,)
+        )
+        if rows is not None:
+            return rows
     results = []
     db = _db()
     if db:

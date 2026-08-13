@@ -32,6 +32,11 @@ def _db():
     return _SUPABASE
 
 
+def _pg():
+    from supabase_client import get_db, db_fetch, db_execute
+    return get_db(), db_fetch, db_execute
+
+
 # ── People ──
 
 def remember_person(name, relationship="", traits="", preferences="", notes=""):
@@ -41,23 +46,23 @@ def remember_person(name, relationship="", traits="", preferences="", notes=""):
         return {"success": False, "error": "Name is required"}
     now = datetime.now().isoformat()
 
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            existing = db.table("people").select("id").eq("name", name).limit(1).execute()
-            payload = {
-                "name": name,
-                "relationship": relationship,
-                "traits": traits,
-                "preferences": preferences,
-                "notes": notes,
-                "updated_at": now,
-            }
-            if existing.data and len(existing.data) > 0:
-                db.table("people").update(payload).eq("id", existing.data[0]["id"]).execute()
+            rows = fetch("SELECT id FROM people WHERE name ILIKE %s LIMIT 1", (name,))
+            if rows:
+                execute(
+                    "UPDATE people SET relationship=%s, traits=%s, preferences=%s, notes=%s, "
+                    "updated_at=%s WHERE id=%s",
+                    (relationship, traits, preferences, notes, now, rows[0]["id"]),
+                )
             else:
-                payload["created_at"] = now
-                db.table("people").insert(payload).execute()
+                execute(
+                    "INSERT INTO people (name, relationship, traits, preferences, notes, "
+                    "created_at, updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                    (name, relationship, traits, preferences, notes, now, now),
+                )
+            return {"success": True, "name": name, "action": "updated" if rows else "created"}
         except Exception as e:
             print(f"[Supabase] remember_person failed: {e}")
 
@@ -102,23 +107,22 @@ def remember_person(name, relationship="", traits="", preferences="", notes=""):
 def recall_person(query, limit=5):
     """Search people by name, relationship, or traits."""
     q = query.lower()
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            r = db.table("people").select("*").or_(
-                f"name.ilike.%{q}%,relationship.ilike.%{q}%,traits.ilike.%{q}%,notes.ilike.%{q}%"
-            ).limit(limit).execute()
-            matches = []
-            for row in r.data or []:
-                matches.append({
-                    "name": row.get("name", ""),
-                    "relationship": row.get("relationship", ""),
-                    "traits": row.get("traits", ""),
-                    "preferences": row.get("preferences", ""),
-                    "notes": row.get("notes", ""),
-                    "ts": row.get("ts", ""),
-                })
-            return {"success": True, "query": query, "count": len(matches), "matches": matches}
+            rows = fetch(
+                "SELECT name, relationship, traits, preferences, notes, updated_at FROM people "
+                "WHERE name ILIKE %s OR relationship ILIKE %s OR traits ILIKE %s OR notes ILIKE %s "
+                "ORDER BY id DESC LIMIT %s",
+                (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%", limit),
+            )
+            if rows is not None:
+                matches = [{
+                    "name": r["name"], "relationship": r["relationship"] or "",
+                    "traits": r["traits"] or "", "preferences": r["preferences"] or "",
+                    "notes": r["notes"] or "", "ts": str(r["updated_at"] or ""),
+                } for r in rows]
+                return {"success": True, "query": query, "count": len(matches), "matches": matches}
         except Exception as e:
             print(f"[Supabase] recall_person failed: {e}")
     if not PEOPLE_PATH.exists():
@@ -149,21 +153,21 @@ def recall_by_relationship(relationship, limit=5):
     if not relationship:
         return {"success": True, "relationship": relationship, "matches": []}
     q = relationship.lower().strip()
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            r = db.table("people").select("*").ilike("relationship", f"%{q}%").limit(limit).execute()
-            matches = []
-            for row in r.data or []:
-                matches.append({
-                    "name": row.get("name", ""),
-                    "relationship": row.get("relationship", ""),
-                    "traits": row.get("traits", ""),
-                    "preferences": row.get("preferences", ""),
-                    "notes": row.get("notes", ""),
-                    "ts": row.get("ts", ""),
-                })
-            return {"success": True, "relationship": relationship, "count": len(matches), "matches": matches}
+            rows = fetch(
+                "SELECT name, relationship, traits, preferences, notes, updated_at FROM people "
+                "WHERE relationship ILIKE %s ORDER BY id DESC LIMIT %s",
+                (f"%{q}%", limit),
+            )
+            if rows is not None:
+                matches = [{
+                    "name": r["name"], "relationship": r["relationship"] or "",
+                    "traits": r["traits"] or "", "preferences": r["preferences"] or "",
+                    "notes": r["notes"] or "", "ts": str(r["updated_at"] or ""),
+                } for r in rows]
+                return {"success": True, "relationship": relationship, "count": len(matches), "matches": matches}
         except Exception as e:
             print(f"[Supabase] recall_by_relationship failed: {e}")
     if not PEOPLE_PATH.exists():
@@ -190,22 +194,20 @@ def recall_by_relationship(relationship, limit=5):
 
 
 def list_people(limit=20):
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            r = db.table("people").select("*").limit(limit).execute()
-            if r.data:
-                entries = []
-                for row in reversed(r.data):
-                    entries.append({
-                        "name": row.get("name", ""),
-                        "relationship": row.get("relationship", ""),
-                        "traits": row.get("traits", ""),
-                        "preferences": row.get("preferences", ""),
-                        "notes": row.get("notes", ""),
-                        "ts": row.get("created_at", "") or row.get("created", "") or "",
-                    })
-                return entries
+            rows = fetch(
+                "SELECT name, relationship, traits, preferences, notes, created_at, updated_at "
+                "FROM people ORDER BY id DESC LIMIT %s", (limit,)
+            )
+            if rows is not None:
+                return [{
+                    "name": r["name"], "relationship": r["relationship"] or "",
+                    "traits": r["traits"] or "", "preferences": r["preferences"] or "",
+                    "notes": r["notes"] or "",
+                    "ts": str(r["updated_at"] or r["created_at"] or ""),
+                } for r in rows]
         except Exception as e:
             print(f"[Supabase] list_people failed: {e}")
     if not PEOPLE_PATH.exists():
@@ -236,22 +238,21 @@ def remember_lesson(situation, correction):
         return {"success": False, "error": "situation and correction are required"}
     now = datetime.now().isoformat()
 
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            existing = db.table("lessons").select("id,count").eq("situation", situation).limit(1).execute()
-            payload = {
-                "situation": situation,
-                "correction": correction,
-                "count": 1,
-                "created_at": now,
-            }
-            if existing.data and len(existing.data) > 0:
-                row = existing.data[0]
-                payload["count"] = (row.get("count") or 0) + 1
-                db.table("lessons").update(payload).eq("id", row["id"]).execute()
+            rows = fetch("SELECT id, count FROM lessons WHERE situation ILIKE %s LIMIT 1", (situation,))
+            if rows:
+                execute(
+                    "UPDATE lessons SET correction=%s, count=%s WHERE id=%s",
+                    (correction, (rows[0].get("count") or 0) + 1, rows[0]["id"]),
+                )
             else:
-                db.table("lessons").insert(payload).execute()
+                execute(
+                    "INSERT INTO lessons (situation, correction, count, created_at) VALUES (%s,%s,%s,%s)",
+                    (situation, correction, 1, now),
+                )
+            return {"success": True, "situation": situation, "action": "updated" if rows else "created"}
         except Exception as e:
             print(f"[Supabase] remember_lesson failed: {e}")
 
@@ -292,21 +293,24 @@ def remember_lesson(situation, correction):
 def recall_lessons(query="", limit=5):
     """Search lessons by situation or correction. Empty query returns all recent."""
     q = query.lower().strip()
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            r = db.table("lessons").select("*").limit(limit).execute()
-            if r.data:
+            rows = fetch(
+                "SELECT situation, correction, count, created_at FROM lessons ORDER BY id DESC LIMIT %s",
+                (limit,),
+            )
+            if rows is not None:
                 entries = []
-                for row in reversed(r.data):
-                    situation = row.get("situation", "")
-                    correction = row.get("correction", "")
+                for row in rows:
+                    situation = row["situation"] or ""
+                    correction = row["correction"] or ""
                     if not q or q in f"{situation} {correction}".lower():
                         entries.append({
                             "situation": situation,
                             "correction": correction,
                             "count": row.get("count", 1),
-                            "ts": row.get("created_at", "") or row.get("created", "") or "",
+                            "ts": str(row["created_at"] or ""),
                         })
                 return entries
         except Exception as e:
@@ -396,17 +400,16 @@ def save_summary(session_id, topics=None, key_decisions=None, last_exchanges=Non
         "ts": now,
     }
 
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            db.table("conversation_summaries").insert({
-                "session_id": session_id,
-                "summary": {
+            execute(
+                "INSERT INTO conversation_summaries (session_id, summary, topics) VALUES (%s,%s,%s)",
+                (session_id, json.dumps({
                     "key_decisions": key_decisions or [],
                     "last_exchanges": (last_exchanges or [])[:5],
-                },
-                "topics": topics or [],
-            }).execute()
+                }), json.dumps(topics or [])),
+            )
         except Exception as e:
             print(f"[Supabase] save_summary failed: {e}")
 
@@ -427,25 +430,34 @@ def save_summary(session_id, topics=None, key_decisions=None, last_exchanges=Non
 
 def get_recent_summaries(limit=3):
     """Get last N conversation summaries."""
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            r = db.table("conversation_summaries").select("*").limit(limit).execute()
-            if r.data:
+            rows = fetch(
+                "SELECT session_id, summary, topics, created_at FROM conversation_summaries "
+                "ORDER BY id DESC LIMIT %s", (limit,)
+            )
+            if rows is not None:
                 entries = []
-                for row in reversed(r.data):
-                    summary_data = row.get("summary", {})
+                for row in rows:
+                    summary_data = row.get("summary") or {}
                     if isinstance(summary_data, str):
                         try:
                             summary_data = json.loads(summary_data)
                         except Exception:
                             summary_data = {}
+                    topics = row.get("topics") or []
+                    if isinstance(topics, str):
+                        try:
+                            topics = json.loads(topics)
+                        except Exception:
+                            topics = []
                     entries.append({
                         "session_id": row.get("session_id", ""),
-                        "topics": row.get("topics", []),
+                        "topics": topics,
                         "key_decisions": summary_data.get("key_decisions", []),
                         "last_exchanges": summary_data.get("last_exchanges", []),
-                        "ts": row.get("created_at", ""),
+                        "ts": str(row.get("created_at") or ""),
                     })
                 return entries
         except Exception as e:
@@ -534,6 +546,19 @@ def build_context_block():
         topics = s.get("topics", [])
         if topics:
             parts.append(f"LAST SESSION TOPICS: {', '.join(topics[:3])}")
+        decisions = s.get("key_decisions", [])
+        if decisions:
+            parts.append(f"LAST SESSION DECISIONS: {'; '.join(decisions[:3])}")
+        exchanges = s.get("last_exchanges", [])[:3]
+        if exchanges:
+            lines = []
+            for e in exchanges:
+                if e.get("user"):
+                    lines.append(f"USER: {e['user'][:120]}")
+                if e.get("model"):
+                    lines.append(f"SODA: {e['model'][:120]}")
+            if lines:
+                parts.append("LAST SESSION TAIL:\n" + "\n".join(lines))
 
     try:
         from feelings_memory import FeelingsMemory

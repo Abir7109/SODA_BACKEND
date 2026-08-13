@@ -40,25 +40,38 @@ def _db():
     return _SUPABASE
 
 
+def _pg():
+    from supabase_client import get_db, db_fetch, db_execute
+    return get_db(), db_fetch, db_execute
+
+
 # ── Profile ──
 
 def _load_profile() -> dict:
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            r = db.table("profiles").select("*").limit(1).execute()
-            if r.data and len(r.data) > 0:
-                row = r.data[0]
+            rows = fetch(
+                "SELECT name, creator, nationality, language, preferences, created_at, updated_at "
+                "FROM profiles ORDER BY id LIMIT 1"
+            )
+            if rows:
+                row = rows[0]
                 prefs = row.get("preferences") or {}
+                if isinstance(prefs, str):
+                    try:
+                        prefs = json.loads(prefs)
+                    except Exception:
+                        prefs = {}
                 return {
                     **DEFAULT_PROFILE,
-                    "name": row.get("name", "Sir"),
-                    "creator": row.get("creator", ""),
-                    "nationality": row.get("nationality", ""),
-                    "language": row.get("language", "en"),
+                    "name": row.get("name", "Sir") or "Sir",
+                    "creator": row.get("creator", "") or "",
+                    "nationality": row.get("nationality", "") or "",
+                    "language": row.get("language", "en") or "en",
                     "preferences": prefs if isinstance(prefs, dict) else {},
-                    "created": row.get("created", "") or row.get("created_at", ""),
-                    "updated": row.get("updated", "") or row.get("updated_at", ""),
+                    "created": str(row.get("created_at", "") or ""),
+                    "updated": str(row.get("updated_at", "") or ""),
                 }
         except Exception as e:
             print(f"[Supabase] load_profile failed: {e}")
@@ -73,25 +86,33 @@ def _load_profile() -> dict:
 
 def _save_profile(profile: dict) -> None:
     profile["updated"] = datetime.now().isoformat()
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            existing = db.table("profiles").select("id").limit(1).execute()
             now_iso = datetime.now().isoformat()
             payload = {
                 "name": profile.get("name", "Sir"),
                 "creator": profile.get("creator", ""),
                 "nationality": profile.get("nationality", ""),
                 "language": profile.get("language", "en"),
-                "preferences": profile.get("preferences", {}),
+                "preferences": json.dumps(profile.get("preferences", {})),
                 "updated_at": now_iso,
             }
-            if existing.data and len(existing.data) > 0:
-                row_id = existing.data[0]["id"]
-                db.table("profiles").update(payload).eq("id", row_id).execute()
+            rows = fetch("SELECT id FROM profiles ORDER BY id LIMIT 1")
+            if rows:
+                execute(
+                    "UPDATE profiles SET name=%s, creator=%s, nationality=%s, language=%s, "
+                    "preferences=%s, updated_at=%s WHERE id=%s",
+                    (payload["name"], payload["creator"], payload["nationality"],
+                     payload["language"], payload["preferences"], now_iso, rows[0]["id"]),
+                )
             else:
-                payload["created_at"] = now_iso
-                db.table("profiles").insert(payload).execute()
+                execute(
+                    "INSERT INTO profiles (name, creator, nationality, language, preferences, "
+                    "created_at, updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                    (payload["name"], payload["creator"], payload["nationality"],
+                     payload["language"], payload["preferences"], now_iso, now_iso),
+                )
         except Exception as e:
             print(f"[Supabase] _save_profile failed: {e}")
     with open(PROFILE_PATH, "w", encoding="utf-8") as f:
@@ -126,14 +147,14 @@ def add_fact(key: str, value: str) -> dict:
         "value": value.strip(),
         "ts": datetime.now().isoformat(),
     }
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            db.table("facts").insert({
-                "key": entry["key"],
-                "value": entry["value"],
-                "category": "general",
-            }).execute()
+            execute(
+                "INSERT INTO facts (key, value, category) VALUES (%s,%s,%s)",
+                (entry["key"], entry["value"], "general"),
+            )
+            return {"success": True, "key": entry["key"], "value": entry["value"], "ts": entry["ts"]}
         except Exception as e:
             print(f"[Supabase] add_fact failed: {e}")
     FACTS_PATH.touch(exist_ok=True)
@@ -144,18 +165,20 @@ def add_fact(key: str, value: str) -> dict:
 
 def search_facts(query: str, limit: int = 5) -> dict:
     q = query.lower()
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            r = db.table("facts").select("*").or_(f"key.ilike.%{q}%,value.ilike.%{q}%").limit(limit).execute()
-            matches = []
-            for row in r.data or []:
-                matches.append({
-                    "key": row.get("key", ""),
-                    "value": row.get("value", ""),
-                    "ts": row.get("created_at", "") or row.get("created", "") or "",
-                })
-            return {"success": True, "query": query, "count": len(matches), "matches": matches}
+            rows = fetch(
+                "SELECT key, value, created_at FROM facts "
+                "WHERE key ILIKE %s OR value ILIKE %s ORDER BY id DESC LIMIT %s",
+                (f"%{q}%", f"%{q}%", limit),
+            )
+            if rows is not None:
+                matches = [{
+                    "key": r["key"], "value": r["value"],
+                    "ts": str(r["created_at"] or ""),
+                } for r in rows]
+                return {"success": True, "query": query, "count": len(matches), "matches": matches}
         except Exception as e:
             print(f"[Supabase] search_facts failed: {e}")
     if not FACTS_PATH.exists():
@@ -181,18 +204,17 @@ def search_facts(query: str, limit: int = 5) -> dict:
 
 
 def list_facts(limit: int = 50) -> dict:
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            r = db.table("facts").select("*").limit(limit).execute()
-            if r.data:
-                facts = []
-                for row in reversed(r.data):
-                    facts.append({
-                        "key": row.get("key", ""),
-                        "value": row.get("value", ""),
-                        "ts": row.get("created_at", "") or row.get("created", "") or "",
-                    })
+            rows = fetch(
+                "SELECT key, value, created_at FROM facts ORDER BY id DESC LIMIT %s", (limit,)
+            )
+            if rows is not None:
+                facts = [{
+                    "key": r["key"], "value": r["value"],
+                    "ts": str(r["created_at"] or ""),
+                } for r in rows]
                 return {"success": True, "count": len(facts), "facts": facts}
         except Exception as e:
             print(f"[Supabase] list_facts failed: {e}")
@@ -217,10 +239,10 @@ def list_facts(limit: int = 50) -> dict:
 
 def delete_fact(key: str) -> dict:
     key = key.strip().lower()
-    db = _db()
+    db, fetch, execute = _pg()
     if db:
         try:
-            r = db.table("facts").delete().eq("key", key).execute()
+            execute("DELETE FROM facts WHERE key=%s", (key,))
         except Exception as e:
             print(f"[Supabase] delete_fact failed: {e}")
     if not FACTS_PATH.exists():
