@@ -375,6 +375,7 @@ def _check_deps():
 
 _reconnect_count = 0
 _last_connected = None
+_BACKGROUND_THREADS_STARTED = False
 
 
 @sio.event
@@ -397,6 +398,7 @@ def connect():
 
 @sio.event
 def connect_error(data):
+    global _reconnect_count
     _reconnect_count += 1
     log(f"[LocalAgent] ❌ Connection error ({_reconnect_count}): {data}")
     log(f"[LocalAgent]    Check: (1) Backend at {BACKEND_URL} is running, (2) Internet is up, (3) No firewall blocking")
@@ -2670,9 +2672,11 @@ if __name__ == "__main__":
     while True:
         try:
             _connect_with_retry()
-            # Start background threads
-            _start_abort_monitor()
-            threading.Thread(target=_heartbeat_loop, daemon=True).start()
+            # Start background threads (guard against duplicates from reconnect cycles)
+            if not _BACKGROUND_THREADS_STARTED:
+                _start_abort_monitor()
+                threading.Thread(target=_heartbeat_loop, daemon=True).start()
+                _BACKGROUND_THREADS_STARTED = True
             log(f"[LocalAgent] ✅ ALIVE — waiting for commands from backend...")
             log(f"[LocalAgent] 💡 Say something to SODA in the browser, like 'open Notepad' or 'list my desktop files'")
             sio.wait()
