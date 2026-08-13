@@ -450,9 +450,6 @@ async def start_audio(sid, data=None):
     # Initialize SODA
     try:
         print(f"Initializing AudioLoop with device_index={device_index}")
-        # Build greeting for start message
-        start_msg = "Greet your owner warmly and funnily in ONE short sentence. Read his expression from the camera snapshot to gauge his mood, then say something that matches. Keep it tight - one sentence, warm, and genuinely funny. Do NOT call any tools during the greeting. Just greet, then stop and listen."
-
         audio_loop = soda.AudioLoop(
             video_mode="none",
             sio=sio,
@@ -462,13 +459,33 @@ async def start_audio(sid, data=None):
             on_project_update=on_project_update,
             on_error=on_error,
             on_mic_level=on_mic_level,
-            start_message=start_msg,
+            start_message="",
             input_device_index=device_index,
             input_device_name=device_name,
             mic_source=mic_source,
         )
         audio_loop._owner_sid = sid
         print("AudioLoop initialized successfully.")
+
+        # Build greeting for start message — reference the previous session when known
+        start_msg = ("Greet your owner warmly and funnily in ONE short sentence. "
+                     "Read his expression from the camera snapshot to gauge his mood, then say something that matches. "
+                     "Keep it tight - one sentence, warm, and genuinely funny. "
+                     "Do NOT call any tools during the greeting. Just greet, then stop and listen.")
+        prev = audio_loop._exchange_history
+        if prev:
+            lines = []
+            for e in prev[-8:]:
+                if e.get("user"):
+                    lines.append(f"Sir: {str(e['user'])[:200]}")
+                if e.get("model"):
+                    lines.append(f"SODA: {str(e['model'])[:200]}")
+            if lines:
+                start_msg += ("\n\nPREVIOUS SESSION — you are waking up after an earlier session. "
+                              "Below is what you two last said. Your greeting must naturally reference this "
+                              "(e.g. 'back on it — we were talking about X'), then stop and listen. "
+                              "Keep it ONE sentence total:\n" + "\n".join(lines[-12:]))
+        audio_loop.start_message = start_msg
 
         global _audio_loop
         _audio_loop = audio_loop

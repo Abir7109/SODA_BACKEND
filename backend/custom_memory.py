@@ -71,6 +71,27 @@ def _ensure_mem_table(db_execute, schema_name: str, columns: list) -> bool:
     return True
 
 
+def _ensure_table_from_schema(fetch, execute, schema_name: str) -> bool:
+    """Heal: if a schema is registered but its real table is missing, create it."""
+    tname = table_name_for(schema_name)
+    rows = fetch("SELECT to_regclass(%s) AS t", (tname,))
+    if rows and rows[0].get("t"):
+        return True
+    srow = fetch("SELECT columns FROM custom_schemas WHERE name=%s LIMIT 1", (schema_name,))
+    if not srow:
+        return False
+    cols = srow[0].get("columns") or []
+    if isinstance(cols, str):
+        try:
+            cols = json.loads(cols)
+        except Exception:
+            cols = []
+    ok = _ensure_mem_table(execute, schema_name, cols)
+    if ok:
+        print(f"[MEMDB] healed missing table {tname} from registered schema")
+    return ok
+
+
 # ── Schema Management ──
 
 def create_memory_schema(name, description="", columns=None):
@@ -247,6 +268,7 @@ def store_custom_memory(schema_name, data):
     if db:
         try:
             tname = table_name_for(schema_name)
+            _ensure_table_from_schema(fetch, execute, schema_name)
             rows = fetch(
                 "SELECT column_name FROM information_schema.columns "
                 "WHERE table_schema='public' AND table_name=%s", (tname,)
@@ -308,6 +330,7 @@ def query_custom_memory(schema_name, query="", limit=20):
     if db:
         try:
             tname = table_name_for(schema_name)
+            _ensure_table_from_schema(fetch, execute, schema_name)
             if q:
                 rows = fetch(
                     f'SELECT row_to_json(t) AS data, created_at FROM "{tname}" t '
