@@ -48,14 +48,16 @@ def get_db():
             return _PG_CONN
         url = os.getenv("SUPABASE_DB_URL", "") or os.getenv("DATABASE_URL", "")
         if not url:
+            print("[MEMDB] pooler NOT configured: SUPABASE_DB_URL missing — memory will use file fallback")
             return None
         try:
             import psycopg2
             # ponytail: single shared conn; per-request pool if concurrency ever matters
             _PG_CONN = psycopg2.connect(url, connect_timeout=10)
+            print("[MEMDB] pooler connected — DATABASE BACKEND ACTIVE")
             return _PG_CONN
         except Exception as e:
-            print(f"[Supabase] Pooler connect failed: {e}")
+            print(f"[MEMDB] pooler connect FAILED: {e} — memory will use file fallback")
             return None
 
 
@@ -66,16 +68,18 @@ def db_configured() -> bool:
 def db_execute(sql: str, params=None) -> bool:
     conn = get_db()
     if not conn:
+        print(f"[MEMDB] exec skipped (no DB): {_short_sql(sql)}")
         return False
     with _PG_LOCK:
         try:
             with conn.cursor() as cur:
                 cur.execute(sql, params if params else None)
             conn.commit()
+            print(f"[MEMDB] exec OK: {_short_sql(sql)}")
             return True
         except Exception as e:
             conn.rollback()
-            print(f"[Supabase] db_execute failed: {e}")
+            print(f"[MEMDB] exec FAIL: {_short_sql(sql)} — {e}")
             return False
 
 
@@ -83,6 +87,7 @@ def db_fetch(sql: str, params=None):
     """Run a SELECT, return list of dicts, or None on no-DB/failure."""
     conn = get_db()
     if not conn:
+        print(f"[MEMDB] fetch skipped (no DB): {_short_sql(sql)}")
         return None
     with _PG_LOCK:
         try:
@@ -91,11 +96,17 @@ def db_fetch(sql: str, params=None):
                 cols = [d[0] for d in cur.description] if cur.description else []
                 rows = [dict(zip(cols, row)) for row in cur.fetchall()]
             conn.commit()
+            print(f"[MEMDB] fetch OK: {_short_sql(sql)} -> {len(rows)} rows")
             return rows
         except Exception as e:
             conn.rollback()
-            print(f"[Supabase] db_fetch failed: {e}")
+            print(f"[MEMDB] fetch FAIL: {_short_sql(sql)} — {e}")
             return None
+
+
+def _short_sql(sql: str, n: int = 110) -> str:
+    sql = " ".join((sql or "").split())
+    return sql if len(sql) <= n else sql[:n] + "..."
 
 
 # ── Tables (SODA creates its own schema) ──

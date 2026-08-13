@@ -51,18 +51,21 @@ def remember_person(name, relationship="", traits="", preferences="", notes=""):
         try:
             rows = fetch("SELECT id FROM people WHERE name ILIKE %s LIMIT 1", (name,))
             if rows:
-                execute(
+                ok = execute(
                     "UPDATE people SET relationship=%s, traits=%s, preferences=%s, notes=%s, "
                     "updated_at=%s WHERE id=%s",
                     (relationship, traits, preferences, notes, now, rows[0]["id"]),
                 )
             else:
-                execute(
+                ok = execute(
                     "INSERT INTO people (name, relationship, traits, preferences, notes, "
                     "created_at, updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
                     (name, relationship, traits, preferences, notes, now, now),
                 )
-            return {"success": True, "name": name, "action": "updated" if rows else "created"}
+            if ok:
+                print(f"[MEMDB] remember_person({name!r}) -> db OK ({'updated' if rows else 'created'})")
+                return {"success": True, "name": name, "action": "updated" if rows else "created"}
+            print(f"[MEMDB] remember_person({name!r}) -> db FAIL, using file fallback")
         except Exception as e:
             print(f"[Supabase] remember_person failed: {e}")
 
@@ -101,6 +104,7 @@ def remember_person(name, relationship="", traits="", preferences="", notes=""):
     with open(PEOPLE_PATH, "w", encoding="utf-8") as f:
         for entry in entries:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    print(f"[MEMDB] remember_person({name!r}) -> FILE fallback (NOT persistent across redeploys)")
     return {"success": True, "name": name, "action": "updated" if found else "created"}
 
 

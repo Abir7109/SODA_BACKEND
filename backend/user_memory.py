@@ -99,20 +99,22 @@ def _save_profile(profile: dict) -> None:
                 "updated_at": now_iso,
             }
             rows = fetch("SELECT id FROM profiles ORDER BY id LIMIT 1")
+            ok = False
             if rows:
-                execute(
+                ok = execute(
                     "UPDATE profiles SET name=%s, creator=%s, nationality=%s, language=%s, "
                     "preferences=%s, updated_at=%s WHERE id=%s",
                     (payload["name"], payload["creator"], payload["nationality"],
                      payload["language"], payload["preferences"], now_iso, rows[0]["id"]),
                 )
             else:
-                execute(
+                ok = execute(
                     "INSERT INTO profiles (name, creator, nationality, language, preferences, "
                     "created_at, updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
                     (payload["name"], payload["creator"], payload["nationality"],
                      payload["language"], payload["preferences"], now_iso, now_iso),
                 )
+            print(f"[MEMDB] profile save -> {'db OK' if ok else 'db FAIL (file fallback)'}")
         except Exception as e:
             print(f"[Supabase] _save_profile failed: {e}")
     with open(PROFILE_PATH, "w", encoding="utf-8") as f:
@@ -150,16 +152,20 @@ def add_fact(key: str, value: str) -> dict:
     db, fetch, execute = _pg()
     if db:
         try:
-            execute(
+            ok = execute(
                 "INSERT INTO facts (key, value, category) VALUES (%s,%s,%s)",
                 (entry["key"], entry["value"], "general"),
             )
-            return {"success": True, "key": entry["key"], "value": entry["value"], "ts": entry["ts"]}
+            if ok:
+                print(f"[MEMDB] add_fact({entry['key']!r}) -> db OK")
+                return {"success": True, "key": entry["key"], "value": entry["value"], "ts": entry["ts"]}
+            print(f"[MEMDB] add_fact({entry['key']!r}) -> db FAIL, using file fallback")
         except Exception as e:
             print(f"[Supabase] add_fact failed: {e}")
     FACTS_PATH.touch(exist_ok=True)
     with open(FACTS_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    print(f"[MEMDB] add_fact({entry['key']!r}) -> FILE fallback (NOT persistent across redeploys)")
     return {"success": True, "key": entry["key"], "value": entry["value"], "ts": entry["ts"]}
 
 

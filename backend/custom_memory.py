@@ -91,18 +91,21 @@ def create_memory_schema(name, description="", columns=None):
             _ensure_mem_table(execute, name, columns)
             rows = fetch("SELECT id FROM custom_schemas WHERE name=%s LIMIT 1", (name,))
             if rows:
-                execute(
+                ok = execute(
                     "UPDATE custom_schemas SET columns=%s, description=%s, updated_at=%s WHERE id=%s",
                     (json.dumps(columns), description, now, rows[0]["id"]),
                 )
             else:
-                execute(
+                ok = execute(
                     "INSERT INTO custom_schemas (name, description, columns, created_at, updated_at) "
                     "VALUES (%s,%s,%s,%s,%s)",
                     (name, description, json.dumps(columns), now, now),
                 )
-            return {"success": True, "action": "updated" if rows else "created",
-                    "schema": {"name": name, "columns": columns, "description": description}}
+            if ok:
+                print(f"[MEMDB] create_memory_schema({name!r}) -> db OK, real table created")
+                return {"success": True, "action": "updated" if rows else "created",
+                        "schema": {"name": name, "columns": columns, "description": description}}
+            print(f"[MEMDB] create_memory_schema({name!r}) -> db FAIL, using fallback")
         except Exception as e:
             print(f"[Supabase] create_memory_schema failed: {e}")
 
@@ -254,12 +257,15 @@ def store_custom_memory(schema_name, data):
                 vals = [json.dumps(data.get(c)) if isinstance(data.get(c), (dict, list)) else data.get(c)
                         for c in colnames]
                 placeholders = ", ".join(["%s"] * len(cols))
-                execute(
+                ok = execute(
                     f'INSERT INTO "{tname}" ({", ".join(cols)}) VALUES ({placeholders})',
                     vals,
                 )
-                return {"success": True, "entry": {"id": entry_id, "schema_name": schema_name,
-                        "data": data, "created_at": now}}
+                if ok:
+                    print(f"[MEMDB] store_custom_memory({schema_name!r}) -> db OK")
+                    return {"success": True, "entry": {"id": entry_id, "schema_name": schema_name,
+                            "data": data, "created_at": now}}
+                print(f"[MEMDB] store_custom_memory({schema_name!r}) -> db FAIL, using fallback")
         except Exception as e:
             print(f"[Supabase] store_custom_memory failed: {e}")
 
@@ -285,6 +291,7 @@ def store_custom_memory(schema_name, data):
     }
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    print(f"[MEMDB] store_custom_memory({schema_name!r}) -> FILE fallback (NOT persistent across redeploys)")
     return {"success": True, "entry": entry}
 
 

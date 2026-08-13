@@ -30,8 +30,11 @@ try:
     if ensure_tables():
         _SUPABASE_AVAILABLE = True
         print("[Supabase] Memory tables ensured")
+        print("[MEMDB] ACTIVE BACKEND: POSTGRES DATABASE (Supabase pooler) — memory is permanent")
+    else:
+        print("[MEMDB] ACTIVE BACKEND: FILE (no database) — memory will be LOST on redeploy/restart")
 except Exception:
-    pass
+    print("[MEMDB] ACTIVE BACKEND: FILE (ensure_tables crashed) — memory will be LOST on redeploy/restart")
 
 # IELTS lazy singletons (created on first tool call)
 _ielts_engine = None
@@ -1098,6 +1101,7 @@ class AudioLoop:
                         self._exchange_history = hist[-30:]
                         log.info(f"Loaded {len(self._exchange_history)} context history entries (DB)")
                         return
+                log.info("No context history in DB — file fallback")
         except Exception as e:
             log.warning(f"Failed to load context history from DB: {e}")
         try:
@@ -1115,13 +1119,14 @@ class AudioLoop:
         try:
             from supabase_client import get_db, db_execute
             if get_db():
-                db_execute(
+                ok = db_execute(
                     "INSERT INTO sessions (id, exchange_history, turn_count, updated_at) "
                     "VALUES (%s,%s,%s,now()) "
                     "ON CONFLICT (id) DO UPDATE SET exchange_history=EXCLUDED.exchange_history, "
                     "turn_count=EXCLUDED.turn_count, updated_at=now()",
                     (self._session_id, json.dumps(self._exchange_history), self._turn_count),
                 )
+                print(f"[MEMDB] session context save ({self._session_id}) -> {'db OK' if ok else 'db FAIL (file fallback)'}")
         except Exception as e:
             log.warning(f"Failed to save context history to DB: {e}")
         try:
