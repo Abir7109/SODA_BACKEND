@@ -223,10 +223,9 @@ LOCAL_AGENT_TOOLS = {
     # UI automation
     "ui_find_image", "ui_click_image", "ui_click_text",
     "ui_wait_for_image", "ui_drag_drop",
-    # Messaging (runs locally — WhatsApp/Telegram Desktop required)
+    # Messaging (runs locally — WhatsApp Desktop required)
     "send_whatsapp", "whatsapp_find_and_call", "whatsapp_find_and_message",
     "check_whatsapp", "reply_whatsapp", "read_whatsapp_chat",
-    "send_telegram_message", "send_telegram_file",
     # System info / agent control
     "get_system_status",
     "go_to_sleep", "go_background", "come_back",

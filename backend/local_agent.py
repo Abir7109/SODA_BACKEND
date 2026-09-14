@@ -87,7 +87,6 @@ LOCAL_TOOLS = [
     "window_manage", "window_get_info",
     "send_whatsapp", "whatsapp_find_and_call", "whatsapp_find_and_message",
     "check_whatsapp", "reply_whatsapp", "read_whatsapp_chat",
-    "send_telegram_message", "send_telegram_file",
     "get_active_window", "list_processes", "process_kill",
     "get_system_status",
     "analyze_screen", "read_screen_text", "recognize_face",
@@ -1533,9 +1532,6 @@ def _dispatch(tool, args):
             return whatsapp_handler(tool, args)
         except ImportError:
             return {"success": False, "error": "whatsapp_bridge not available locally"}
-
-    elif tool in ("send_telegram_message", "send_telegram_file"):
-        return {"success": False, "error": f"{tool} requires cloud backend. Use from the SODA web interface."}
 
     # ── UI Automation ──────────────────────────────────────────────
     elif tool == "ui_find_image":

@@ -145,9 +145,6 @@ from external_apis import (
     view_file_tool,
     go_to_sleep_tool,
     wake_up_tool,
-    send_telegram_message_tool,
-    send_telegram_file_tool,
-    search_and_send_telegram_tool,
     create_folder_tool,
     show_agents_tool,
     shutdown_soda_tool,
@@ -160,7 +157,6 @@ from external_apis import (
     scroll_file_list_tool,
     scrape_site_tool,
     export_data_tool,
-    get_pagespeed_insights_tool,
 )
 from soda_agents import get_agent_tool_defs
 from workbase import (

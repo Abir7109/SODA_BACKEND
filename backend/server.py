@@ -1160,6 +1160,22 @@ async def speaking_timer_expired(sid, data):
         asyncio.create_task(audio_loop.inject_text(text))
 
 @sio.event
+async def telegram_message(sid, data):
+    text = data.get('text', '')
+    user_id = data.get('from', 0)
+    if not text:
+        return
+    log.info(f"[TELEGRAM] Message from {user_id}: {text[:80]}")
+    if not audio_loop or not audio_loop.session:
+        log.warning("telegram_message: audio loop not ready")
+        if audio_loop:
+            from telegram_bot import telegram_bot
+            await telegram_bot.send_message("SODA is not ready yet. Please wait a moment.")
+        return
+    from telegram_bot import telegram_bot
+    await audio_loop.inject_text(f"[Telegram message from user {user_id}]: {text}")
+
+@sio.event
 async def save_memory(sid, data):
     try:
         messages = data.get('messages', [])
