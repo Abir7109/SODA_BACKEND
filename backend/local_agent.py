@@ -696,8 +696,60 @@ def _save_credentials(entries):
         return False
 
 
+def thinking_validate(tool, args):
+    """Level 1 thinking: local validation before tool execution. No API calls."""
+    errors = []
+    warnings = []
+
+    # File existence checks
+    if tool in ("read_file", "open_file", "write_file", "edit_file"):
+        p = args.get("path", "")
+        if not p:
+            errors.append(f"{tool} requires a 'path' parameter")
+        elif tool in ("read_file", "open_file") and not os.path.exists(p):
+            errors.append(f"File not found: {p}")
+
+    elif tool == "delete_items":
+        paths = args.get("paths", [])
+        if not paths:
+            errors.append("delete_items requires a 'paths' list")
+        for p in paths:
+            if not os.path.exists(p):
+                warnings.append(f"Path does not exist: {p}")
+
+    elif tool in ("rename_item", "copy_item", "move_item"):
+        src = args.get("source") or args.get("old_path", "")
+        if not src:
+            errors.append(f"{tool} requires a source path")
+        elif not os.path.exists(src):
+            errors.append(f"Source not found: {src}")
+
+    elif tool == "terminal_execute":
+        cmd = args.get("command", "")
+        if not cmd:
+            errors.append("terminal_execute requires a 'command'")
+        elif any(x in cmd.lower() for x in ("rm -rf /", "format c:", "del /s /q c:\\windows")):
+            errors.append(f"Dangerous command blocked: {cmd[:80]}")
+
+    elif tool in ("mouse_click", "mouse_move", "mouse_drag"):
+        x = args.get("x")
+        y = args.get("y")
+        if x is None or y is None:
+            errors.append(f"{tool} requires x and y coordinates")
+
+    return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings}
+
+
 def _dispatch(tool, args):
     """Dispatch tool execution using backend modules or fallback implementations."""
+
+    # Level 1 thinking: validate before executing
+    check = thinking_validate(tool, args)
+    if not check["valid"]:
+        return {"success": False, "error": "Validation failed", "details": check["errors"]}
+    if check["warnings"]:
+        for w in check["warnings"]:
+            log.warning(f"[THINK] {tool}: {w}")
 
     # ── File operations (use builtins + backend modules) ──────────
     if tool == "list_files":

@@ -1056,7 +1056,7 @@ class AudioLoop:
         self._last_camera_use = 0.0
         self._last_camera_fail = 0.0
         self._turn_count = 0
-        self._context_refresh_interval = 999
+        self._context_refresh_interval = 5
         self._last_refresh_turn = 0
         self._summary_interval = 5
         self._last_summary_turn = 0
@@ -1100,7 +1100,7 @@ class AudioLoop:
                     if isinstance(hist, str):
                         hist = json.loads(hist)
                     if isinstance(hist, list) and hist:
-                        self._exchange_history = hist[-30:]
+                        self._exchange_history = hist[-100:]
                         log.info(f"Loaded {len(self._exchange_history)} context history entries (DB)")
                         return
                 log.info("No context history in DB — file fallback")
@@ -1112,7 +1112,7 @@ class AudioLoop:
                 with open(p) as f:
                     data = json.load(f)
                 if isinstance(data, list):
-                    self._exchange_history = data[-30:]
+                    self._exchange_history = data[-100:]
                     log.info(f"Loaded {len(self._exchange_history)} context history entries")
         except Exception as e:
             log.warning(f"Failed to load context history: {e}")
@@ -1156,6 +1156,13 @@ class AudioLoop:
     def _mark_activity(self):
         self._last_activity = time.time()
         self.personality.mood.record_user_input()
+
+    async def _flush_context_loop(self):
+        """Flush exchange_history to Supabase every 2 minutes."""
+        while not self.stop_event.is_set():
+            await asyncio.sleep(120)
+            if self._exchange_history:
+                self._save_context_history()
 
     async def _idle_check_loop(self):
         CHECK_INTERVAL = 10
@@ -1368,6 +1375,21 @@ class AudioLoop:
                         parts.extend(summary_lines)
             except Exception:
                 pass
+        try:
+            lessons = memory_store.recall_lessons("", limit=3)
+            if lessons:
+                lesson_lines = [f"  - {l.get('correction', '')}" for l in lessons]
+                parts.append("Lessons learned:")
+                parts.extend(lesson_lines)
+        except Exception:
+            pass
+        try:
+            people = memory_store.list_people(limit=3)
+            if people:
+                people_str = ", ".join(f"{p.get('name','')} ({p.get('relationship','')})" for p in people)
+                parts.append(f"People: {people_str}")
+        except Exception:
+            pass
         if self._exchange_history:
             recent = self._exchange_history[-6:]
             lines = []
@@ -1661,6 +1683,7 @@ class AudioLoop:
                     tg.create_task(self.play_audio())
                     tg.create_task(self._idle_check_loop())
                     tg.create_task(self._flag_watchdog())
+                    tg.create_task(self._flush_context_loop())
 
                     if not is_reconnect:
                         if self.on_project_update:
@@ -1892,8 +1915,8 @@ class AudioLoop:
                         entry["model"] = model_text[-300:]
                     if not self._exchange_history or self._exchange_history[-1] != entry:
                         self._exchange_history.append(entry)
-                        if len(self._exchange_history) > 30:
-                            self._exchange_history = self._exchange_history[-30:]
+                        if len(self._exchange_history) > 100:
+                            self._exchange_history = self._exchange_history[-100:]
                         self._save_context_history()
                 if self._turn_count - self._last_refresh_turn >= self._context_refresh_interval:
                     if self._exchange_history and self.session:
