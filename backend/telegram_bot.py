@@ -47,16 +47,21 @@ class TelegramBot:
 
     def start(self, sio):
         if self._running:
+            print("[TELEGRAM] Already running, skipping start")
             return
         self._sio = sio
         token = self._get_bot_token()
         if not token:
-            print("[TELEGRAM] No BOT_TOKEN set — Telegram bot disabled")
+            print("[TELEGRAM] ⚠️  No BOT_TOKEN set — Telegram bot DISABLED")
+            print("[TELEGRAM]    Set BOT_TOKEN in .env to enable Telegram bridge")
             return
+        if not self._user_id:
+            print("[TELEGRAM] ⚠️  No TELEGRAM_USER_ID set — bot will accept ALL users")
+            print("[TELEGRAM]    Set TELEGRAM_USER_ID in .env for security")
         self._running = True
         self._thread = threading.Thread(target=self._run_bot, args=(token,), daemon=True)
         self._thread.start()
-        print("[TELEGRAM] Bot thread started")
+        print(f"[TELEGRAM] 🚀 Bot thread started (user_id={self._user_id or 'ANY'})")
 
     def stop(self):
         self._running = False
@@ -103,28 +108,36 @@ class TelegramBot:
         self._running = False
 
     async def _post_init(self, app):
-        print("[TELEGRAM] Bot connected!")
+        print("[TELEGRAM] ✅ Bot connected to Telegram servers")
         if self._user_id:
             try:
                 await app.bot.send_message(chat_id=self._user_id, text="SODA Telegram bridge is online ⚡")
+                print(f"[TELEGRAM] ✅ Startup message sent to user {self._user_id}")
             except Exception as e:
-                print(f"[TELEGRAM] Startup message failed: {e}")
+                print(f"[TELEGRAM] ❌ Startup message failed: {e}")
+        else:
+            print("[TELEGRAM] ⚠️  No user_id — startup message skipped")
 
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not update.message or not update.message.text:
             return
         user_id = update.effective_user.id
+        username = update.effective_user.username or "unknown"
         if self._user_id and user_id != self._user_id:
+            print(f"[TELEGRAM] 🚫 Unauthorized message from user {user_id} (@{username})")
             await update.message.reply_text("Unauthorized")
             return
 
         text = update.message.text.strip()
-        print(f"[TELEGRAM] Received: {text[:60]}")
+        print(f"[TELEGRAM] ✉️  Received from @{username} ({user_id}): {text[:80]}")
 
         await update.message.reply_text("🤖 Processing...")
 
         if self._sio:
+            print(f"[TELEGRAM] 📤 Emitting 'telegram_message' event to backend")
             await self._sio.emit('telegram_message', {'text': text, 'from': user_id})
+        else:
+            print(f"[TELEGRAM] ❌ No Socket.IO connection — message dropped!")
 
     async def send_message(self, text: str) -> str:
         if not self._app or not self._user_id:

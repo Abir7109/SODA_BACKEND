@@ -392,7 +392,11 @@ def connect():
         "tools": LOCAL_TOOLS,
         "app_registry": registry_info,
     })
-    log(f"[LocalAgent] Registered as {MACHINE_ID} ({len(LOCAL_TOOLS)} tools, {len(APP_REGISTRY)} apps)")
+    log(f"[LocalAgent] 📋 Registered as {MACHINE_ID}")
+    log(f"[LocalAgent]    Platform: {sys.platform}")
+    log(f"[LocalAgent]    Tools: {len(LOCAL_TOOLS)}")
+    log(f"[LocalAgent]    Apps in registry: {len(APP_REGISTRY)}")
+    log(f"[LocalAgent]    Agent token: {'set' if AGENT_TOKEN else 'NOT SET'}")
 
 
 @sio.event
@@ -417,11 +421,12 @@ def on_agent_execute(data):
     callback_id = data.get("callback_id", "")
 
     clear()
-    log(f"[LocalAgent] Executing: {tool}({json.dumps(args)[:200]})")
+    log(f"[LocalAgent] 🔧 Executing: {tool}({json.dumps(args)[:200]})")
 
     def _run():
         try:
             result = _dispatch(tool, args)
+            log(f"[LocalAgent] ✅ {tool} completed successfully")
             sio.emit("agent_tool_result", {
                 "callback_id": callback_id,
                 "tool": tool,
@@ -429,7 +434,7 @@ def on_agent_execute(data):
                 "success": True,
             })
         except AbortError:
-            log(f"[LocalAgent] Tool {tool} aborted (frontend disconnected)")
+            log(f"[LocalAgent] ⚠️  {tool} aborted (frontend disconnected)")
             try:
                 sio.emit("agent_tool_result", {
                     "callback_id": callback_id,
@@ -441,7 +446,7 @@ def on_agent_execute(data):
                 pass
         except Exception as e:
             tb = traceback.format_exc()
-            log(f"[LocalAgent] Error executing {tool}: {e}")
+            log(f"[LocalAgent] ❌ Error executing {tool}: {e}")
             log(tb)
             sio.emit("agent_tool_result", {
                 "callback_id": callback_id,

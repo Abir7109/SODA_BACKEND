@@ -91,6 +91,10 @@ async def lifespan(_app):
             now = datetime.now()
             stale_threshold = 90  # seconds without pong → stale
             stale_sids = []
+            # Log bridge status summary
+            agent_count = len(_connected_agents)
+            agent_names = [a.get('machine_id', '?') for a in _connected_agents.values()]
+            log.info(f"[BRIDGE STATUS] Agents connected: {agent_count} ({', '.join(agent_names) if agent_names else 'none'})")
             if _connected_agents:
                 for sid, agent_info in list(_connected_agents.items()):
                     machine_id = agent_info.get('machine_id', sid)
@@ -346,7 +350,9 @@ async def agent_register(sid, data):
         'connected_at': datetime.now().isoformat(),
         'sid': sid,
     }
-    print(f"[AGENT] Registered: {machine_id} ({platform}) — {len(tools)} tools, {app_count} apps in registry")
+    print(f"[AGENT] ✅ Registered: {machine_id} ({platform}) — {len(tools)} tools, {app_count} apps in registry")
+    print(f"[AGENT]    SID: {sid}")
+    print(f"[AGENT]    Available tools: {', '.join(tools[:10])}{'...' if len(tools) > 10 else ''}")
     await sio.emit('agent_connection_status', {
         'connected': True,
         'machine_id': machine_id,
@@ -1164,16 +1170,36 @@ async def telegram_message(sid, data):
     text = data.get('text', '')
     user_id = data.get('from', 0)
     if not text:
+        log.warning("[TELEGRAM] Empty message received, ignoring")
         return
-    log.info(f"[TELEGRAM] Message from {user_id}: {text[:80]}")
-    if not audio_loop or not audio_loop.session:
-        log.warning("telegram_message: audio loop not ready")
-        if audio_loop:
+    log.info(f"[TELEGRAM] ✉️  Message from user {user_id}: {text[:100]}")
+    if not audio_loop:
+        log.error("[TELEGRAM] ❌ audio_loop is None — backend not initialized")
+        try:
             from telegram_bot import telegram_bot
-            await telegram_bot.send_message("SODA is not ready yet. Please wait a moment.")
+            await telegram_bot.send_message("SODA backend is not running. Please restart.")
+        except Exception as e:
+            log.error(f"[TELEGRAM] Could not send error reply: {e}")
         return
-    from telegram_bot import telegram_bot
-    await audio_loop.inject_text(f"[Telegram message from user {user_id}]: {text}")
+    if not audio_loop.session:
+        log.error("[TELEGRAM] ❌ audio_loop.session is None — Gemini not connected")
+        try:
+            from telegram_bot import telegram_bot
+            await telegram_bot.send_message("SODA is connecting to Gemini... Please wait.")
+        except Exception as e:
+            log.error(f"[TELEGRAM] Could not send error reply: {e}")
+        return
+    try:
+        from telegram_bot import telegram_bot
+        await audio_loop.inject_text(f"[Telegram message from user {user_id}]: {text}")
+        log.info(f"[TELEGRAM] ✅ Injected into Gemini session successfully")
+    except Exception as e:
+        log.error(f"[TELEGRAM] ❌ Failed to inject message: {e}")
+        try:
+            from telegram_bot import telegram_bot
+            await telegram_bot.send_message("Failed to process your message. Please try again.")
+        except Exception:
+            pass
 
 @sio.event
 async def save_memory(sid, data):

@@ -2059,11 +2059,13 @@ class AudioLoop:
                     "attempt": 1, "total": 5,
                     "output": "", "error": "", "success": None,
                 }))
+            self.log.info(f"[BRIDGE] 📤 Dispatching {name} to agent {agent_sid}")
             await self.sio.emit('agent_execute', {
                 'callback_id': callback_id,
                 'tool': name,
                 'args': args,
             }, room=agent_sid)
+            self.log.info(f"[BRIDGE] 📤 Emitted to {agent_sid}, waiting for response (timeout={timeout}s)")
             # Per-tool timeouts — WhatsApp needs extra time (app launch + search + typing)
             _TOOL_TIMEOUTS = {
                 "send_whatsapp": 45.0,
@@ -2141,6 +2143,7 @@ class AudioLoop:
                         callback_id = str(_uuid.uuid4())
                         future = asyncio.Future()
                         _pending_agent_results[callback_id] = future
+                        self.log.info(f"[BRIDGE] 🔄 Retry: dispatching {name} (attempt {total_attempts}/{max_attempts})")
                         await self.sio.emit('agent_execute', {
                             'callback_id': callback_id,
                             'tool': name,
@@ -2843,6 +2846,7 @@ class AudioLoop:
                 fut = asyncio.Future()
                 _pending_agent_results[cid] = fut
                 agent_sid = max(_connected_agents, key=lambda s: len(_connected_agents[s].get('tools', [])))
+                self.log.info(f"[BRIDGE] 📤 Dispatching window_manage to {agent_sid}")
                 await self.sio.emit('agent_execute', {
                     'callback_id': cid,
                     'tool': 'window_manage',
@@ -2979,17 +2983,23 @@ class AudioLoop:
 
         elif name == "send_telegram_message":
             from telegram_bot import telegram_bot
+            log.info(f"[TOOL] send_telegram_message: dispatching to telegram_bot")
             try:
                 r = telegram_bot.send_message(args.get("text", ""))
+                log.info(f"[TOOL] send_telegram_message: ✅ sent successfully")
             except Exception as e:
+                log.error(f"[TOOL] send_telegram_message: ❌ failed: {e}")
                 r = str(e)
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         elif name == "send_telegram_file":
             from telegram_bot import telegram_bot
+            log.info(f"[TOOL] send_telegram_file: dispatching to telegram_bot")
             try:
                 r = telegram_bot.send_file(args.get("path", ""))
+                log.info(f"[TOOL] send_telegram_file: ✅ sent successfully")
             except Exception as e:
+                log.error(f"[TOOL] send_telegram_file: ❌ failed: {e}")
                 r = str(e)
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
