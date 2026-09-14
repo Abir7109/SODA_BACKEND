@@ -65,15 +65,13 @@ class TelegramBot:
 
     def stop(self):
         self._running = False
-        if self._app:
-            try:
-                self._app.stop()
-            except:
-                pass
         if self._loop and self._loop.is_running():
             try:
-                self._loop.call_soon_threadsafe(self._loop.stop)
-            except:
+                if self._app:
+                    self._loop.call_soon_threadsafe(
+                        self._loop.create_task, self._app.stop()
+                    )
+            except Exception:
                 pass
         print("[TELEGRAM] Bot stopped")
 
@@ -95,7 +93,13 @@ class TelegramBot:
                 )
                 self._app.post_init = self._post_init
                 print("[TELEGRAM] Starting polling...")
-                self._app.run_polling(drop_pending_updates=True)
+                self._loop.run_until_complete(self._app.initialize())
+                if self._app.post_init:
+                    self._loop.run_until_complete(self._app.post_init(self._app))
+                self._loop.run_until_complete(self._app.start())
+                self._loop.run_until_complete(self._app.updater.start_polling(drop_pending_updates=True))
+                print("[TELEGRAM] ✅ Polling started — blocking until stopped")
+                self._loop.run_until_complete(self._app.updater.wait())
             except Exception as e:
                 print(f"[TELEGRAM] Bot error: {e}")
                 if self._running:
