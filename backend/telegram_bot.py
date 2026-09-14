@@ -65,14 +65,8 @@ class TelegramBot:
 
     def stop(self):
         self._running = False
-        if self._loop and self._loop.is_running():
-            try:
-                if self._app:
-                    self._loop.call_soon_threadsafe(
-                        self._loop.create_task, self._app.stop()
-                    )
-            except Exception:
-                pass
+        if hasattr(self, '_stop_event') and self._loop and self._loop.is_running():
+            self._loop.call_soon_threadsafe(self._stop_event.set)
         print("[TELEGRAM] Bot stopped")
 
     def _run_bot(self, token):
@@ -99,7 +93,8 @@ class TelegramBot:
                 self._loop.run_until_complete(self._app.start())
                 self._loop.run_until_complete(self._app.updater.start_polling(drop_pending_updates=True))
                 print("[TELEGRAM] ✅ Polling started — blocking until stopped")
-                self._loop.run_until_complete(self._app.updater.wait())
+                self._stop_event = asyncio.Event()
+                self._loop.run_until_complete(self._stop_event.wait())
             except Exception as e:
                 print(f"[TELEGRAM] Bot error: {e}")
                 if self._running:
