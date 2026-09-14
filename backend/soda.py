@@ -1923,7 +1923,10 @@ class AudioLoop:
                         self._save_context_history()
                 if self._turn_count - self._last_refresh_turn >= self._context_refresh_interval:
                     if self._exchange_history and self.session:
-                        await self._inject_context_refresh()
+                        if self._model_is_speaking:
+                            log.debug("[ContextRefresh] Skipping — model is speaking")
+                        else:
+                            await self._inject_context_refresh()
                     self._last_refresh_turn = self._turn_count
 
                 # Auto-summarization every N turns
@@ -1998,7 +2001,8 @@ class AudioLoop:
 
                 self._exchange_history.append({"model": brief})
                 self._save_context_history()
-                await self._inject_context_refresh()
+                if not self._model_is_speaking:
+                    await self._inject_context_refresh()
 
                 # auto-save txt report to Downloads folder
                 try:
