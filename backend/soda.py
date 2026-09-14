@@ -1161,8 +1161,11 @@ class AudioLoop:
         """Flush exchange_history to Supabase every 2 minutes."""
         while not self.stop_event.is_set():
             await asyncio.sleep(120)
-            if self._exchange_history:
-                self._save_context_history()
+            try:
+                if self._exchange_history:
+                    self._save_context_history()
+            except Exception as e:
+                log.warning(f"[ContextFlush] Failed to flush to Supabase: {e}")
 
     async def _idle_check_loop(self):
         CHECK_INTERVAL = 10
@@ -1381,15 +1384,15 @@ class AudioLoop:
                 lesson_lines = [f"  - {l.get('correction', '')}" for l in lessons]
                 parts.append("Lessons learned:")
                 parts.extend(lesson_lines)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"[ContextRefresh] Failed to load lessons: {e}")
         try:
             people = memory_store.list_people(limit=3)
             if people:
                 people_str = ", ".join(f"{p.get('name','')} ({p.get('relationship','')})" for p in people)
                 parts.append(f"People: {people_str}")
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"[ContextRefresh] Failed to load people: {e}")
         if self._exchange_history:
             recent = self._exchange_history[-6:]
             lines = []

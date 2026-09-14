@@ -698,6 +698,8 @@ def _save_credentials(entries):
 
 def thinking_validate(tool, args):
     """Level 1 thinking: local validation before tool execution. No API calls."""
+    if not isinstance(args, dict):
+        args = {}
     errors = []
     warnings = []
 
