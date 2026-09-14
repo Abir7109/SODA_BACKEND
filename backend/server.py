@@ -45,7 +45,22 @@ soda._pending_agent_results = _pending_agent_results
 
 # Bump Engine.IO payload decode limit (default 16 is too low for reconnection bursts)
 import engineio.payload
-engineio.payload.Payload.max_decode_packets = 128
+engineio.payload.Payload.max_decode_packets = 512
+
+
+# ASGI middleware to catch Engine.IO payload decode errors gracefully
+class EngineIOPayloadMiddleware:
+    """Wraps the ASGI app to catch 'Too many packets in payload' errors."""
+    def __init__(self, app):
+        self.app = app
+    async def __call__(self, scope, receive, send):
+        try:
+            return await self.app(scope, receive, send)
+        except ValueError as e:
+            if 'Too many packets' in str(e):
+                from starlette.responses import Response
+                return Response(status_code=400)
+            raise
 
 # Create a Socket.IO server
 sio = socketio.AsyncServer(
@@ -156,7 +171,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app_socketio = socketio.ASGIApp(sio, app)
+app_socketio = EngineIOPayloadMiddleware(socketio.ASGIApp(sio, app))
 
 import signal
 

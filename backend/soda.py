@@ -1128,7 +1128,7 @@ class AudioLoop:
                     "turn_count=EXCLUDED.turn_count, updated_at=now()",
                     (self._session_id, json.dumps(self._exchange_history), self._turn_count),
                 )
-                print(f"[MEMDB] session context save ({self._session_id}) -> {'db OK' if ok else 'db FAIL (file fallback)'}")
+                print(f"[MEMDB] session context saved ({self._session_id[:8]})")
         except Exception as e:
             log.warning(f"Failed to save context history to DB: {e}")
         try:

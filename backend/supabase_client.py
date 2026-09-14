@@ -54,10 +54,10 @@ def get_db():
             import psycopg2
             # ponytail: single shared conn; per-request pool if concurrency ever matters
             _PG_CONN = psycopg2.connect(url, connect_timeout=10)
-            print("[MEMDB] pooler connected — DATABASE BACKEND ACTIVE")
+            print("[MEMDB] pooler connected")
             return _PG_CONN
         except Exception as e:
-            print(f"[MEMDB] pooler connect FAILED: {e} — memory will use file fallback")
+            print(f"[MEMDB] pooler FAILED: {e}")
             return None
 
 
@@ -68,14 +68,12 @@ def db_configured() -> bool:
 def db_execute(sql: str, params=None) -> bool:
     conn = get_db()
     if not conn:
-        print(f"[MEMDB] exec skipped (no DB): {_short_sql(sql)}")
         return False
     with _PG_LOCK:
         try:
             with conn.cursor() as cur:
                 cur.execute(sql, params if params else None)
             conn.commit()
-            print(f"[MEMDB] exec OK: {_short_sql(sql)}")
             return True
         except Exception as e:
             conn.rollback()
@@ -87,7 +85,6 @@ def db_fetch(sql: str, params=None):
     """Run a SELECT, return list of dicts, or None on no-DB/failure."""
     conn = get_db()
     if not conn:
-        print(f"[MEMDB] fetch skipped (no DB): {_short_sql(sql)}")
         return None
     with _PG_LOCK:
         try:
@@ -96,7 +93,6 @@ def db_fetch(sql: str, params=None):
                 cols = [d[0] for d in cur.description] if cur.description else []
                 rows = [dict(zip(cols, row)) for row in cur.fetchall()]
             conn.commit()
-            print(f"[MEMDB] fetch OK: {_short_sql(sql)} -> {len(rows)} rows")
             return rows
         except Exception as e:
             conn.rollback()
