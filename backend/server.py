@@ -1,6 +1,7 @@
 import sys
 import asyncio
 import base64
+import traceback
 
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -43,24 +44,25 @@ _pending_agent_results: dict[str, asyncio.Future] = {}
 soda._connected_agents = _connected_agents
 soda._pending_agent_results = _pending_agent_results
 
-# Bump Engine.IO payload decode limit (default 16 is too low for reconnection bursts)
-import engineio.payload
-engineio.payload.Payload.max_decode_packets = 512
-
-
-# ASGI middleware to catch Engine.IO payload decode errors gracefully
-class EngineIOPayloadMiddleware:
-    """Wraps the ASGI app to catch 'Too many packets in payload' errors."""
-    def __init__(self, app):
-        self.app = app
-    async def __call__(self, scope, receive, send):
-        try:
-            return await self.app(scope, receive, send)
-        except ValueError as e:
-            if 'Too many packets' in str(e):
-                from starlette.responses import Response
-                return Response(status_code=400)
-            raise
+# Engine.IO payload decode limit — patch Payload.decode to truncate instead of raising
+# The class-attr patch (max_decode_packets) works but engineio catches the ValueError
+# internally and prints the full traceback before our ASGI middleware sees it.
+import engineio.payload as _eio_payload
+_eio_payload.Payload.max_decode_packets = 512
+_original_decode = _eio_payload.Payload.decode
+def _safe_decode(self, encoded_payload):
+    self.packets = []
+    if len(encoded_payload) == 0:
+        return
+    import urllib.parse
+    if encoded_payload.startswith('d='):
+        encoded_payload = urllib.parse.parse_qs(encoded_payload)['d'][0]
+    encoded_packets = encoded_payload.split('\x1e')
+    if len(encoded_packets) > self.max_decode_packets:
+        encoded_packets = encoded_packets[-self.max_decode_packets:]
+    import engineio.packet as _pkt
+    self.packets = [_pkt.Packet(encoded_packet=ep) for ep in encoded_packets]
+_eio_payload.Payload.decode = _safe_decode
 
 # Create a Socket.IO server
 sio = socketio.AsyncServer(
@@ -171,7 +173,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app_socketio = EngineIOPayloadMiddleware(socketio.ASGIApp(sio, app))
+app_socketio = socketio.ASGIApp(sio, app)
 
 import signal
 
