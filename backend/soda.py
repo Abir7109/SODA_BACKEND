@@ -1622,6 +1622,12 @@ class AudioLoop:
     async def play_audio(self):
         silent_ticks = 0
         was_tools_running = False
+        # Batch audio chunks before emitting — reduces per-chunk overhead and eliminates
+        # tiny-BufferSource click/pop artifacts on the frontend
+        _batch_buf = bytearray()
+        _BATCH_TARGET = 4800  # ~100ms at 24kHz 16-bit mono
+        _BATCH_MAX_WAIT = 0.08  # max 80ms before flushing partial batch
+        _last_flush = asyncio.get_event_loop().time()
         while True:
             try:
                 data = await asyncio.wait_for(self.audio_in_queue.get(), timeout=0.5)
@@ -1637,8 +1643,19 @@ class AudioLoop:
                     else:
                         self.on_mic_level(0.0)
                 if self.on_audio_data:
-                    self.on_audio_data(data)
-            except Exception:
+                    _batch_buf.extend(data)
+                    now = asyncio.get_event_loop().time()
+                    if len(_batch_buf) >= _BATCH_TARGET or (now - _last_flush) >= _BATCH_MAX_WAIT:
+                        if _batch_buf:
+                            self.on_audio_data(bytes(_batch_buf))
+                            _batch_buf.clear()
+                            _last_flush = now
+            except asyncio.TimeoutError:
+                # Flush any partial batch on timeout
+                if _batch_buf and self.on_audio_data:
+                    self.on_audio_data(bytes(_batch_buf))
+                    _batch_buf.clear()
+                    _last_flush = asyncio.get_event_loop().time()
                 silent_ticks += 1
                 if self._tools_running:
                     was_tools_running = True

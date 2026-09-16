@@ -460,7 +460,8 @@ async def start_audio(sid, data=None):
     
     device_index = None
     device_name = None
-    mic_source = 'local'
+    # Auto-detect Render (no physical mic) — use browser mic only
+    mic_source = 'remote' if os.environ.get('RENDER') or os.environ.get('RENDER_SERVICE_ID') else 'local'
     if data:
         if 'device_index' in data:
             device_index = data['device_index']
@@ -480,7 +481,7 @@ async def start_audio(sid, data=None):
     # Continue with audio loop initialization...
     from soda import AudioLoop
     def on_audio_data(data_bytes):
-        asyncio.create_task(sio.emit('audio_data', {'data': list(data_bytes)}))
+        asyncio.create_task(sio.emit('audio_data', data_bytes))
 
     # Callback to send Transcription data to frontend
     def on_transcription(data):

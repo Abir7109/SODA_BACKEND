@@ -692,23 +692,64 @@ export default function App() {
 
   // ── Frontend audio playback via Web Audio API ──
   const audioCtxRef = useRef(null)
-  const audioNextTime = useRef(0)
   const audioReadyRef = useRef(false)
+  // Ring buffer for gap-free streaming playback
+  const ringBufRef = useRef(null)
+  const ringWritePos = useRef(0)
+  const ringReadPos = useRef(0)
+  const scriptNodeRef = useRef(null)
+  const audioActiveRef = useRef(false)
+
+  const RING_SECONDS = 3
+  const PLAYBACK_RATE = 24000
 
   function stopAudio() {
-    audioNextTime.current = 0
+    audioActiveRef.current = false
+    if (scriptNodeRef.current) {
+      scriptNodeRef.current.disconnect()
+      scriptNodeRef.current = null
+    }
     if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
       audioCtxRef.current.close().catch(() => {})
       audioCtxRef.current = null
     }
+    ringBufRef.current = null
+    ringWritePos.current = 0
+    ringReadPos.current = 0
   }
 
   function initAudioCtx() {
     if (!audioCtxRef.current) {
       const AC = window.AudioContext || window.webkitAudioContext
       if (!AC) return null
-      audioCtxRef.current = new AC()
-      console.log('[Audio] Created AudioContext')
+      audioCtxRef.current = new AC({ sampleRate: PLAYBACK_RATE })
+      // Allocate ring buffer
+      ringBufRef.current = new Float32Array(RING_SECONDS * PLAYBACK_RATE)
+      ringWritePos.current = 0
+      ringReadPos.current = 0
+      // Create a single ScriptProcessorNode for continuous streaming output
+      const bufSize = 2048
+      scriptNodeRef.current = audioCtxRef.current.createScriptProcessor(bufSize, 0, 1)
+      scriptNodeRef.current.onaudioprocess = (e) => {
+        const out = e.outputBuffer.getChannelData(0)
+        const buf = ringBufRef.current
+        if (!buf) { out.fill(0); return }
+        const total = buf.length
+        let rpos = ringReadPos.current
+        for (let i = 0; i < out.length; i++) {
+          if (rpos === ringWritePos.current) {
+            // underrun — output silence (click-free)
+            out[i] = 0
+          } else {
+            out[i] = buf[rpos]
+            rpos = (rpos + 1) % total
+          }
+        }
+        ringReadPos.current = rpos
+      }
+      scriptNodeRef.current.connect(audioCtxRef.current.destination)
+      audioActiveRef.current = true
+      console.log('[Audio] Created AudioContext + streaming ScriptProcessor')
     }
     if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume().catch(e => console.warn('[Audio] resume failed:', e))
@@ -725,26 +766,16 @@ export default function App() {
     }
     const len = Math.floor(bytes.length / 2)
     if (len === 0) return
-    const float32 = new Float32Array(len)
+    const buf = ringBufRef.current
+    if (!buf) return
+    const total = buf.length
+    let wpos = ringWritePos.current
     for (let i = 0; i < len; i++) {
       const val = bytes[i * 2] | (bytes[i * 2 + 1] << 8)
-      float32[i] = (val << 16 >> 16) / 32768.0
+      buf[wpos] = (val << 16 >> 16) / 32768.0
+      wpos = (wpos + 1) % total
     }
-    try {
-      const buffer = ctx.createBuffer(1, float32.length, 24000)
-      buffer.copyToChannel(float32, 0)
-      const source = ctx.createBufferSource()
-      source.buffer = buffer
-      source.connect(ctx.destination)
-      let startTime = audioNextTime.current
-      if (startTime < ctx.currentTime) {
-        startTime = ctx.currentTime
-      }
-      source.start(startTime)
-      audioNextTime.current = startTime + buffer.duration
-    } catch (e) {
-      console.warn('[Audio] Playback error:', e)
-    }
+    ringWritePos.current = wpos
   }
 
   const connectGuardRef = useRef(false)
@@ -1292,7 +1323,16 @@ export default function App() {
     }
     socket.on('background_cmd_status', onBackgroundCmdStatus)
     const onAudioData = (data) => {
-      if (data && data.data) playPcmBytes(data.data)
+      if (!data) return
+      // Binary transport: data is ArrayBuffer/Buffer
+      if (data instanceof ArrayBuffer || (typeof Buffer !== 'undefined' && Buffer.isBuffer(data))) {
+        playPcmBytes(new Uint8Array(data))
+      } else if (data instanceof Uint8Array) {
+        playPcmBytes(data)
+      } else if (data.data) {
+        // Legacy JSON array format
+        playPcmBytes(data.data)
+      }
     }
     socket.on('audio_data', onAudioData)
     const onMicLevel = (data) => { if (data && typeof data.level === 'number') setOrbMicLevel(data.level) }

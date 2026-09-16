@@ -56,7 +56,6 @@ export default function useBrowserMic(socket) {
       }
 
       source.connect(scriptNode)
-      scriptNode.connect(audioCtx.destination)
       activeRef.current = true
       setMicActive(true)
       setMicError(null)
