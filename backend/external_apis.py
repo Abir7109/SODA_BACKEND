@@ -777,26 +777,6 @@ create_folder_tool = {
     }
 }
 
-search_and_send_telegram_tool = {
-    "name": "search_and_send_telegram",
-    "description": (
-        "Search the web for a query, then save the results as a markdown file with "
-        "a summary and all useful links, and send the file to the user's Telegram. "
-        "Perfect for research: 'search for X and send me the results', "
-        "'find info about Y and send to my Telegram', "
-        "'search the web for Z and send links and summary'. "
-        "Example: search_and_send_telegram(query='latest AI news 2026', num_results=8)"
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "query": {"type": "STRING", "description": "The search query"},
-            "num_results": {"type": "INTEGER", "description": "Number of results (1-15). Default 8."}
-        },
-        "required": ["query"]
-    }
-}
-
 
 async def get_pagespeed_insights(url: str, strategy: str = "desktop"):
     """Fetches Lighthouse SEO/performance audit from Google PageSpeed Insights API (free)."""

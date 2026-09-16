@@ -1899,8 +1899,6 @@ class AudioLoop:
                                 self._exchange_history.append({"user": user_text[-300:]})
                                 self._save_context_history()
                             try:
-                                # Flush any accumulated SODA text to Telegram before sending tool result
-                                await self._flush_telegram_reply()
                                 await self.session.send_tool_response(
                                     function_responses=function_responses
                                 )
@@ -1921,7 +1919,6 @@ class AudioLoop:
                             self._tools_running = False
 
                 await self.flush_chat()
-                await self._flush_telegram_reply()
                 self._turn_count += 1
                 user_text = self._last_input_transcription.strip()
                 model_text = self._last_output_transcription.strip()
