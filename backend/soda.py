@@ -181,7 +181,6 @@ from external_apis import (
     get_bangladeshi_news,
     define_word, list_files, open_file,
     get_system_status, close_window, create_folder,
-    search_and_send_telegram,
     get_pagespeed_insights,
 )
 from soda_agents import AgentOrchestrator, get_global_orchestrator
@@ -474,7 +473,7 @@ def _build_system_prompt():
          "You do NOT have direct access to Abir sir's Windows PC. "
          "However, a LOCAL DESKTOP AGENT runs on his PC. The dedicated tools provided to you "
          "(open_app, spotify_play, spotify_control, spotify_search, spotify_now_playing, "
-         "send_whatsapp, send_telegram_message, "
+         "send_whatsapp, "
          "list_files, open_file, execute_command, terminal_execute, browse_file_system, "
          "mouse_click, send_keys_window, window_list, window_move, go_to_sleep, wake_up, etc.) "
          "ALL execute on his Windows PC through this local agent. "
@@ -1030,8 +1029,6 @@ class AudioLoop:
         self.paused = False
         self._turn_had_tools = False
         self._processed_fc_ids = set()
-        self._telegram_pending_user_id = None
-        self._telegram_reply_buffer = ""
         self._pending_confirmations = {}
         self._pending_face_frames = {}
         self._pending_frames = {}
@@ -1283,9 +1280,8 @@ class AudioLoop:
         if self.video_queue:
             await self.video_queue.put(self._latest_image_payload)
 
-    async def inject_text(self, text, telegram_user_id=None):
-        """Inject text command from mobile remote as if user spoke it.
-        If telegram_user_id is set, the model's text reply will be sent back to Telegram."""
+    async def inject_text(self, text):
+        """Inject text command from mobile remote as if user spoke it."""
         if not self.session:
             log.warning("inject_text: no active session")
             return
@@ -1293,40 +1289,11 @@ class AudioLoop:
             return
         log.info(f"inject_text: '{text[:80]}...'")
         self._mark_activity()
-        # Track Telegram reply target
-        self._telegram_pending_user_id = telegram_user_id
-        self._telegram_reply_buffer = ""
         if self.on_transcription:
             self.on_transcription({"sender": "User", "text": text})
         if self.video_queue and self._latest_image_payload:
             await self.video_queue.put(self._latest_image_payload)
         await self.session.send_realtime_input(text=text)
-
-    def _schedule_telegram_flush(self):
-        """Debounce: flush Telegram reply after 3s of no new SODA text."""
-        if hasattr(self, '_telegram_flush_handle') and self._telegram_flush_handle:
-            self._telegram_flush_handle.cancel()
-        loop = asyncio.get_event_loop()
-        self._telegram_flush_handle = loop.call_later(3.0, lambda: loop.create_task(self._flush_telegram_reply()))
-
-    async def _flush_telegram_reply(self):
-        """Send accumulated SODA text to Telegram and clear the buffer."""
-        if not self._telegram_pending_user_id or not self._telegram_reply_buffer.strip():
-            self._telegram_pending_user_id = None
-            self._telegram_reply_buffer = ""
-            self._telegram_flush_handle = None
-            return
-        text = self._telegram_reply_buffer.strip()
-        user_id = self._telegram_pending_user_id
-        self._telegram_pending_user_id = None
-        self._telegram_reply_buffer = ""
-        self._telegram_flush_handle = None
-        try:
-            from telegram_bot import telegram_bot
-            await telegram_bot.send_message(text)
-            log.info(f"[TELEGRAM] ✅ Sent reply to user {user_id} ({len(text)} chars)")
-        except Exception as e:
-            log.error(f"[TELEGRAM] ❌ Failed to send reply: {e}")
 
     async def inject_audio(self, base64_pcm):
         """Inject PCM audio from mobile mic into Gemini session."""
@@ -1867,10 +1834,6 @@ class AudioLoop:
                                 self._last_output_transcription = transcript
                                 if delta and self.on_transcription:
                                     self.on_transcription({"sender": "SODA", "text": delta})
-                                    # Accumulate for Telegram reply
-                                    if self._telegram_pending_user_id:
-                                        self._telegram_reply_buffer += delta
-                                        self._schedule_telegram_flush()
                                     if self.chat_buffer["sender"] != "SODA":
                                         if self.chat_buffer["sender"] and self.chat_buffer["text"].strip():
                                             pass
@@ -3062,32 +3025,6 @@ class AudioLoop:
                 args.get("width"), args.get("height"),
             )
             return types.FunctionResponse(id=fc.id, name=name, response={"result": "Moved."})
-
-        elif name == "send_telegram_message":
-            from telegram_bot import telegram_bot
-            log.info(f"[TOOL] send_telegram_message: dispatching to telegram_bot")
-            try:
-                r = await telegram_bot.send_message(args.get("text", ""))
-                log.info(f"[TOOL] send_telegram_message: ✅ sent successfully")
-            except Exception as e:
-                log.error(f"[TOOL] send_telegram_message: ❌ failed: {e}")
-                r = str(e)
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
-
-        elif name == "send_telegram_file":
-            from telegram_bot import telegram_bot
-            log.info(f"[TOOL] send_telegram_file: dispatching to telegram_bot")
-            try:
-                r = await telegram_bot.send_file(args.get("path", ""))
-                log.info(f"[TOOL] send_telegram_file: ✅ sent successfully")
-            except Exception as e:
-                log.error(f"[TOOL] send_telegram_file: ❌ failed: {e}")
-                r = str(e)
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
-
-        elif name == "search_and_send_telegram":
-            r = await search_and_send_telegram(args.get("query", ""), args.get("num_results", 8))
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         elif name == "show_agents":
             try:

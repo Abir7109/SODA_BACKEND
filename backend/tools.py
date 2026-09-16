@@ -955,45 +955,6 @@ wake_up_tool = {
     }
 }
 
-# ── Telegram ──
-
-send_telegram_message_tool = {
-    "name": "send_telegram_message",
-    "description": "Send a text message via Telegram bot.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "text": {"type": "STRING", "description": "Message text to send"}
-        },
-        "required": ["text"]
-    }
-}
-
-send_telegram_file_tool = {
-    "name": "send_telegram_file",
-    "description": "Send a file via Telegram bot.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "path": {"type": "STRING", "description": "Path to the file to send"}
-        },
-        "required": ["path"]
-    }
-}
-
-search_and_send_telegram_tool = {
-    "name": "search_and_send_telegram",
-    "description": "Search the web and send results via Telegram.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "query": {"type": "STRING", "description": "Search query"},
-            "num_results": {"type": "INTEGER", "description": "Number of results to send"}
-        },
-        "required": ["query"]
-    }
-}
-
 create_folder_tool = {
     "name": "create_folder",
     "description": "Create a folder at the specified path. Also creates parent directories if needed.",
@@ -2522,9 +2483,6 @@ tools_list = [{"function_declarations": [
     window_focus_tool,
     window_list_tool,
     window_move_tool,
-    send_telegram_message_tool,
-    send_telegram_file_tool,
-    search_and_send_telegram_tool,
     create_folder_tool,
     delete_items_tool,
     rename_item_tool,

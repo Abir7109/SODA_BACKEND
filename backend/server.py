@@ -94,13 +94,6 @@ async def lifespan(_app):
     except Exception as e:
         log.warning(f"Reminder scheduler failed to start: {e}")
 
-    try:
-        from telegram_bot import telegram_bot
-        telegram_bot.start(sio)
-        print("[SERVER] Telegram bot started in background thread")
-    except Exception as e:
-        log.warning(f"Telegram bot failed to start: {e}")
-
     # ── Agent health monitor (logs every 60s) + stale agent eviction ──
     async def _agent_health_logger():
         while True:
@@ -1059,16 +1052,6 @@ async def force_tool(sid, data):
                     if hasattr(audio_loop, '_pending_face_frames'):
                         audio_loop._pending_face_frames.pop(request_id, None)
             await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'send_telegram_message':
-            from telegram_bot import telegram_bot
-            text = args.get('text', '')
-            r = {'result': await telegram_bot.send_message(text)}
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'send_telegram_file':
-            from telegram_bot import telegram_bot
-            path = args.get('path', '')
-            r = await telegram_bot.send_file(path)
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
         elif tool == 'export_data':
             from export_service import export_data as _export
             fmt = args.get('format', 'markdown')
@@ -1118,12 +1101,6 @@ async def shutdown(sid, data=None):
         print("[SERVER] Cancelling scheduler task...")
         _scheduler_task.cancel()
         _scheduler_task = None
-    
-    try:
-        from telegram_bot import telegram_bot
-        telegram_bot.stop()
-    except:
-        pass
     
     print("[SERVER] Graceful shutdown complete. Terminating process...")
 
@@ -1224,42 +1201,6 @@ async def speaking_timer_expired(sid, data):
         )
         log.info(f"speaking_timer_expired: injecting eval request for Part {part}")
         asyncio.create_task(audio_loop.inject_text(text))
-
-@sio.event
-async def telegram_message(sid, data):
-    text = data.get('text', '')
-    user_id = data.get('from', 0)
-    if not text:
-        log.warning("[TELEGRAM] Empty message received, ignoring")
-        return
-    log.info(f"[TELEGRAM] ✉️  Message from user {user_id}: {text[:100]}")
-    if not audio_loop:
-        log.error("[TELEGRAM] ❌ audio_loop is None — backend not initialized")
-        try:
-            from telegram_bot import telegram_bot
-            await telegram_bot.send_message("SODA backend is not running. Please restart.")
-        except Exception as e:
-            log.error(f"[TELEGRAM] Could not send error reply: {e}")
-        return
-    if not audio_loop.session:
-        log.error("[TELEGRAM] ❌ audio_loop.session is None — Gemini not connected")
-        try:
-            from telegram_bot import telegram_bot
-            await telegram_bot.send_message("SODA is connecting to Gemini... Please wait.")
-        except Exception as e:
-            log.error(f"[TELEGRAM] Could not send error reply: {e}")
-        return
-    try:
-        from telegram_bot import telegram_bot
-        await audio_loop.inject_text(f"[Telegram message from user {user_id}]: {text}", telegram_user_id=user_id)
-        log.info(f"[TELEGRAM] ✅ Injected into Gemini session successfully")
-    except Exception as e:
-        log.error(f"[TELEGRAM] ❌ Failed to inject message: {e}")
-        try:
-            from telegram_bot import telegram_bot
-            await telegram_bot.send_message("Failed to process your message. Please try again.")
-        except Exception:
-            pass
 
 @sio.event
 async def save_memory(sid, data):

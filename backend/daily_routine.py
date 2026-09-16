@@ -84,7 +84,6 @@ _TOOL_LABELS = {
     "open_app": "Opened app",
     "screenshot": "Took a screenshot",
     "send_email": "Sent email",
-    "send_telegram_message": "Sent Telegram message",
     "read_emails": "Checked emails",
     "set_reminder": "Set a reminder",
     "set_schedule": "Saved a schedule",
