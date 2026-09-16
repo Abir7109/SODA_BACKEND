@@ -187,6 +187,18 @@ TABLES = {
             started_at TIMESTAMPTZ DEFAULT now(),
             updated_at TIMESTAMPTZ DEFAULT now()
         )""",
+    "opencode_notebook": """
+        CREATE TABLE IF NOT EXISTS opencode_notebook (
+            id BIGSERIAL PRIMARY KEY,
+            task_id TEXT UNIQUE NOT NULL,
+            folder TEXT NOT NULL,
+            prompt TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'running',
+            output_summary TEXT DEFAULT '',
+            error TEXT DEFAULT '',
+            started_at TIMESTAMPTZ DEFAULT now(),
+            completed_at TIMESTAMPTZ DEFAULT now()
+        )""",
 }
 
 # Legacy tables from older SODA versions lack the columns current code uses.

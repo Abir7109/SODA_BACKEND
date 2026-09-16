@@ -2668,6 +2668,20 @@ def _heartbeat_loop():
             log(f"[LocalAgent] Disconnected — will auto-reconnect...")
 
 
+def push_update(push_type: str, task_id: str, text: str):
+    """Push an update to SODA without being asked (agent-initiated)."""
+    if not sio.connected:
+        return
+    try:
+        sio.emit("agent_push", {
+            "type": push_type,
+            "task_id": task_id,
+            "text": text,
+        })
+    except Exception:
+        pass
+
+
 def _connect_with_retry():
     """Connect to backend with exponential backoff retry. Never exits on failure."""
     retry_delay = 1

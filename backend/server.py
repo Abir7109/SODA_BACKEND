@@ -415,6 +415,49 @@ async def agent_pong(sid, data):
         agent['last_pong'] = datetime.now().isoformat()
 
 @sio.event
+async def agent_push(sid, data):
+    """Agent-initiated push — agent sends updates without being asked."""
+    agent_info = _connected_agents.get(sid)
+    if not agent_info:
+        print(f"[AGENT_PUSH] Unknown agent {sid}, ignoring")
+        return
+    push_type = data.get("type", "unknown")
+    task_id = data.get("task_id", "")
+    text = data.get("text", "")
+    print(f"[AGENT_PUSH] type={push_type} task={task_id} from={agent_info.get('machine_id', sid)}")
+
+    if not audio_loop:
+        print("[AGENT_PUSH] audio_loop not initialized")
+        return
+
+    # Handle OpenCode-specific updates
+    if push_type in ("opencode_output", "opencode_complete", "opencode_error"):
+        try:
+            from opencode_monitor import update_task, get_task
+            if push_type == "opencode_output":
+                update_task(task_id, output_line=text)
+            elif push_type == "opencode_complete":
+                update_task(task_id, status="completed", exit_code=0)
+                task = get_task(task_id)
+                if task:
+                    from notebook import save_task
+                    await save_task(task_id, task.folder, task.prompt, "completed",
+                                  output_summary=task.summary())
+            elif push_type == "opencode_error":
+                update_task(task_id, status="failed", error=text)
+                task = get_task(task_id)
+                if task:
+                    from notebook import save_task
+                    await save_task(task_id, task.folder, task.prompt, "failed",
+                                  error=text, output_summary=task.summary())
+        except Exception as e:
+            print(f"[AGENT_PUSH] Error handling {push_type}: {e}")
+
+    # Inject into SODA's Gemini session for voice response
+    formatted = f"[Agent update: {push_type}] {text}"
+    await audio_loop.inject_text(formatted)
+
+@sio.event
 async def start_audio(sid, data=None):
     global audio_loop, loop_task
     
@@ -1208,7 +1251,7 @@ async def telegram_message(sid, data):
         return
     try:
         from telegram_bot import telegram_bot
-        await audio_loop.inject_text(f"[Telegram message from user {user_id}]: {text}")
+        await audio_loop.inject_text(f"[Telegram message from user {user_id}]: {text}", telegram_user_id=user_id)
         log.info(f"[TELEGRAM] ✅ Injected into Gemini session successfully")
     except Exception as e:
         log.error(f"[TELEGRAM] ❌ Failed to inject message: {e}")

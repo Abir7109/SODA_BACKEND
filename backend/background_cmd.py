@@ -342,3 +342,38 @@ async def execute_with_retry(
         "total_attempts": len(attempts),
         "error": f"All {len(attempts)} attempts failed. Last error: {last_error[:300]}",
     }
+
+
+def run_hidden_command_streaming(command, timeout=90, task_id=None, agent=None):
+    """Run a command and stream output lines via agent_push."""
+    import threading
+    startupinfo = None
+    if sys.platform == "win32":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+
+    proc = subprocess.Popen(
+        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        startupinfo=startupinfo, text=True, bufsize=1
+    )
+
+    def reader():
+        try:
+            for line in proc.stdout:
+                line = line.rstrip("\n\r")
+                if line and agent:
+                    agent.push_update("opencode_output", task_id, line)
+            proc.wait(timeout=timeout)
+            if agent:
+                if proc.returncode == 0:
+                    agent.push_update("opencode_complete", task_id, "Process exited with code 0")
+                else:
+                    agent.push_update("opencode_error", task_id, f"Process exited with code {proc.returncode}")
+        except Exception as e:
+            if agent:
+                agent.push_update("opencode_error", task_id, str(e))
+
+    t = threading.Thread(target=reader, daemon=True)
+    t.start()
+    return {"success": True, "pid": proc.pid, "task_id": task_id}

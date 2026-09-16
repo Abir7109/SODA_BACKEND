@@ -606,6 +606,19 @@ def _build_system_prompt():
         "The exported file opens automatically in SODA's viewer.\n"
         "12. If user declines scraping, move on. Do NOT ask repeatedly.\n"
          "Never narrate the search results list. Only speak about the specific page the user asked you to open.\n"
+         "OPENCODE REMOTE TASKS — When the user wants to run OpenCode in a project folder:\n"
+         "1. Use opencode_start(folder, prompt) to launch an OpenCode session on the local machine.\n"
+         "2. First confirm the folder exists: use terminal_execute with `cd \"<folder>\" && dir /b` to verify.\n"
+         "3. Show the folder listing to the user and ask for confirmation before launching.\n"
+         "4. After confirmation, call opencode_start with the folder path and the user's task prompt.\n"
+         "5. The task runs in background. Use opencode_status(task_id) to check progress.\n"
+         "6. The local agent streams output via agent_push — you will receive updates automatically.\n"
+         "7. When the task completes, results are auto-saved to the notebook. Read them aloud.\n"
+         "8. Use opencode_stop(task_id) to kill a running task if the user asks.\n"
+         "NOTEBOOK — All OpenCode task results are saved to the notebook (Supabase + file backup):\n"
+         "- Use notebook_read(task_id) to read a past task result.\n"
+         "- Use notebook_search(keyword) to search task history.\n"
+         "- When recalling past work, check the notebook first before asking the user.\n"
          "Complete every task fully. Never refuse a valid request. "
         "CRITICAL — NEVER tell the user to do something themselves. When they ask you to check, read, open, or "
         "look up something, YOU must do it. Do NOT say 'you can check it yourself', 'I opened it, you read it', "
@@ -1017,6 +1030,8 @@ class AudioLoop:
         self.paused = False
         self._turn_had_tools = False
         self._processed_fc_ids = set()
+        self._telegram_pending_user_id = None
+        self._telegram_reply_buffer = ""
         self._pending_confirmations = {}
         self._pending_face_frames = {}
         self._pending_frames = {}
@@ -1268,8 +1283,9 @@ class AudioLoop:
         if self.video_queue:
             await self.video_queue.put(self._latest_image_payload)
 
-    async def inject_text(self, text):
-        """Inject text command from mobile remote as if user spoke it."""
+    async def inject_text(self, text, telegram_user_id=None):
+        """Inject text command from mobile remote as if user spoke it.
+        If telegram_user_id is set, the model's text reply will be sent back to Telegram."""
         if not self.session:
             log.warning("inject_text: no active session")
             return
@@ -1277,11 +1293,40 @@ class AudioLoop:
             return
         log.info(f"inject_text: '{text[:80]}...'")
         self._mark_activity()
+        # Track Telegram reply target
+        self._telegram_pending_user_id = telegram_user_id
+        self._telegram_reply_buffer = ""
         if self.on_transcription:
             self.on_transcription({"sender": "User", "text": text})
         if self.video_queue and self._latest_image_payload:
             await self.video_queue.put(self._latest_image_payload)
         await self.session.send_realtime_input(text=text)
+
+    def _schedule_telegram_flush(self):
+        """Debounce: flush Telegram reply after 3s of no new SODA text."""
+        if hasattr(self, '_telegram_flush_handle') and self._telegram_flush_handle:
+            self._telegram_flush_handle.cancel()
+        loop = asyncio.get_event_loop()
+        self._telegram_flush_handle = loop.call_later(3.0, lambda: loop.create_task(self._flush_telegram_reply()))
+
+    async def _flush_telegram_reply(self):
+        """Send accumulated SODA text to Telegram and clear the buffer."""
+        if not self._telegram_pending_user_id or not self._telegram_reply_buffer.strip():
+            self._telegram_pending_user_id = None
+            self._telegram_reply_buffer = ""
+            self._telegram_flush_handle = None
+            return
+        text = self._telegram_reply_buffer.strip()
+        user_id = self._telegram_pending_user_id
+        self._telegram_pending_user_id = None
+        self._telegram_reply_buffer = ""
+        self._telegram_flush_handle = None
+        try:
+            from telegram_bot import telegram_bot
+            await telegram_bot.send_message(text)
+            log.info(f"[TELEGRAM] ✅ Sent reply to user {user_id} ({len(text)} chars)")
+        except Exception as e:
+            log.error(f"[TELEGRAM] ❌ Failed to send reply: {e}")
 
     async def inject_audio(self, base64_pcm):
         """Inject PCM audio from mobile mic into Gemini session."""
@@ -1822,6 +1867,10 @@ class AudioLoop:
                                 self._last_output_transcription = transcript
                                 if delta and self.on_transcription:
                                     self.on_transcription({"sender": "SODA", "text": delta})
+                                    # Accumulate for Telegram reply
+                                    if self._telegram_pending_user_id:
+                                        self._telegram_reply_buffer += delta
+                                        self._schedule_telegram_flush()
                                     if self.chat_buffer["sender"] != "SODA":
                                         if self.chat_buffer["sender"] and self.chat_buffer["text"].strip():
                                             pass
@@ -1887,6 +1936,8 @@ class AudioLoop:
                                 self._exchange_history.append({"user": user_text[-300:]})
                                 self._save_context_history()
                             try:
+                                # Flush any accumulated SODA text to Telegram before sending tool result
+                                await self._flush_telegram_reply()
                                 await self.session.send_tool_response(
                                     function_responses=function_responses
                                 )
@@ -1907,6 +1958,7 @@ class AudioLoop:
                             self._tools_running = False
 
                 await self.flush_chat()
+                await self._flush_telegram_reply()
                 self._turn_count += 1
                 user_text = self._last_input_transcription.strip()
                 model_text = self._last_output_transcription.strip()
@@ -3015,7 +3067,7 @@ class AudioLoop:
             from telegram_bot import telegram_bot
             log.info(f"[TOOL] send_telegram_message: dispatching to telegram_bot")
             try:
-                r = telegram_bot.send_message(args.get("text", ""))
+                r = await telegram_bot.send_message(args.get("text", ""))
                 log.info(f"[TOOL] send_telegram_message: ✅ sent successfully")
             except Exception as e:
                 log.error(f"[TOOL] send_telegram_message: ❌ failed: {e}")
@@ -3026,7 +3078,7 @@ class AudioLoop:
             from telegram_bot import telegram_bot
             log.info(f"[TOOL] send_telegram_file: dispatching to telegram_bot")
             try:
-                r = telegram_bot.send_file(args.get("path", ""))
+                r = await telegram_bot.send_file(args.get("path", ""))
                 log.info(f"[TOOL] send_telegram_file: ✅ sent successfully")
             except Exception as e:
                 log.error(f"[TOOL] send_telegram_file: ❌ failed: {e}")
@@ -3347,6 +3399,62 @@ class AudioLoop:
             from background_agent_manager import BackgroundAgentManager
             r = BackgroundAgentManager.list_tasks()
             return types.FunctionResponse(id=fc.id, name=name, response={"result": {"success": True, "tasks": r}})
+
+        elif name == "opencode_start":
+            folder = args.get("folder", "")
+            prompt = args.get("prompt", "")
+            if not folder or not prompt:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Error: folder and prompt are required"})
+            from opencode_monitor import create_task
+            task = create_task(folder, prompt)
+            task_id = task.task_id
+            if _connected_agents:
+                agent_sid = max(_connected_agents, key=lambda s: len(_connected_agents[s].get('tools', [])))
+                self.sio.emit("agent_execute", {
+                    "tool": "terminal_execute",
+                    "args": {"command": f'cd "{folder}" && dir /b'},
+                    "callback_id": f"opencode_check_{task_id}",
+                    "_opencode_check": True,
+                    "_task_id": task_id,
+                }, room=agent_sid)
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Task {task_id} created. Checking folder '{folder}'..."})
+
+        elif name == "opencode_status":
+            task_id = args.get("task_id", "")
+            from opencode_monitor import get_task
+            task = get_task(task_id)
+            if not task:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Task {task_id} not found"})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": task.to_dict()})
+
+        elif name == "opencode_stop":
+            task_id = args.get("task_id", "")
+            from opencode_monitor import get_task, update_task
+            task = update_task(task_id, status="killed")
+            if not task:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Task {task_id} not found"})
+            if _connected_agents:
+                agent_sid = max(_connected_agents, key=lambda s: len(_connected_agents[s].get('tools', [])))
+                self.sio.emit("agent_execute", {
+                    "tool": "terminal_execute",
+                    "args": {"command": "taskkill /F /IM opencode.exe 2>nul || echo no process"},
+                    "callback_id": f"opencode_kill_{task_id}",
+                }, room=agent_sid)
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Task {task_id} killed"})
+
+        elif name == "notebook_read":
+            from notebook import read_task
+            task_id = args.get("task_id", "")
+            result = await read_task(task_id)
+            if not result:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Task {task_id} not found in notebook"})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": result})
+
+        elif name == "notebook_search":
+            from notebook import search_tasks
+            keyword = args.get("keyword", "")
+            results = await search_tasks(keyword)
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": results})
 
         elif name == "open_app":
             app_name = args.get("app_name", "")

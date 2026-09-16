@@ -2084,9 +2084,71 @@ bg_kill_tool = {
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "task_id": {"type": "STRING", "description": "The task_id of the task to kill"}
+            "task_id": {"type": "STRING", "description": "The task_id to kill"}
         },
         "required": ["task_id"]
+    }
+}
+
+# ── OpenCode Remote Tasks ────────────────────────────────────
+opencode_start_tool = {
+    "name": "opencode_start",
+    "description": "Launch an OpenCode session in a specific folder on the local machine. The agent will cd into the folder, confirm it exists, and start OpenCode with the given prompt. Use when the user wants to run OpenCode tasks in a project folder.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "folder": {"type": "STRING", "description": "Full path to the project folder (e.g. D:\\projects\\my-site)"},
+            "prompt": {"type": "STRING", "description": "The task prompt for OpenCode (e.g. 'deploy this site to netlify')"},
+        },
+        "required": ["folder", "prompt"]
+    }
+}
+
+opencode_status_tool = {
+    "name": "opencode_status",
+    "description": "Check the status of a running OpenCode task. Returns output lines, progress, and status.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "task_id": {"type": "STRING", "description": "The task ID returned by opencode_start"},
+        },
+        "required": ["task_id"]
+    }
+}
+
+opencode_stop_tool = {
+    "name": "opencode_stop",
+    "description": "Kill a running OpenCode task.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "task_id": {"type": "STRING", "description": "The task ID to stop"},
+        },
+        "required": ["task_id"]
+    }
+}
+
+notebook_read_tool = {
+    "name": "notebook_read",
+    "description": "Read a past OpenCode task result from the notebook. Returns the full task record including output summary.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "task_id": {"type": "STRING", "description": "The task ID to read"},
+        },
+        "required": ["task_id"]
+    }
+}
+
+notebook_search_tool = {
+    "name": "notebook_search",
+    "description": "Search the OpenCode notebook by keyword. Returns matching task records.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "keyword": {"type": "STRING", "description": "Search keyword (matches prompt and output)"},
+        },
+        "required": ["keyword"]
     }
 }
 
@@ -2543,6 +2605,13 @@ tools_list = [{"function_declarations": [
     bg_status_tool,
     bg_kill_tool,
     bg_list_tool,
+
+    # ── OpenCode Remote Tasks ──
+    opencode_start_tool,
+    opencode_status_tool,
+    opencode_stop_tool,
+    notebook_read_tool,
+    notebook_search_tool,
 
     read_emails_tool,
     send_email_tool,
