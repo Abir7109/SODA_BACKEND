@@ -1,345 +1,83 @@
 """
-IELTS Tool Schemas for Gemini Live API
-All 18 IELTS tools defined here, imported by tools.py
+IELTS Tool Schema for Gemini Live API — Consolidated
+Single tool with action enum replaces 18 individual tools.
 """
 
 IELTS_TOOLS = [
     {
-        "name": "ielts_dashboard",
+        "name": "ielts",
         "description": (
-            "Show the user's IELTS preparation dashboard: current band scores, "
-            "target band, exam date, streak, and progress history. Use when the "
-            "user asks about their IELTS progress or overall status."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
-    },
-    {
-        "name": "ielts_set_goal",
-        "description": (
-            "Set the user's target IELTS band score and/or exam date. "
-            "Use when the user tells you their target score or test date."
+            "IELTS preparation assistant. Use action to select the operation:\n"
+            "  dashboard — Show band scores, target, exam date, streak, progress\n"
+            "  set_goal — Set target band score and/or exam date\n"
+            "  speaking_start — Start speaking practice (Part 1/2/3). Result contains EXACT text to speak aloud word for word.\n"
+            "  speaking_evaluate — Evaluate spoken response. Result contains EXACT feedback to speak aloud word for word.\n"
+            "  speaking_tips — Get tips for improving speaking band score\n"
+            "  writing_prompt — Get a writing task prompt for practice\n"
+            "  writing_evaluate — Evaluate a writing submission with detailed band scores\n"
+            "  writing_template — Get essay structure/template for a specific type\n"
+            "  grammar_check — Check text for grammar errors with IELTS context\n"
+            "  reading_start — Start reading practice session with passage and questions\n"
+            "  reading_check — Check reading answers and get score with explanations\n"
+            "  reading_strategy — Get strategies for a specific question type\n"
+            "  vocab_add — Add word to personal vocabulary bank\n"
+            "  vocab_topic — Get topic-specific vocabulary with collocations\n"
+            "  vocab_flashcards — Start flashcard review session from saved words\n"
+            "  vocab_upgrade — Scan text and suggest Band 7+ vocabulary upgrades\n"
+            "  study_plan — Generate personalized study plan\n"
+            "  mock_test — Start timed mock test for a specific module"
         ),
         "parameters": {
             "type": "object",
             "properties": {
-                "target_band": {
-                    "type": "number",
-                    "description": "Target overall band score (e.g., 7.0, 7.5)"
+                "action": {
+                    "type": "string",
+                    "description": "IELTS operation to perform",
+                    "enum": [
+                        "dashboard", "set_goal",
+                        "speaking_start", "speaking_evaluate", "speaking_tips",
+                        "writing_prompt", "writing_evaluate", "writing_template", "grammar_check",
+                        "reading_start", "reading_check", "reading_strategy",
+                        "vocab_add", "vocab_topic", "vocab_flashcards", "vocab_upgrade",
+                        "study_plan", "mock_test"
+                    ]
                 },
-                "exam_date": {
-                    "type": "string",
-                    "description": "Exam date in ISO format YYYY-MM-DD"
-                }
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "ielts_speaking_start",
-        "description": (
-            "Start IELTS Speaking Part {part}. The result field contains "
-            "the EXACT text you must speak aloud to the user in a natural "
-            "interviewer voice. Read it word for word — do NOT change, "
-            "summarize, or rephrase. After speaking, wait for the user's "
-            "response. Call ielts_speaking_evaluate with their transcript."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "part": {
-                    "type": "integer",
-                    "description": "Speaking part: 1 (interview), 2 (cue card), or 3 (discussion)"
-                },
-                "topic": {
-                    "type": "string",
-                    "description": "Optional topic (e.g., 'technology', 'education')"
-                }
-            },
-            "required": ["part"]
-        }
-    },
-    {
-        "name": "ielts_speaking_evaluate",
-        "description": (
-            "Evaluate the user's spoken response. The result field "
-            "contains the EXACT feedback text you must speak aloud to "
-            "the user. Read it word for word — do NOT change, summarize, "
-            "or rephrase. Then continue the interview."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "transcript": {
-                    "type": "string",
-                    "description": "The user's spoken response (transcribed)"
-                },
-                "question": {
-                    "type": "string",
-                    "description": "The question or cue card topic they were responding to"
-                },
-                "part": {
-                    "type": "integer",
-                    "description": "Which speaking part (1, 2, or 3)"
-                }
-            },
-            "required": ["transcript", "question", "part"]
-        }
-    },
-    {
-        "name": "ielts_speaking_tips",
-        "description": (
-            "Get specific tips for improving IELTS Speaking band score. "
-            "Can target specific criteria or general improvement."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "criteria": {
-                    "type": "string",
-                    "description": "Specific criterion: fluency, vocabulary, grammar, or pronunciation"
-                },
-                "current_band": {
-                    "type": "number",
-                    "description": "Current band in this criterion"
-                }
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "ielts_writing_prompt",
-        "description": (
-            "Get an IELTS Writing task prompt for practice. "
-            "Specify task 1 or 2, and optionally a topic type."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "task": {
-                    "type": "integer",
-                    "description": "Task 1 (graph/letter) or Task 2 (essay)"
-                },
-                "type": {
-                    "type": "string",
-                    "description": "For Task 2: opinion/discussion/problem_solution/advantages_disadvantages"
-                }
-            },
-            "required": ["task"]
-        }
-    },
-    {
-        "name": "ielts_writing_evaluate",
-        "description": (
-            "Evaluate a writing submission. Provide the essay text and the prompt. "
-            "Returns detailed band scores across all 4 criteria with specific corrections."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "essay": {
-                    "type": "string",
-                    "description": "The user's essay or Task 1 response"
-                },
-                "task_prompt": {
-                    "type": "string",
-                    "description": "The original task prompt they were responding to"
-                },
-                "task_type": {
-                    "type": "string",
-                    "description": "opinion/discussion/problem_solution/advantages_disadvantages/task1_academic"
-                }
-            },
-            "required": ["essay", "task_prompt", "task_type"]
-        }
-    },
-    {
-        "name": "ielts_writing_template",
-        "description": (
-            "Get a template or structure guide for a specific IELTS essay type. "
-            "Includes paragraph structure, linking phrases, and band 7+ examples."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "essay_type": {
-                    "type": "string",
-                    "description": "opinion/discussion/problem_solution/advantages_disadvantages/task1"
-                }
-            },
-            "required": ["essay_type"]
-        }
-    },
-    {
-        "name": "ielts_grammar_check",
-        "description": (
-            "Check a sentence or paragraph for grammar errors with IELTS context. "
-            "Identifies error types and provides corrections."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "text": {
-                    "type": "string",
-                    "description": "The text to grammar-check"
-                }
-            },
-            "required": ["text"]
-        }
-    },
-    {
-        "name": "ielts_reading_start",
-        "description": (
-            "Start an IELTS Reading practice session. "
-            "Returns a passage and questions for the user to answer."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "topic": {
-                    "type": "string",
-                    "description": "Optional topic preference (e.g., 'science', 'environment')"
-                }
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "ielts_reading_check",
-        "description": (
-            "Check the user's reading answers and provide score with explanations."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "passage_title": {
-                    "type": "string",
-                    "description": "Title of the passage (from ielts_reading_start)"
-                },
-                "answers": {
-                    "type": "object",
-                    "description": "Dictionary of question_number: answer (e.g. {'1': 'TRUE', '2': 'B'})"
-                }
-            },
-            "required": ["passage_title", "answers"]
-        }
-    },
-    {
-        "name": "ielts_reading_strategy",
-        "description": (
-            "Get strategies for a specific reading question type."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "question_type": {
-                    "type": "string",
-                    "description": "true_false_not_given/matching_headings/sentence_completion/multiple_choice"
-                }
-            },
-            "required": ["question_type"]
-        }
-    },
-    {
-        "name": "ielts_vocab_add",
-        "description": (
-            "Add a word to the user's personal IELTS vocabulary bank. "
-            "Use when learning a new word during any session."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "word": {"type": "string", "description": "The word to add"},
+                # ── set_goal ──
+                "target_band": {"type": "number", "description": "Target overall band score (e.g., 7.0)"},
+                "exam_date": {"type": "string", "description": "Exam date YYYY-MM-DD"},
+                # ── speaking_start / speaking_evaluate ──
+                "part": {"type": "integer", "description": "Speaking part: 1, 2, or 3"},
+                "topic": {"type": "string", "description": "Topic (e.g., 'technology', 'education')"},
+                "transcript": {"type": "string", "description": "User's spoken response (transcribed)"},
+                "question": {"type": "string", "description": "Question or cue card topic"},
+                # ── speaking_tips ──
+                "criteria": {"type": "string", "description": "fluency/vocabulary/grammar/pronunciation"},
+                "current_band": {"type": "number", "description": "Current band in this criterion"},
+                # ── writing_prompt / writing_evaluate ──
+                "task": {"type": "integer", "description": "Task 1 (graph/letter) or Task 2 (essay)"},
+                "type": {"type": "string", "description": "opinion/discussion/problem_solution/advantages_disadvantages/task1_academic"},
+                "essay": {"type": "string", "description": "User's essay or Task 1 response"},
+                "task_prompt": {"type": "string", "description": "Original task prompt"},
+                "essay_type": {"type": "string", "description": "opinion/discussion/problem_solution/advantages_disadvantages/task1"},
+                # ── grammar_check ──
+                "text": {"type": "string", "description": "Text to check"},
+                # ── reading_check ──
+                "passage_title": {"type": "string", "description": "Title of the reading passage"},
+                "answers": {"type": "object", "description": "Dict of question_number: answer (e.g. {'1': 'TRUE', '2': 'B'})"},
+                # ── reading_strategy ──
+                "question_type": {"type": "string", "description": "true_false_not_given/matching_headings/sentence_completion/multiple_choice"},
+                # ── vocab_add ──
+                "word": {"type": "string", "description": "Word to add"},
                 "definition": {"type": "string", "description": "Definition"},
                 "example": {"type": "string", "description": "Example sentence"},
-                "topic": {"type": "string", "description": "Topic category"}
+                # ── vocab_flashcards ──
+                "count": {"type": "integer", "description": "Number of flashcards (default 10)"},
+                # ── study_plan ──
+                "hours_per_day": {"type": "number", "description": "Hours available per day"},
+                # ── mock_test ──
+                "module": {"type": "string", "description": "speaking/writing/reading/listening or full"}
             },
-            "required": ["word", "definition", "example"]
-        }
-    },
-    {
-        "name": "ielts_vocab_topic",
-        "description": (
-            "Get topic-specific vocabulary for IELTS. "
-            "Returns curated words, collocations, and upgrade suggestions."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "topic": {
-                    "type": "string",
-                    "description": "Topic: education/technology/environment/health/society"
-                }
-            },
-            "required": ["topic"]
-        }
-    },
-    {
-        "name": "ielts_vocab_flashcards",
-        "description": (
-            "Start a vocabulary flashcard review session using the user's saved words."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer",
-                    "description": "Number of flashcards (default 10)"
-                }
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "ielts_vocab_upgrade",
-        "description": (
-            "Scan a text and suggest vocabulary upgrades to reach Band 7+."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "text": {
-                    "type": "string",
-                    "description": "Text to analyze for vocabulary improvements"
-                }
-            },
-            "required": ["text"]
-        }
-    },
-    {
-        "name": "ielts_study_plan",
-        "description": (
-            "Generate a personalized IELTS study plan based on the user's "
-            "current bands, target band, and days until exam."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "hours_per_day": {
-                    "type": "number",
-                    "description": "Hours available per day for study"
-                }
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "ielts_mock_test",
-        "description": (
-            "Start a timed mock test for a specific IELTS module."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "module": {
-                    "type": "string",
-                    "description": "speaking/writing/reading/listening or full"
-                }
-            },
-            "required": ["module"]
+            "required": ["action"]
         }
     }
 ]

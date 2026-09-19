@@ -1,3 +1,0 @@
-"System Log - Problems:"  
-"1. Navigation service unavailable."  
-"2. Fallback to web search failed."  

@@ -143,11 +143,8 @@ from external_apis import (
     notepad_write_tool,
     notepad_read_tool,
     view_file_tool,
-    go_to_sleep_tool,
-    wake_up_tool,
     create_folder_tool,
     show_agents_tool,
-    shutdown_soda_tool,
     delete_items_tool,
     get_pagespeed_insights_tool,
     rename_item_tool,
@@ -159,38 +156,9 @@ from external_apis import (
     export_data_tool,
 )
 from soda_agents import get_agent_tool_defs
-from workbase import (
-    workbase_list_tool,
-    workbase_get_tool,
-    workbase_save_progress_tool,
-    workbase_import_tool,
-    workbase_save_context_tool,
-    workbase_compare_tool,
-)
+from workbase import workbase_tool, Workbase
 from ielts_tools import IELTS_TOOLS
 from feelings_tools import FEELINGS_TOOLS_SCHEMA
-
-clipboard_read_tool = {
-    "name": "clipboard_read",
-    "description": "Read text content from the system clipboard. Use when the user says 'what's on my clipboard', 'paste the latest', 'show clipboard', 'I copied something, read it'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-clipboard_write_tool = {
-    "name": "clipboard_write",
-    "description": "Write text to the system clipboard. Use when the user says 'copy this to clipboard', 'put this on my clipboard', 'clipboard this', 'I need to paste this later'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "text": {"type": "STRING", "description": "Text to put on the clipboard"}
-        },
-        "required": ["text"]
-    }
-}
 
 screenshot_tool = {
     "name": "screenshot",
@@ -419,77 +387,37 @@ read_screen_text_tool = {
     }
 }
 
-set_reminder_tool = {
-    "name": "set_reminder",
-    "description": "Schedule a one-shot or recurring reminder. Use when the user says 'remind me in 10 minutes to...', 'remind me at 3pm to call John', 'every hour remind me to stretch', 'alert me when...'. Times are ISO 8601 (e.g. '2026-06-03T15:30:00').",
+reminder_tool = {
+    "name": "reminder",
+    "description": "One-shot or recurring reminders. Actions: set, list, cancel.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "message": {"type": "STRING", "description": "What to remind the user about"},
-            "in_seconds": {"type": "INTEGER", "description": "How many seconds from now to fire (one-shot)"},
-            "fire_at": {"type": "STRING", "description": "ISO 8601 timestamp for one-shot reminders"},
-            "recurring_seconds": {"type": "INTEGER", "description": "Interval in seconds for a recurring reminder (e.g. 3600 for hourly)"}
+            "action": {"type": "STRING", "description": "Reminder action", "enum": ["set", "list", "cancel"]},
+            "message": {"type": "STRING", "description": "What to remind about. Required for set."},
+            "in_seconds": {"type": "INTEGER", "description": "Seconds from now (one-shot). For set."},
+            "fire_at": {"type": "STRING", "description": "ISO 8601 timestamp. For set."},
+            "recurring_seconds": {"type": "INTEGER", "description": "Recurring interval in seconds. For set."},
+            "id": {"type": "STRING", "description": "Reminder ID. Required for cancel."}
         },
-        "required": ["message"]
+        "required": ["action"]
     }
 }
 
-list_reminders_tool = {
-    "name": "list_reminders",
-    "description": "List all active reminders with their IDs and fire times.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-cancel_reminder_tool = {
-    "name": "cancel_reminder",
-    "description": "Cancel a reminder by its ID. Use when the user says 'cancel reminder', 'stop reminder', 'don't remind me'.",
+schedule_tool = {
+    "name": "schedule",
+    "description": "Calendar schedule management. Actions: set (save event), list (all events), delete (remove event by ID).",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "id": {"type": "STRING", "description": "The reminder ID to cancel"}
+            "action": {"type": "STRING", "description": "Schedule action", "enum": ["set", "list", "delete"]},
+            "title": {"type": "STRING", "description": "Event title. Required for set."},
+            "date": {"type": "STRING", "description": "Date: 'tomorrow', 'today', 'YYYY-MM-DD'. Required for set."},
+            "time": {"type": "STRING", "description": "Time in HH:MM format. Optional for set."},
+            "details": {"type": "STRING", "description": "Additional details. Optional for set."},
+            "id": {"type": "STRING", "description": "Schedule ID. Required for delete."}
         },
-        "required": ["id"]
-    }
-}
-
-set_schedule_tool = {
-    "name": "set_schedule",
-    "description": "Save a schedule/event with date and time. Opens a beautiful floating window with an animated analog clock and calendar. Also registers in Windows Task Scheduler as fallback so the notification fires even if SODA is offline. Use when the user says 'schedule', 'save a schedule', 'set an event', 'plan a meeting', 'add to calendar'. Examples: 'schedule meeting tomorrow at 8', 'save dentist appointment on June 10 at 2pm', 'set event for day after tomorrow at 5:30pm'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "title": {"type": "STRING", "description": "Title of the schedule/event"},
-            "date": {"type": "STRING", "description": "Date: 'tomorrow', 'today', 'day after tomorrow', or 'YYYY-MM-DD' format"},
-            "time": {"type": "STRING", "description": "Time in HH:MM format (e.g. '08:00', '14:30'). Optional."},
-            "details": {"type": "STRING", "description": "Additional details about the schedule. Optional."}
-        },
-        "required": ["title", "date"]
-    }
-}
-
-list_schedules_tool = {
-    "name": "list_schedules",
-    "description": "List all saved schedules sorted by date/time. Returns each schedule with id, title, date, time, and details.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-delete_schedule_tool = {
-    "name": "delete_schedule",
-    "description": "Delete a schedule by its ID. Also removes the Windows Task Scheduler fallback task. Use when the user says 'delete schedule', 'remove event', 'cancel schedule'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "id": {"type": "STRING", "description": "The schedule ID to delete"}
-        },
-        "required": ["id"]
+        "required": ["action"]
     }
 }
 
@@ -552,51 +480,20 @@ good_night_tool = {
     }
 }
 
-window_focus_tool = {
-    "name": "window_focus",
-    "description": "Bring a window to the front and give it focus by searching its title. Use to switch between apps before interacting with them. Examples: 'Chrome', 'Notepad', 'Visual Studio Code', 'Spotify'.",
+window_tool = {
+    "name": "window",
+    "description": "Manage desktop windows. Actions: focus (bring window to front by title), list (show all open windows), move (reposition/resize window).",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "title": {"type": "STRING", "description": "Window title to focus (partial match works)"}
+            "action": {"type": "STRING", "description": "Action to perform", "enum": ["focus", "list", "move"]},
+            "title": {"type": "STRING", "description": "Window title (partial match). Required for focus and move."},
+            "x": {"type": "INTEGER", "description": "New X position. Required for move."},
+            "y": {"type": "INTEGER", "description": "New Y position. Required for move."},
+            "width": {"type": "INTEGER", "description": "New width in pixels (optional). For move."},
+            "height": {"type": "INTEGER", "description": "New height in pixels (optional). For move."}
         },
-        "required": ["title"]
-    }
-}
-
-window_list_tool = {
-    "name": "window_list",
-    "description": "List all visible open windows with their titles. Use to discover what apps and windows are currently open on the desktop.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {}
-    }
-}
-
-go_background_tool = {
-    "name": "go_background",
-    "description": "Put SODA into background mode. Minimizes the window so the user can see their desktop and work on other things, but SODA stays fully active — can still hear voice commands, respond, use tools, and control the screen. Use when the user says 'go to background', 'minimize', 'go away but stay listening', 'work in background', 'go to the back'. Does NOT pause audio or camera unlike sleep.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {}
-    }
-}
-
-come_back_tool = {
-    "name": "come_back",
-    "description": "Bring SODA back to the foreground. Restores the minimized window. Use when the user says 'come back', 'come to foreground', 'restore window', 'show yourself', 'come to front', 'come forward'. Works from both background and sleep modes.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {}
-    }
-}
-
-welcome_home_tool = {
-    "name": "welcome_home",
-    "description": "Play a spoken welcome message via ElevenLabs TTS. Use when the user says 'welcome home', 'I'm back', 'jarvis', 'I returned', or after double-clap detection.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {}
+        "required": ["action"]
     }
 }
 
@@ -625,21 +522,7 @@ control_system_tool = {
     }
 }
 
-window_move_tool = {
-    "name": "window_move",
-    "description": "Move or resize a window by title. Use to arrange windows on the desktop. If width and height are omitted, only moves the window.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "title": {"type": "STRING", "description": "Window title to move/resize"},
-            "x": {"type": "INTEGER", "description": "New X screen position"},
-            "y": {"type": "INTEGER", "description": "New Y screen position"},
-            "width": {"type": "INTEGER", "description": "New width in pixels (optional)"},
-            "height": {"type": "INTEGER", "description": "New height in pixels (optional)"}
-        },
-        "required": ["title", "x", "y"]
-    }
-}
+
 
 # ── Face Auth ──
 
@@ -667,198 +550,65 @@ remember_face_tool = {
 
 # ── GitHub ──
 
-github_list_repos_tool = {
-    "name": "github_list_repos",
-    "description": "List GitHub repositories, optionally filtered by owner. Uses the 'gh' CLI.",
+github_tool = {
+    "name": "github",
+    "description": "GitHub operations via 'gh' CLI. Actions: list_repos, create_repo, get_repo, create_pr, list_issues, create_issue.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "owner": {"type": "STRING", "description": "GitHub username or org to list repos for (optional)"}
+            "action": {"type": "STRING", "description": "GitHub action", "enum": ["list_repos", "create_repo", "get_repo", "create_pr", "list_issues", "create_issue"]},
+            "owner": {"type": "STRING", "description": "GitHub username or org. For list_repos."},
+            "name": {"type": "STRING", "description": "Repository name. For create_repo."},
+            "repo": {"type": "STRING", "description": "Repository in 'owner/name' format. For get_repo, create_pr, list_issues, create_issue."},
+            "description": {"type": "STRING", "description": "Description. For create_repo."},
+            "private": {"type": "BOOLEAN", "description": "Private repo. For create_repo."},
+            "auto_init": {"type": "BOOLEAN", "description": "Init with README. For create_repo."},
+            "title": {"type": "STRING", "description": "PR or issue title. For create_pr, create_issue."},
+            "body": {"type": "STRING", "description": "PR or issue body. For create_pr, create_issue."},
+            "head": {"type": "STRING", "description": "Source branch. For create_pr."},
+            "base": {"type": "STRING", "description": "Target branch (default: main). For create_pr."},
+            "state": {"type": "STRING", "description": "Filter: 'open', 'closed', 'all'. For list_issues."}
         },
-        "required": []
-    }
-}
-
-github_create_repo_tool = {
-    "name": "github_create_repo",
-    "description": "Create a new GitHub repository. Uses the 'gh' CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "name": {"type": "STRING", "description": "Repository name"},
-            "description": {"type": "STRING", "description": "Repository description"},
-            "private": {"type": "BOOLEAN", "description": "Whether the repo should be private"},
-            "auto_init": {"type": "BOOLEAN", "description": "Initialize with a README"}
-        },
-        "required": ["name"]
-    }
-}
-
-github_get_repo_tool = {
-    "name": "github_get_repo",
-    "description": "Get details about a specific GitHub repository. Uses the 'gh' CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "repo": {"type": "STRING", "description": "Repository in format 'owner/name'"}
-        },
-        "required": ["repo"]
-    }
-}
-
-github_create_pr_tool = {
-    "name": "github_create_pr",
-    "description": "Create a pull request on a GitHub repository. Uses the 'gh' CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "repo": {"type": "STRING", "description": "Repository in format 'owner/name'"},
-            "title": {"type": "STRING", "description": "Pull request title"},
-            "body": {"type": "STRING", "description": "Pull request body/description"},
-            "head": {"type": "STRING", "description": "Source branch name"},
-            "base": {"type": "STRING", "description": "Target branch name (default: main)"}
-        },
-        "required": ["repo", "title", "head"]
-    }
-}
-
-github_list_issues_tool = {
-    "name": "github_list_issues",
-    "description": "List issues for a GitHub repository. Uses the 'gh' CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "repo": {"type": "STRING", "description": "Repository in format 'owner/name'"},
-            "state": {"type": "STRING", "description": "Filter by state: 'open', 'closed', 'all'"}
-        },
-        "required": ["repo"]
-    }
-}
-
-github_create_issue_tool = {
-    "name": "github_create_issue",
-    "description": "Create a new issue on a GitHub repository. Uses the 'gh' CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "repo": {"type": "STRING", "description": "Repository in format 'owner/name'"},
-            "title": {"type": "STRING", "description": "Issue title"},
-            "body": {"type": "STRING", "description": "Issue body/description"}
-        },
-        "required": ["repo", "title"]
+        "required": ["action"]
     }
 }
 
 # ── Vercel ──
 
-vercel_list_projects_tool = {
-    "name": "vercel_list_projects",
-    "description": "List Vercel projects. Uses the Vercel CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-vercel_deploy_tool = {
-    "name": "vercel_deploy",
-    "description": "Deploy a project to Vercel from a local path. Uses the Vercel CLI.",
+vercel_tool = {
+    "name": "vercel",
+    "description": "Vercel deployment operations. Actions: list_projects, deploy, list_deployments, get_deployment.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "path": {"type": "STRING", "description": "Path to the project directory"},
-            "name": {"type": "STRING", "description": "Project name (optional)"},
-            "prod": {"type": "BOOLEAN", "description": "Deploy to production"}
+            "action": {"type": "STRING", "description": "Vercel action", "enum": ["list_projects", "deploy", "list_deployments", "get_deployment"]},
+            "path": {"type": "STRING", "description": "Project directory path. For deploy."},
+            "name": {"type": "STRING", "description": "Project name. For deploy."},
+            "prod": {"type": "BOOLEAN", "description": "Deploy to production. For deploy."},
+            "project": {"type": "STRING", "description": "Vercel project name. For list_deployments."},
+            "limit": {"type": "INTEGER", "description": "Max deployments. For list_deployments."},
+            "url_or_id": {"type": "STRING", "description": "Deployment URL or ID. For get_deployment."}
         },
-        "required": []
-    }
-}
-
-vercel_list_deployments_tool = {
-    "name": "vercel_list_deployments",
-    "description": "List recent Vercel deployments for a project. Uses the Vercel CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "project": {"type": "STRING", "description": "Vercel project name"},
-            "limit": {"type": "INTEGER", "description": "Max number of deployments to return"}
-        },
-        "required": []
-    }
-}
-
-vercel_get_deployment_tool = {
-    "name": "vercel_get_deployment",
-    "description": "Get details about a specific Vercel deployment by URL or ID. Uses the Vercel CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "url_or_id": {"type": "STRING", "description": "Deployment URL or ID"}
-        },
-        "required": ["url_or_id"]
+        "required": ["action"]
     }
 }
 
 # ── Netlify ──
 
-netlify_list_sites_tool = {
-    "name": "netlify_list_sites",
-    "description": "List Netlify sites. Uses the Netlify CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-netlify_get_site_tool = {
-    "name": "netlify_get_site",
-    "description": "Get details about a specific Netlify site. Uses the Netlify CLI.",
+netlify_tool = {
+    "name": "netlify",
+    "description": "Netlify deployment operations. Actions: list_sites, get_site, deploy, create_site, list_deploys.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "site_id": {"type": "STRING", "description": "Netlify site ID"}
+            "action": {"type": "STRING", "description": "Netlify action", "enum": ["list_sites", "get_site", "deploy", "create_site", "list_deploys"]},
+            "site_id": {"type": "STRING", "description": "Site ID. For get_site, list_deploys."},
+            "path": {"type": "STRING", "description": "Build directory path. For deploy."},
+            "prod": {"type": "BOOLEAN", "description": "Deploy to production. For deploy."},
+            "message": {"type": "STRING", "description": "Deploy message. For deploy."},
+            "name": {"type": "STRING", "description": "Site name. For create_site."}
         },
-        "required": ["site_id"]
-    }
-}
-
-netlify_deploy_tool = {
-    "name": "netlify_deploy",
-    "description": "Deploy a local directory to Netlify. Uses the Netlify CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "path": {"type": "STRING", "description": "Path to the build directory"},
-            "prod": {"type": "BOOLEAN", "description": "Deploy to production branch"},
-            "message": {"type": "STRING", "description": "Deploy message"}
-        },
-        "required": []
-    }
-}
-
-netlify_create_site_tool = {
-    "name": "netlify_create_site",
-    "description": "Create a new empty Netlify site. Uses the Netlify CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "name": {"type": "STRING", "description": "Site name (optional)"}
-        },
-        "required": []
-    }
-}
-
-netlify_list_deploys_tool = {
-    "name": "netlify_list_deploys",
-    "description": "List recent deploys for a Netlify site. Uses the Netlify CLI.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "site_id": {"type": "STRING", "description": "Netlify site ID"}
-        },
-        "required": ["site_id"]
+        "required": ["action"]
     }
 }
 
@@ -933,37 +683,22 @@ view_file_tool = {
     }
 }
 
-# ── Sleep / Wake ──
-
-go_to_sleep_tool = {
-    "name": "go_to_sleep",
-    "description": "Put SODA to sleep mode. Minimizes the window and stops proactive monitoring. Use when the user says 'go to sleep', 'sleep', 'goodnight'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-wake_up_tool = {
-    "name": "wake_up",
-    "description": "Wake SODA from sleep mode. Restores the window, maximizes the Chrome tab running the HUD via the local agent, gathers system status (CPU, RAM, disk), and checks configured websites (guardianlock.netlify.app, hajjkafela.vercel.app) for uptime. Use when the user says 'wake up', 'come back'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-create_folder_tool = {
-    "name": "create_folder",
-    "description": "Create a folder at the specified path. Also creates parent directories if needed.",
+file_manager_tool = {
+    "name": "file_manager",
+    "description": "File system operations. Actions: create_folder, delete_items, rename_item, copy_item, move_item, list_drives, scroll_file_list.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "path": {"type": "STRING", "description": "Folder path to create"}
+            "action": {"type": "STRING", "description": "File manager action", "enum": ["create_folder", "delete_items", "rename_item", "copy_item", "move_item", "list_drives", "scroll_file_list"]},
+            "path": {"type": "STRING", "description": "File/folder path. For create_folder."},
+            "paths": {"type": "ARRAY", "items": {"type": "STRING"}, "description": "List of paths. For delete_items, copy_item, move_item."},
+            "source": {"type": "STRING", "description": "Source path. For rename_item, copy_item, move_item."},
+            "destination": {"type": "STRING", "description": "Destination path. For rename_item, copy_item, move_item."},
+            "new_name": {"type": "STRING", "description": "New name. For rename_item."},
+            "direction": {"type": "STRING", "description": "Scroll direction: 'up' or 'down'. For scroll_file_list."},
+            "amount": {"type": "INTEGER", "description": "Scroll amount in pixels. For scroll_file_list."}
         },
-        "required": ["path"]
+        "required": ["action"]
     }
 }
 
@@ -1002,43 +737,19 @@ show_agents_tool = {
     }
 }
 
-shutdown_soda_tool = {
-    "name": "shutdown_soda",
-    "description": "Gracefully shut down the SODA assistant only (not the computer). Use when the user says 'turn off', 'exit', 'quit', 'stop'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-shutdown_system_tool = {
-    "name": "shutdown_system",
-    "description": "SHUT DOWN THE ENTIRE COMPUTER. Use ONLY when the user explicitly says 'shutdown', 'shut down', 'power off', or 'turn off the laptop/computer/pc'. This will force-close everything and power off the machine.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
 # ── Task Planner ──
 
-plan_tasks_tool = {
-    "name": "plan_tasks",
-    "description": (
-        "Create a structured plan with multiple TODO items. Call this IMMEDIATELY when the user gives 2+ commands "
-        "or a multi-step request (e.g. 'do X, then Y, then Z'). Breaks the request into numbered steps. "
-        "A panel slides from the left showing the plan with checkboxes. "
-        "Each task is tracked as pending/running/done/failed."
-    ),
+plan_tool = {
+    "name": "plan",
+    "description": "Multi-step task planner. Actions: create (new plan with tasks), get (current plan), update (change task status), cancel (dismiss plan).",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "title": {"type": "STRING", "description": "Plan title"},
+            "action": {"type": "STRING", "description": "Plan action", "enum": ["create", "get", "update", "cancel"]},
+            "title": {"type": "STRING", "description": "Plan title. Required for create."},
             "tasks": {
                 "type": "ARRAY",
-                "description": "List of task objects, each with 'title' and optional 'description'",
+                "description": "List of {title, description} objects. Required for create.",
                 "items": {
                     "type": "OBJECT",
                     "properties": {
@@ -1046,54 +757,12 @@ plan_tasks_tool = {
                         "description": {"type": "STRING", "description": "Task description"}
                     }
                 }
-            }
+            },
+            "task_id": {"type": "STRING", "description": "Task ID. Required for update."},
+            "status": {"type": "STRING", "description": "New status: 'running', 'done', 'failed'. Required for update."},
+            "result": {"type": "STRING", "description": "Result description. Optional for update."}
         },
-        "required": ["title", "tasks"]
-    }
-}
-
-update_task_tool = {
-    "name": "update_task",
-    "description": (
-        "Update the status of a task in the active plan. Call after completing each step. "
-        "Status: 'running' when you start working on a task, 'done' when completed, "
-        "'failed' if it couldn't be done."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "task_id": {"type": "STRING", "description": "The task ID to update"},
-            "status": {"type": "STRING", "description": "New status: 'running', 'done', or 'failed'"},
-            "result": {"type": "STRING", "description": "Optional result description"}
-        },
-        "required": ["task_id", "status"]
-    }
-}
-
-cancel_plan_tool = {
-    "name": "cancel_plan",
-    "description": (
-        "Cancel/dismiss the current task plan. Call when the user says 'cancel', 'dismiss tasks', "
-        "'forget the tasks', or when ALL tasks are done and the panel should close."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-get_plan_tool = {
-    "name": "get_plan",
-    "description": (
-        "Get the current active plan with all tasks and their statuses. "
-        "Call when resuming work after a reset to recover the task list "
-        "and continue from the first task that isn't 'done'."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
+        "required": ["action"]
     }
 }
 
@@ -1314,340 +983,36 @@ app_scroll_tool = {
 
 # ── Credential Manager ──
 
-credential_save_tool = {
-    "name": "credential_save",
-    "description": (
-        "Save a username/password for a service (like a website login). "
-        "Credentials are encrypted at rest using Fernet (cryptography). "
-        "Use when the user says 'save my password for [service]', "
-        "'remember my login for [service]', 'store credentials for [service]'. "
-        "service is the website/app name (e.g. 'facebook', 'gmail', 'amazon'). "
-        "username is the email or username. password is the password. "
-        "All three are required. "
-        "Returns success confirmation. "
-        "Example: credential_save(service='facebook', username='user@email.com', password='mypassword123')"
-    ),
+credential_tool = {
+    "name": "credential",
+    "description": "Encrypted credential manager. Actions: save (store login), get (retrieve login), list (all saved services), delete (remove service).",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "service": {"type": "STRING", "description": "Service/app name (e.g. 'facebook', 'gmail', 'amazon')"},
-            "username": {"type": "STRING", "description": "Username or email for the service"},
-            "password": {"type": "STRING", "description": "Password for the service"}
-        },
-        "required": ["service", "username", "password"]
-    }
-}
-
-credential_get_tool = {
-    "name": "credential_get",
-    "description": (
-        "Retrieve saved credentials for a specific service. "
-        "Returns username and password that were previously saved. "
-        "Use when the user says 'what's my password for [service]', "
-        "'get my [service] login', 'show me my saved password'. "
-        "Example: credential_get(service='facebook')"
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "service": {"type": "STRING", "description": "Service name to retrieve credentials for"}
-        },
-        "required": ["service"]
-    }
-}
-
-credential_list_tool = {
-    "name": "credential_list",
-    "description": (
-        "List all services that have saved credentials. "
-        "Returns an array of service names with their usernames. "
-        "Does NOT leak passwords. "
-        "Use when the user says 'list my saved passwords', 'what services do I have saved', "
-        "'show me all saved credentials'. "
-        "No parameters required."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {}
-    }
-}
-
-credential_delete_tool = {
-    "name": "credential_delete",
-    "description": (
-        "Delete saved credentials for a specific service. "
-        "Use when the user says 'delete my [service] password', "
-        "'remove [service] credentials', 'forget [service] login'. "
-        "Example: credential_delete(service='facebook')"
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "service": {"type": "STRING", "description": "Service name to delete credentials for"}
-        },
-        "required": ["service"]
-    }
-}
-
-# ── Browser Automation ──
-
-browser_automate_tool = {
-    "name": "browser_automate",
-    "description": (
-        "Full browser automation: navigate to a URL, then execute a list of steps. "
-        "SUPPORTED ACTIONS:\n"
-        "- navigate(url): Navigate to a URL in Chrome (Chrome profile 'rahikulmakhtum' auto-detected).\n"
-        "- click(description): Find and click an element. Uses AI Vision to locate it on screen. "
-        "description must describe what to click clearly (e.g. 'the login button', 'the search box'). "
-        "3 retries with escalating vision prompts on failure.\n"
-        "- type(text, target): Type text into an input field. 'target' describes where to click first. "
-        "Automatically clicks the target before typing. Set press_enter=true to press Enter after typing.\n"
-        "- read(prompt): Read text from the current page. prompt explains what to look for. "
-        "Uses AI Vision to analyze the screenshot.\n"
-        "- wait(seconds): Wait a specified number of seconds.\n\n"
-        "COMMON WORKFLOWS:\n"
-        "1. LOGIN: navigate(url) → click('username/email field') → type(username, 'the email input') → "
-        "click('password field') → type(password, 'the password input') → click('login/sign in button').\n"
-        "2. SEARCH: navigate(url) → click('search box') → type(query, 'search box', press_enter=true) → "
-        "read('What are the search results on this page? List them.').\n\n"
-        "Use for ANY task that needs clicking, typing, and reading in a web browser. "
-        "Especially useful for sites without APIs (messaging platforms, social media, internal tools). "
-        "ALWAYS auto-inject saved credentials from credential_get when doing login workflows. "
-        "CRITICAL: When the user asks to log into a service, FIRST call credential_get(service=...) "
-        "to retrieve saved credentials, then inject them at the right step. "
-        "DO NOT use this tool for reading or checking emails. Use read_emails tool instead — "
-        "browser automation does NOT work for Gmail (Google blocks automated login)."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "url": {"type": "STRING", "description": "The URL to navigate to"},
-            "steps": {
-                "type": "ARRAY",
-                "description": "List of step objects to execute. Each step has 'action' and 'params' fields.",
-                "items": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "action": {
-                            "type": "STRING",
-                            "description": "Action: 'navigate', 'click', 'type', 'read', 'wait'"
-                        },
-                        "params": {
-                            "type": "OBJECT",
-                            "description": "Parameters for the action. See description for details per action type.",
-                            "properties": {
-                                "url": {"type": "STRING", "description": "For navigate: the URL to go to"},
-                                "description": {"type": "STRING", "description": "For click: description of the element to find and click"},
-                                "target": {"type": "STRING", "description": "For type: description of the input field to click first"},
-                                "text": {"type": "STRING", "description": "For type: the text to type"},
-                                "press_enter": {"type": "BOOLEAN", "description": "For type: press Enter after typing (default false)"},
-                                "prompt": {"type": "STRING", "description": "For read: what to look for on the page"},
-                                "seconds": {"type": "NUMBER", "description": "For wait: seconds to wait"}
-                            }
-                        }
-                    },
-                    "required": ["action", "params"]
-                }
-            },
-            "profile": {"type": "STRING", "description": "Chrome profile name (default: 'rahikulmakhtum')"}
-        },
-        "required": ["url", "steps"]
-    }
-}
-
-# ── Hermes-Style Browser Automation (12 tools) ──
-
-browser_navigate_tool = {
-    "name": "browser_navigate",
-    "description": "Open a URL in the automated browser. Initializes a new browser session on first call (launches Chrome). Returns the page title and accessibility snapshot with element ref IDs (like @e0, @e1) that you use with browser_click and browser_type. Call this first before using any other browser_* tool.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "url": {"type": "STRING", "description": "Full URL to navigate to (must include protocol, e.g. https://example.com)"}
-        },
-        "required": ["url"]
-    }
-}
-
-browser_snapshot_tool = {
-    "name": "browser_snapshot",
-    "description": "Get the current page's interactive elements as an accessibility tree. Each interactive element has a ref ID like @e0, @e1, @e2. Use these ref IDs with browser_click and browser_type to interact with the page. The snapshot includes element roles (button, link, textbox, heading, etc.), names, values, and states (disabled, focused, required). Call this after any navigation or page change to get fresh refs.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "full": {"type": "BOOLEAN", "description": "If True, returns the full page accessibility tree including non-interactive elements. If False (default), only interactive/meaningful elements.", "default": False}
-        },
-        "required": []
-    }
-}
-
-browser_click_tool = {
-    "name": "browser_click",
-    "description": "Click an element on the page identified by its ref ID from browser_snapshot (e.g. @e3). The ref ID is the @eN identifier shown in the snapshot output. Do NOT use this for typing into text fields — use browser_type for that.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "ref": {"type": "STRING", "description": "Element ref ID from snapshot, e.g. @e3"}
-        },
-        "required": ["ref"]
-    }
-}
-
-browser_type_tool = {
-    "name": "browser_type",
-    "description": "Type text into an input field or textbox identified by its ref ID from browser_snapshot. Clears any existing content in the field first before typing the new text. Use for filling form fields, search boxes, text areas. Do NOT use for pressing keyboard keys — use browser_press for that.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "ref": {"type": "STRING", "description": "Element ref ID from snapshot to type into, e.g. @e1"},
-            "text": {"type": "STRING", "description": "The text to type into the field"}
-        },
-        "required": ["ref", "text"]
-    }
-}
-
-browser_scroll_tool = {
-    "name": "browser_scroll",
-    "description": "Scroll the current page in a direction. Use 'down' or 'up' to scroll by about one viewport height. Use 'top' to jump to the very top of the page, 'bottom' to jump to the very bottom.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "direction": {"type": "STRING", "enum": ["down", "up", "top", "bottom"], "description": "Direction to scroll: 'down', 'up', 'top', or 'bottom'"}
-        },
-        "required": ["direction"]
-    }
-}
-
-browser_back_tool = {
-    "name": "browser_back",
-    "description": "Navigate back one page in the browser's history. Equivalent to clicking the browser's back button.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-browser_press_tool = {
-    "name": "browser_press",
-    "description": "Press a keyboard key by name. Common keys: Enter, Tab, Escape, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Backspace, Delete, Home, End. Use for submitting forms (Enter), moving between fields (Tab), dismissing dialogs (Escape), or navigating dropdowns (ArrowDown/ArrowUp). Do NOT use for typing text into fields — use browser_type for that.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "key": {"type": "STRING", "description": "Key name: Enter, Tab, Escape, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Backspace, Delete, Home, End"}
-        },
-        "required": ["key"]
-    }
-}
-
-browser_vision_tool = {
-    "name": "browser_vision",
-    "description": "Take a screenshot of the current page and analyze it with AI vision. Use this ONLY when you need to see visual content that the accessibility tree doesn't capture: images, CAPTCHAs, visual layouts, charts, graphs, visual styling, colors, complex UI layouts. For text content and interactive elements, use browser_snapshot instead (faster, cheaper, more detailed).",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "question": {"type": "STRING", "description": "What to look for in the screenshot. Be specific about what you want to identify or describe."}
-        },
-        "required": ["question"]
-    }
-}
-
-browser_console_tool = {
-    "name": "browser_console",
-    "description": "Get recent JavaScript console output from the page, including errors, warnings, and log messages. Useful for debugging why a page isn't working correctly, detecting JavaScript errors, or checking if an action succeeded.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-browser_get_images_tool = {
-    "name": "browser_get_images",
-    "description": "List all images on the current page with their URLs, alt text, and dimensions. Useful for finding image sources, checking if images loaded, or getting information about media on the page.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-browser_dialog_tool = {
-    "name": "browser_dialog",
-    "description": "Respond to a JavaScript dialog (alert, confirm, or prompt) that appeared on the page. Check browser_snapshot for 'pending_dialogs' to see if there are any active dialogs. Use action='accept' to click OK/Yes, or action='dismiss' to click Cancel/No. For prompt dialogs, provide the text to type in the 'text' parameter.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "action": {"type": "STRING", "enum": ["accept", "dismiss"], "description": "'accept' for OK/Yes, 'dismiss' for Cancel/No"},
-            "text": {"type": "STRING", "description": "Text to type for prompt() dialogs (optional, only used for prompt dialogs)"}
+            "action": {"type": "STRING", "description": "Credential action", "enum": ["save", "get", "list", "delete"]},
+            "service": {"type": "STRING", "description": "Service name (e.g. 'facebook', 'gmail'). Required for save, get, delete."},
+            "username": {"type": "STRING", "description": "Username or email. Required for save."},
+            "password": {"type": "STRING", "description": "Password. Required for save."}
         },
         "required": ["action"]
     }
 }
 
-browser_cdp_tool = {
-    "name": "browser_cdp",
-    "description": "Send a raw Chrome DevTools Protocol command to the browser for advanced control. Only use this when the other browser tools don't support what you need. The method is a CDP method name like Page.captureScreenshot, Runtime.evaluate, Network.getCookies, etc. Params is a JSON string of method parameters. Requires CDP supervisor to be active.",
+# ── Scheduled Tasks (recurring) ──
+
+scheduled_task_tool = {
+    "name": "scheduled_task",
+    "description": "Recurring automated tasks (like cron). Actions: create, list, delete. For calendar events, use 'schedule' tool instead.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "method": {"type": "STRING", "description": "CDP method name, e.g. Page.captureScreenshot, Runtime.evaluate, DOM.getDocument, Network.getCookies, Input.dispatchMouseEvent"},
-            "params": {"type": "STRING", "description": "JSON string of method parameters (optional, default '{}')"}
+            "action": {"type": "STRING", "description": "Action", "enum": ["create", "list", "delete"]},
+            "action_text": {"type": "STRING", "description": "What to do. Required for create."},
+            "schedule": {"type": "STRING", "description": "Human-readable schedule like 'every day at 9am'. Required for create."},
+            "label": {"type": "STRING", "description": "Short label. Optional for create."},
+            "task_id": {"type": "STRING", "description": "Task ID. Required for delete."}
         },
-        "required": ["method"]
-    }
-}
-
-# ── Scheduled Tasks ──
-
-create_scheduled_task_tool = {
-    "name": "create_scheduled_task",
-    "description": (
-        "Schedule a task to run at a specific time or interval. "
-        "Use when the user says 'schedule [action] at [time]', "
-        "'every [interval] do [action]', 'remind me to [action] at [time]', "
-        "or similar scheduling requests. "
-        "The action_text is WHAT to do — write it exactly as the user described it "
-        "so it can be re-injected into conversation later. "
-        "The schedule is a human-readable time expression. Supported formats:\n"
-        "- 'every day at 9am' or 'daily at 09:00'\n"
-        "- 'every monday at 14:30'\n"
-        "- 'every 30 minutes' or 'every 2 hours'\n"
-        "- 'tomorrow at 8am'\n"
-        "- 'in 10 minutes'\n"
-        "- 'at 3pm' (today or next occurrence)\n"
-        "When the time comes, SODA will act as if the user said the action_text."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "action_text": {"type": "STRING", "description": "What to do — the natural language description of the action"},
-            "schedule": {"type": "STRING", "description": "Human-readable schedule like 'every day at 9am' or 'every 30 minutes'"},
-            "label": {"type": "STRING", "description": "Short label for the task (optional, defaults to action_text)"}
-        },
-        "required": ["action_text", "schedule"]
-    }
-}
-
-list_scheduled_tasks_tool = {
-    "name": "list_scheduled_tasks",
-    "description": "List all currently scheduled tasks with their IDs, labels, and next fire times.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-delete_scheduled_task_tool = {
-    "name": "delete_scheduled_task",
-    "description": "Delete a scheduled task by its ID. Use when the user says 'cancel schedule', 'remove task', 'delete schedule'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "task_id": {"type": "STRING", "description": "The task ID to delete"}
-        },
-        "required": ["task_id"]
+        "required": ["action"]
     }
 }
 
@@ -1918,16 +1283,6 @@ pentest_target_tool = {
     }
 }
 
-open_pastebox_tool = {
-    "name": "open_pastebox",
-    "description": "Show a floating text box where the user can paste or type content for SODA to read, analyze, or process. Returns the pasted content as text. Use when user says 'open paste box', 'show paste box', 'I need to paste something', 'open a text box', 'I want to paste text'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
 pentest_browser_target_tool = {
     "name": "pentest_browser_target",
     "description": (
@@ -1942,47 +1297,6 @@ pentest_browser_target_tool = {
         "type": "OBJECT",
         "properties": {},
         "required": []
-    }
-}
-
-# ── Lead Finder ──────────────────────────────────────────────
-find_leads_tool = {
-    "name": "find_leads",
-    "description": "Search Google Places for local businesses. Returns name, address, phone, website, rating. Use to find prospects, find businesses without websites, or build a lead list for outreach.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "query": {"type": "STRING", "description": "Business type or category to search (e.g. 'plumber', 'bakery', 'auto repair')"},
-            "location": {"type": "STRING", "description": "City and state or region (e.g. 'Austin, TX', 'Berlin, Germany')"},
-            "min_rating": {"type": "NUMBER", "description": "Minimum rating filter (0-5, default 0 for no filter)"},
-            "max_results": {"type": "INTEGER", "description": "Maximum leads to return (default 20, max 100)"},
-        },
-        "required": ["query", "location"]
-    }
-}
-
-enrich_leads_tool = {
-    "name": "enrich_leads",
-    "description": "Get detailed info for a single business from Google Places by place_id. Includes full address, hours, price level.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "place_id": {"type": "STRING", "description": "The place_id from find_leads results"}
-        },
-        "required": ["place_id"]
-    }
-}
-
-export_leads_tool = {
-    "name": "export_leads",
-    "description": "Export a list of business leads to CSV, JSON, or Markdown format. Use after find_leads to save results.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "data": {"type": "STRING", "description": "JSON string of the leads array from find_leads"},
-            "format": {"type": "STRING", "description": "Export format: 'csv', 'json', or 'markdown'"}
-        },
-        "required": ["data", "format"]
     }
 }
 
@@ -2014,78 +1328,34 @@ export_research_tool = {
 }
 
 # ── Background Agent Management ─────────────────────────────
-bg_spawn_tool = {
-    "name": "bg_spawn",
-    "description": "Run a task in the background using OpenCode CLI. Returns immediately with a task_id. Use for long-running tasks like building a website, code generation, or any task that takes more than 30 seconds. The task runs asynchronously and the frontend will notify when complete.",
+bg_tasks_tool = {
+    "name": "bg_tasks",
+    "description": "Background task management. Actions: spawn (run task async), status (check task), kill (terminate task), list (all tasks).",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "prompt": {"type": "STRING", "description": "The full prompt to give OpenCode for the background task"},
-            "workdir": {"type": "STRING", "description": "Working directory for the task (optional, defaults to project root)"},
+            "action": {"type": "STRING", "description": "BG task action", "enum": ["spawn", "status", "kill", "list"]},
+            "prompt": {"type": "STRING", "description": "Task prompt. Required for spawn."},
+            "workdir": {"type": "STRING", "description": "Working directory. Optional for spawn."},
+            "task_id": {"type": "STRING", "description": "Task ID. Required for status and kill."}
         },
-        "required": ["prompt"]
-    }
-}
-
-bg_status_tool = {
-    "name": "bg_status",
-    "description": "Check the status of a background task by task_id. Returns phase, output, elapsed time, and exit code.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "task_id": {"type": "STRING", "description": "The task_id returned by bg_spawn"}
-        },
-        "required": ["task_id"]
-    }
-}
-
-bg_kill_tool = {
-    "name": "bg_kill",
-    "description": "Terminate a running background task by task_id.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "task_id": {"type": "STRING", "description": "The task_id to kill"}
-        },
-        "required": ["task_id"]
+        "required": ["action"]
     }
 }
 
 # ── OpenCode Remote Tasks ────────────────────────────────────
-opencode_start_tool = {
-    "name": "opencode_start",
-    "description": "Launch an OpenCode session in a specific folder on the local machine. The agent will cd into the folder, confirm it exists, and start OpenCode with the given prompt. Use when the user wants to run OpenCode tasks in a project folder.",
+opencode_tool = {
+    "name": "opencode",
+    "description": "OpenCode remote task management. Actions: start (launch session), status (check task), stop (kill task).",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "folder": {"type": "STRING", "description": "Full path to the project folder (e.g. D:\\projects\\my-site)"},
-            "prompt": {"type": "STRING", "description": "The task prompt for OpenCode (e.g. 'deploy this site to netlify')"},
+            "action": {"type": "STRING", "description": "OpenCode action", "enum": ["start", "status", "stop"]},
+            "folder": {"type": "STRING", "description": "Project folder path. Required for start."},
+            "prompt": {"type": "STRING", "description": "Task prompt. Required for start."},
+            "task_id": {"type": "STRING", "description": "Task ID. Required for status and stop."}
         },
-        "required": ["folder", "prompt"]
-    }
-}
-
-opencode_status_tool = {
-    "name": "opencode_status",
-    "description": "Check the status of a running OpenCode task. Returns output lines, progress, and status.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "task_id": {"type": "STRING", "description": "The task ID returned by opencode_start"},
-        },
-        "required": ["task_id"]
-    }
-}
-
-opencode_stop_tool = {
-    "name": "opencode_stop",
-    "description": "Kill a running OpenCode task.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "task_id": {"type": "STRING", "description": "The task ID to stop"},
-        },
-        "required": ["task_id"]
+        "required": ["action"]
     }
 }
 
@@ -2113,75 +1383,24 @@ notebook_search_tool = {
     }
 }
 
-bg_list_tool = {
-    "name": "bg_list",
-    "description": "List all background tasks with their status, elapsed time, and output preview.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
 
-read_emails_tool = {
-    "name": "read_emails",
-    "description": (
-        "CRITICAL: This is the ONLY tool for reading emails. NEVER use open_browser or browser_automate "
-        "for email — those tools do NOT work for Gmail (login blocks automation). "
-        "Read emails from the user's Gmail inbox via IMAP. Returns subject, sender, date, and body preview. "
-        "Use when the user asks to 'check my email', 'read my inbox', 'show unread emails', "
-        "'any new emails', 'read my messages', or 'check gmail'. "
-        "If email is not configured, guide the user through setting up an App Password. "
-        "MANDATORY: Call this tool for ANY email-related request. Do NOT open Gmail in the browser."
-    ),
+
+email_tool = {
+    "name": "email",
+    "description": "Gmail email management. Actions: read (inbox via IMAP), send (via SMTP), config (set credentials). Do NOT use browser for email.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "query": {
-                "type": "STRING",
-                "description": "IMAP search query: 'UNSEEN' (default), 'ALL', 'FROM someone@example.com', 'SUBJECT meeting', 'SINCE 01-Jan-2025'"
-            },
-            "max_results": {
-                "type": "INTEGER",
-                "description": "Maximum emails to return (default 10, max 50)"
-            }
+            "action": {"type": "STRING", "description": "Email action", "enum": ["read", "send", "config"]},
+            "query": {"type": "STRING", "description": "IMAP search: 'UNSEEN', 'ALL', 'FROM x', 'SUBJECT x'. For read."},
+            "max_results": {"type": "INTEGER", "description": "Max emails (default 10). For read."},
+            "to": {"type": "STRING", "description": "Recipient email. Required for send."},
+            "subject": {"type": "STRING", "description": "Subject line. Required for send."},
+            "body": {"type": "STRING", "description": "Body text. Required for send."},
+            "address": {"type": "STRING", "description": "Gmail address. Required for config."},
+            "password": {"type": "STRING", "description": "App Password. Required for config."}
         },
-        "required": []
-    }
-}
-
-send_email_tool = {
-    "name": "send_email",
-    "description": (
-        "Send an email via Gmail SMTP. Use ONLY after asking the user to confirm the reply content "
-        "and getting explicit confirmation. Always show the user what will be sent before sending. "
-        "Parameters: recipient address, subject line, and body text."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "to": {"type": "STRING", "description": "Recipient email address"},
-            "subject": {"type": "STRING", "description": "Email subject line"},
-            "body": {"type": "STRING", "description": "Email body text (plain text)"}
-        },
-        "required": ["to", "subject", "body"]
-    }
-}
-
-email_config_tool = {
-    "name": "email_config",
-    "description": (
-        "Configure Gmail IMAP/SMTP credentials. Call this when the user provides their "
-        "email address and app password. Store them for the session. "
-        "Guide them to https://myaccount.google.com/apppasswords if they don't have an app password."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "address": {"type": "STRING", "description": "Full Gmail address (e.g., user@gmail.com)"},
-            "password": {"type": "STRING", "description": "16-character Gmail App Password"}
-        },
-        "required": ["address", "password"]
+        "required": ["action"]
     }
 }
 
@@ -2267,132 +1486,21 @@ query_custom_memory_tool = {
 
 # ── Project Registry ──
 
-register_project_tool = {
-    "name": "register_project",
-    "description": "Register an external project with SODA. Generates a unique API key and stores the project endpoint. Use when the user says 'add my project', 'register my site', 'connect my app'.",
+project_registry_tool = {
+    "name": "project_registry",
+    "description": "External project registration and analytics. Actions: register, list, query, query_all, remove.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "name": {"type": "STRING", "description": "Project name (e.g. 'Guardian Lock')"},
-            "endpoint": {"type": "STRING", "description": "Base URL of the project's SODA stats endpoint (e.g. 'https://guardian-admin.onrender.com')"}
-        },
-        "required": ["name", "endpoint"]
-    }
-}
-
-list_projects_tool = {
-    "name": "list_projects",
-    "description": "List all registered external projects with their status. Use when the user asks 'show my projects', 'what projects are connected'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-query_project_tool = {
-    "name": "query_project",
-    "description": "Query a specific registered project for its latest stats and analytics by calling its endpoint with the API key. Use when the user says 'check my project stats', 'how is project X doing'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "project_id": {"type": "STRING", "description": "Project ID to query"}
-        },
-        "required": ["project_id"]
-    }
-}
-
-query_all_projects_tool = {
-    "name": "query_all_projects",
-    "description": "Query ALL registered projects at once for their latest stats and analytics. Use when the user says 'check all my projects', 'how are all my sites doing'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-remove_project_tool = {
-    "name": "remove_project",
-    "description": "Remove a registered project from SODA. Use when the user says 'remove project', 'delete my project'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "project_id": {"type": "STRING", "description": "Project ID to remove"}
-        },
-        "required": ["project_id"]
-    }
-}
-
-
-# ── Spotify Tools ──────────────────────────────────────────────────
-
-spotify_search_tool = {
-    "name": "spotify_search",
-    "description": "Search Spotify for tracks, albums, playlists, or artists. Returns results with IDs, names, URIs, and artist info. Use this BEFORE spotify_play when the user wants to find specific music.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "query": {"type": "STRING", "description": "Search query (e.g. 'lofi hip hop', 'Daft Punk', 'chill playlist')"},
-            "search_type": {"type": "STRING", "description": "Type of search: 'track' (default), 'album', 'playlist', 'artist'"},
-            "limit": {"type": "INTEGER", "description": "Number of results (1-20, default 5)"}
-        },
-        "required": ["query"]
-    }
-}
-
-spotify_play_tool = {
-    "name": "spotify_play",
-    "description": "Play music on Spotify Free. Search and auto-play first result, or play a specific URI. Just say what to play — SODA handles the rest. Works in background while user codes.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "query": {"type": "STRING", "description": "What to play (e.g. 'lofi hip hop', 'Daft Punk', 'chill beats'). SODA searches Spotify and plays the first result."},
-            "uri": {"type": "STRING", "description": "Direct Spotify URI (e.g. 'spotify:track:6rqhFgbbKwnb9MLmUQDhG6'). Overrides query."}
-        },
-        "required": []
-    }
-}
-
-spotify_control_tool = {
-    "name": "spotify_control",
-    "description": "Control Spotify playback: play/pause, skip, previous, volume. Use when the user says 'skip song', 'pause music', 'next track', 'volume up'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "action": {
-                "type": "STRING",
-                "description": "Control action: 'play', 'pause', 'toggle', 'skip', 'next', 'previous', 'prev', 'volume_up', 'volume_down', 'volume_mute'"
-            }
+            "action": {"type": "STRING", "description": "Registry action", "enum": ["register", "list", "query", "query_all", "remove"]},
+            "name": {"type": "STRING", "description": "Project name. Required for register."},
+            "endpoint": {"type": "STRING", "description": "Project stats endpoint URL. Required for register."},
+            "project_id": {"type": "STRING", "description": "Project ID. Required for query and remove."}
         },
         "required": ["action"]
     }
 }
 
-spotify_now_playing_tool = {
-    "name": "spotify_now_playing",
-    "description": "Get current Spotify playback status. Use when user asks 'what's playing', 'what song is this'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-spotify_play_playlist_tool = {
-    "name": "spotify_play_playlist",
-    "description": "Search for and play a playlist in Spotify Desktop. Use when user says 'play playlist X', 'play my Y playlist'.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "playlist_name": {
-                "type": "STRING",
-                "description": "Name of the playlist to search for and play"
-            }
-        },
-        "required": ["playlist_name"]
-    }
-}
 
 
 tools_list = [{"function_declarations": [
@@ -2413,8 +1521,6 @@ tools_list = [{"function_declarations": [
     close_panel_tool,
     system_status_tool,
     close_window_tool,
-    clipboard_read_tool,
-    clipboard_write_tool,
     screenshot_tool,
     list_processes_tool,
     get_active_window_tool,
@@ -2432,45 +1538,22 @@ tools_list = [{"function_declarations": [
     show_memory_tool,
     analyze_screen_tool,
     read_screen_text_tool,
-    set_reminder_tool,
-    set_schedule_tool,
-    list_schedules_tool,
-    delete_schedule_tool,
+    reminder_tool,
+    schedule_tool,
     show_calendar_tool,
     brief_me_day_tool,
     day_recap_tool,
     good_night_tool,
-    list_reminders_tool,
-    cancel_reminder_tool,
     recognize_face_tool,
     remember_face_tool,
-    plan_tasks_tool,
-    update_task_tool,
-    cancel_plan_tool,
-    get_plan_tool,
-    github_list_repos_tool,
-    github_create_repo_tool,
-    github_get_repo_tool,
-    github_create_pr_tool,
-    github_list_issues_tool,
-    github_create_issue_tool,
-    vercel_list_projects_tool,
-    vercel_deploy_tool,
-    vercel_list_deployments_tool,
-    vercel_get_deployment_tool,
-    netlify_list_sites_tool,
-    netlify_get_site_tool,
-    netlify_deploy_tool,
-    netlify_create_site_tool,
-    netlify_list_deploys_tool,
+    plan_tool,
+    github_tool,
+    vercel_tool,
+    netlify_tool,
     notepad_open_tool,
     notepad_write_tool,
     notepad_read_tool,
     view_file_tool,
-    go_to_sleep_tool,
-    wake_up_tool,
-    go_background_tool,
-    come_back_tool,
     mouse_click_tool,
     mouse_move_tool,
     mouse_scroll_tool,
@@ -2480,100 +1563,51 @@ tools_list = [{"function_declarations": [
     click_element_tool,
     type_into_tool,
     find_element_tool,
-    window_focus_tool,
-    window_list_tool,
-    window_move_tool,
-    create_folder_tool,
-    delete_items_tool,
-    rename_item_tool,
-    copy_item_tool,
-    move_item_tool,
-    list_drives_tool,
-    scroll_file_list_tool,
+    window_tool,
+    file_manager_tool,
     scrape_site_tool,
     export_data_tool,
     get_pagespeed_insights_tool,
     show_agents_tool,
-    shutdown_soda_tool,
-    shutdown_system_tool,
     start_website_project_tool,
     web_builder_answer_tool,
-    workbase_list_tool,
-    workbase_get_tool,
-    workbase_save_progress_tool,
-    workbase_import_tool,
-    workbase_save_context_tool,
-    workbase_compare_tool,
+    workbase_tool,
     whatsapp_find_and_call_tool,
     whatsapp_find_and_message_tool,
     check_whatsapp_tool,
     reply_whatsapp_tool,
     read_whatsapp_chat_tool,
-    create_scheduled_task_tool,
-    list_scheduled_tasks_tool,
-    delete_scheduled_task_tool,
+    scheduled_task_tool,
     open_app_tool,
     list_installed_apps_tool,
     webview_action_tool,
     take_photo_tool,
     open_camera_tool,
     camera_control_tool,
-    welcome_home_tool,
     control_system_tool,
     *FEELINGS_TOOLS_SCHEMA,
     *IELTS_TOOLS,
     pentest_target_tool,
     pentest_browser_target_tool,
-    open_pastebox_tool,
     browser_command_tool,
     search_youtube_tool,
     app_search_tool,
     app_scroll_tool,
-    credential_save_tool,
-    credential_get_tool,
-    credential_list_tool,
-    credential_delete_tool,
-    browser_automate_tool,
-
-    # ── Hermes-Style Browser Automation ──
-    browser_navigate_tool,
-    browser_snapshot_tool,
-    browser_click_tool,
-    browser_type_tool,
-    browser_scroll_tool,
-    browser_back_tool,
-    browser_press_tool,
-    browser_vision_tool,
-    browser_console_tool,
-    browser_get_images_tool,
-    browser_dialog_tool,
-    browser_cdp_tool,
-
-    # ── Lead Finder ──
-    find_leads_tool,
-    enrich_leads_tool,
-    export_leads_tool,
+    credential_tool,
 
     # ── Research Engine V2 ──
     deep_research_tool,
     export_research_tool,
 
     # ── Background Agent Management ──
-    bg_spawn_tool,
-    bg_status_tool,
-    bg_kill_tool,
-    bg_list_tool,
+    bg_tasks_tool,
 
     # ── OpenCode Remote Tasks ──
-    opencode_start_tool,
-    opencode_status_tool,
-    opencode_stop_tool,
+    opencode_tool,
     notebook_read_tool,
     notebook_search_tool,
 
-    read_emails_tool,
-    send_email_tool,
-    email_config_tool,
+    email_tool,
 
     # ── Custom Memory Schemas ──
     create_memory_schema_tool,
@@ -2582,18 +1616,7 @@ tools_list = [{"function_declarations": [
     query_custom_memory_tool,
 
     # ── Project Registry ──
-    register_project_tool,
-    list_projects_tool,
-    query_project_tool,
-    query_all_projects_tool,
-    remove_project_tool,
-
-    # ── Spotify Music Control ──
-    spotify_search_tool,
-    spotify_play_tool,
-    spotify_play_playlist_tool,
-    spotify_control_tool,
-    spotify_now_playing_tool,
+    project_registry_tool,
 
     
 ]}]

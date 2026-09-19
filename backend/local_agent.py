@@ -79,7 +79,6 @@ LOCAL_TOOLS = [
     "scroll_file_list", "view_file",
     "terminal_execute", "execute_command", "open_app", "list_installed_apps", "refresh_app_registry", "close_window", "close_app",
     "control_system", "screenshot", "screenshot_region",
-    "clipboard_read", "clipboard_write",
     "mouse_click", "mouse_move", "mouse_scroll", "mouse_drag",
     "mouse_get_pos", "mouse_hover", "mouse_right_click",
     "keyboard_type", "keyboard_press", "keyboard_hotkey",
@@ -90,7 +89,6 @@ LOCAL_TOOLS = [
     "get_active_window", "list_processes", "process_kill",
     "get_system_status",
     "analyze_screen", "read_screen_text", "recognize_face",
-    "go_to_sleep", "wake_up", "go_background", "come_back",
     "ui_find_image", "ui_click_image", "ui_click_text",
     "ui_wait_for_image", "ui_drag_drop",
     "system_volume", "system_brightness",
@@ -99,14 +97,7 @@ LOCAL_TOOLS = [
     "env_get", "file_compress", "file_download",
     "browser_command",
     "app_search", "app_scroll",
-    "browser_automate",
-    # Hermes-style browser automation (Playwright-based)
-    "browser_navigate", "browser_snapshot", "browser_click", "browser_type",
-    "browser_scroll", "browser_back", "browser_press", "browser_vision",
-    "browser_console", "browser_get_images", "browser_dialog", "browser_cdp",
-    "credential_save", "credential_get", "credential_list", "credential_delete",
-    # Spotify music control
-    "spotify_search", "spotify_play", "spotify_play_playlist", "spotify_control", "spotify_now_playing",
+    "credential",
 ]
 
 HAS_PYAUTOGUI = False
@@ -1517,21 +1508,6 @@ def _dispatch(tool, args):
             return {"success": True}
         return {"success": False, "error": "Window not found"}
 
-    # ── Clipboard ─────────────────────────────────────────────────
-    elif tool == "clipboard_read":
-        if HAS_PYPERCLIP:
-            import pyperclip
-            text = pyperclip.paste()
-            return {"success": True, "text": text, "length": len(text)}
-        return {"success": False, "error": "pyperclip required"}
-
-    elif tool == "clipboard_write":
-        if HAS_PYPERCLIP:
-            import pyperclip
-            pyperclip.copy(args.get("text", ""))
-            return {"success": True}
-        return {"success": False, "error": "pyperclip required"}
-
     # ── Processes / System ────────────────────────────────────────
     elif tool == "list_processes":
         if HAS_PSUTIL:
@@ -2236,46 +2212,47 @@ def _dispatch(tool, args):
 
         return {"success": True, "app": app_name, "direction": direction, "detail": f"Scrolled {direction} in {app_name}"}
 
-    # ── Credential Manager ──────────────────────────────────────────
-    elif tool == "credential_save":
-        service = args.get("service", "")
-        username = args.get("username", "")
-        password = args.get("password", "")
-        if not all([service, username, password]):
-            return {"success": False, "error": "service, username, and password are required"}
-        entries = _load_credentials()
-        existing = [e for e in entries if e["service"] != service]
-        existing.append({"service": service, "username": username, "password": password})
-        if _save_credentials(existing):
-            return {"success": True, "service": service, "username": username, "detail": f"Saved credentials for {service}"}
-        return {"success": False, "error": "Failed to save credentials"}
-
-    elif tool == "credential_get":
-        service = args.get("service", "")
-        if not service:
-            return {"success": False, "error": "service is required"}
-        entries = _load_credentials()
-        for e in entries:
-            if e["service"] == service:
-                return {"success": True, "service": service, "username": e["username"], "password": e["password"]}
-        return {"success": False, "error": f"No credentials found for {service}"}
-
-    elif tool == "credential_list":
-        entries = _load_credentials()
-        services = [{"service": e["service"], "username": e["username"]} for e in entries]
-        return {"success": True, "services": services, "count": len(services)}
-
-    elif tool == "credential_delete":
-        service = args.get("service", "")
-        if not service:
-            return {"success": False, "error": "service is required"}
-        entries = _load_credentials()
-        filtered = [e for e in entries if e["service"] != service]
-        if len(filtered) == len(entries):
+    # ── Credential Manager (consolidated: 4 -> 1) ──────────────────────
+    elif tool == "credential":
+        action = args.get("action", "list")
+        if action == "save":
+            service = args.get("service", "")
+            username = args.get("username", "")
+            password = args.get("password", "")
+            if not all([service, username, password]):
+                return {"success": False, "error": "service, username, and password are required"}
+            entries = _load_credentials()
+            existing = [e for e in entries if e["service"] != service]
+            existing.append({"service": service, "username": username, "password": password})
+            if _save_credentials(existing):
+                return {"success": True, "service": service, "username": username, "detail": f"Saved credentials for {service}"}
+            return {"success": False, "error": "Failed to save credentials"}
+        elif action == "get":
+            service = args.get("service", "")
+            if not service:
+                return {"success": False, "error": "service is required"}
+            entries = _load_credentials()
+            for e in entries:
+                if e["service"] == service:
+                    return {"success": True, "service": service, "username": e["username"], "password": e["password"]}
             return {"success": False, "error": f"No credentials found for {service}"}
-        if _save_credentials(filtered):
-            return {"success": True, "service": service, "detail": f"Deleted credentials for {service}"}
-        return {"success": False, "error": "Failed to save"}
+        elif action == "list":
+            entries = _load_credentials()
+            services = [{"service": e["service"], "username": e["username"]} for e in entries]
+            return {"success": True, "services": services, "count": len(services)}
+        elif action == "delete":
+            service = args.get("service", "")
+            if not service:
+                return {"success": False, "error": "service is required"}
+            entries = _load_credentials()
+            filtered = [e for e in entries if e["service"] != service]
+            if len(filtered) == len(entries):
+                return {"success": False, "error": f"No credentials found for {service}"}
+            if _save_credentials(filtered):
+                return {"success": True, "service": service, "detail": f"Deleted credentials for {service}"}
+            return {"success": False, "error": "Failed to save"}
+        else:
+            return {"success": False, "error": f"Unknown credential action: {action}"}
 
     # ── Browser Automation ──────────────────────────────────────────
     elif tool == "browser_automate":

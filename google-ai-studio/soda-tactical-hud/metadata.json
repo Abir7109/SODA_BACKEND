@@ -1,6 +1,0 @@
-{
-  "name": "Soda Tactical HUD",
-  "description": "Tactical HUD components featuring 11 tool animation cards with modular states, dense key-value telemetry, and empty input fields for live data mapping.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

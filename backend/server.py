@@ -79,18 +79,18 @@ async def lifespan(_app):
     log.debug(f"Python Version: {sys.version}")
     try:
         loop = asyncio.get_running_loop()
-        print(f"[SERVER DEBUG] Running Loop: {type(loop)}")
+        log.debug(f"[SERVER DEBUG] Running Loop: {type(loop)}")
         policy = asyncio.get_event_loop_policy()
-        print(f"[SERVER DEBUG] Current Policy: {type(policy)}")
+        log.debug(f"[SERVER DEBUG] Current Policy: {type(policy)}")
     except Exception as e:
         log.debug(f"Error checking loop: {e}")
-    print("[SERVER] Startup: Kasa agent removed in cleanup")
+    log.info("[SERVER] Startup: Kasa agent removed in cleanup")
 
     reminder_task = None
     try:
         from reminders import reminder_loop
         reminder_task = asyncio.create_task(reminder_loop(sio, interval=5))
-        print("[SERVER] Reminder scheduler started")
+        log.info("[SERVER] Reminder scheduler started")
     except Exception as e:
         log.warning(f"Reminder scheduler failed to start: {e}")
 
@@ -104,7 +104,7 @@ async def lifespan(_app):
             # Log bridge status summary
             agent_count = len(_connected_agents)
             agent_names = [a.get('machine_id', '?') for a in _connected_agents.values()]
-            log.info(f"[BRIDGE STATUS] Agents connected: {agent_count} ({', '.join(agent_names) if agent_names else 'none'})")
+            log.debug(f"[BRIDGE STATUS] Agents connected: {agent_count} ({', '.join(agent_names) if agent_names else 'none'})")
             if _connected_agents:
                 for sid, agent_info in list(_connected_agents.items()):
                     machine_id = agent_info.get('machine_id', sid)
@@ -114,11 +114,11 @@ async def lifespan(_app):
                     if last_pong:
                         last_pong_dt = datetime.fromisoformat(last_pong)
                         elapsed = (now - last_pong_dt).total_seconds()
-                        print(f"[AGENT] Health: {machine_id} — {tools} tools, {apps} apps, last_pong: {elapsed:.0f}s ago")
+                        log.debug(f"[AGENT] Health: {machine_id} — {tools} tools, {apps} apps, last_pong: {elapsed:.0f}s ago")
                         if elapsed > stale_threshold:
                             stale_sids.append(sid)
                     else:
-                        print(f"[AGENT] Health: {machine_id} — {tools} tools, {apps} apps, never ponged")
+                        log.debug(f"[AGENT] Health: {machine_id} — {tools} tools, {apps} apps, never ponged")
                         # Give new agents 120s grace period before marking stale
                         connected_at = agent_info.get('connected_at')
                         if connected_at:
@@ -128,7 +128,7 @@ async def lifespan(_app):
                 for stale_sid in stale_sids:
                     stale_agent = _connected_agents.pop(stale_sid, None)
                     if stale_agent:
-                        print(f"[AGENT] Evicted stale agent: {stale_agent.get('machine_id', stale_sid)} (no pong >{stale_threshold}s)")
+                        log.info(f"[AGENT] Evicted stale agent: {stale_agent.get('machine_id', stale_sid)} (no pong >{stale_threshold}s)")
                         await sio.emit('agent_connection_status', {
                             'connected': False,
                             'machine_id': stale_agent.get('machine_id', stale_sid),
@@ -136,9 +136,9 @@ async def lifespan(_app):
                             'reason': 'stale_timeout'
                         })
             else:
-                print("[AGENT] Health: NO AGENTS CONNECTED — local desktop agent not running")
+                log.debug("[AGENT] Health: NO AGENTS CONNECTED — local desktop agent not running")
     _health_task = asyncio.create_task(_agent_health_logger())
-    print("[SERVER] Agent health logger started (60s interval, stale eviction >90s)")
+    log.info("[SERVER] Agent health logger started (60s interval, stale eviction >90s)")
 
     yield
 
@@ -154,7 +154,7 @@ async def lifespan(_app):
             await reminder_task
         except asyncio.CancelledError:
             pass
-        print("[SERVER] Reminder scheduler stopped")
+        log.info("[SERVER] Reminder scheduler stopped")
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -176,14 +176,14 @@ audio_loop = None
 # --- SHUTDOWN HANDLER ---
 def signal_handler(sig, frame):
     global audio_loop
-    print(f"\n[SERVER] Caught signal {sig}. Exiting gracefully...")
+    log.warning(f"Caught signal {sig}. Exiting gracefully...")
     if audio_loop:
         try:
-            print("[SERVER] Stopping Audio Loop...")
-            audio_loop.stop() 
+            log.warning("Stopping Audio Loop...")
+            audio_loop.stop()
         except:
             pass
-    print("[SERVER] Force exiting...")
+    log.warning("Force exiting...")
     os._exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -220,7 +220,7 @@ def load_settings():
                          SETTINGS["tool_permissions"].update(v)
                     else:
                         SETTINGS[k] = v
-            print(f"Loaded settings: {SETTINGS}")
+            log.info(f"Loaded settings: {SETTINGS}")
         except Exception as e:
             log.error(f"Error loading settings: {e}")
 
@@ -228,7 +228,7 @@ def save_settings():
     try:
         with open(SETTINGS_FILE, 'w') as f:
             json.dump(SETTINGS, f, indent=4)
-        print("Settings saved.")
+        log.info("Settings saved.")
     except Exception as e:
         log.error(f"Error saving settings: {e}")
 
@@ -249,11 +249,11 @@ async def _wake_wsl():
             stderr=asyncio.subprocess.DEVNULL,
         )
         await asyncio.wait_for(proc.wait(), timeout=15)
-        print("[WSL] Kali Linux is ready")
+        log.info("[WSL] Kali Linux is ready")
     except FileNotFoundError:
-        print("[WSL] WSL not found — pentest tools will not work. Install WSL 2 + Kali Linux.")
+        log.info("[WSL] WSL not found — pentest tools will not work. Install WSL 2 + Kali Linux.")
     except Exception as e:
-        print(f"[WSL] Could not start Kali: {e}")
+        log.info(f"[WSL] Could not start Kali: {e}")
 
 @app.get("/")
 async def root():
@@ -296,7 +296,7 @@ async def http_remove_project(project_id: str):
 @sio.event
 async def connect(sid, environ):
     _client_addresses[sid] = environ.get('REMOTE_ADDR', environ.get('HTTP_X_FORWARDED_FOR', 'unknown'))
-    print(f"Client connected: {sid} from {_client_addresses[sid]}")
+    log.info(f"Client connected: {sid} from {_client_addresses[sid]}")
     await sio.emit('status', {'msg': 'Connected to S.O.D.A Backend'}, room=sid)
     # No auth required - auto-authenticate
     await sio.emit('auth_status', {'authenticated': True})
@@ -304,10 +304,10 @@ async def connect(sid, environ):
 @sio.event
 async def disconnect(sid):
     global audio_loop, loop_task
-    print(f"Client disconnected: {sid}")
+    log.info(f"Client disconnected: {sid}")
 
     if audio_loop and getattr(audio_loop, '_owner_sid', None) == sid:
-        print("Disconnecting - stopping audio loop owned by this client")
+        log.info("Disconnecting - stopping audio loop owned by this client")
         if loop_task and not loop_task.done():
             loop_task.cancel()
         loop_task = None
@@ -320,8 +320,8 @@ async def disconnect(sid):
         connected_at = agent.get('connected_at', '?')
         tools_count = len(agent.get('tools', []))
         agent_type = agent.get('agent_type', 'desktop')
-        print(f"[AGENT] Agent disconnected: {machine_id} (type={agent_type}, {tools_count} tools, connected since {connected_at})")
-        print(f"[AGENT] Active agents remaining: {len(_connected_agents)}")
+        log.info(f"[AGENT] Agent disconnected: {machine_id} (type={agent_type}, {tools_count} tools, connected since {connected_at})")
+        log.info(f"[AGENT] Active agents remaining: {len(_connected_agents)}")
         await sio.emit('agent_connection_status', {
             'connected': False,
             'machine_id': machine_id,
@@ -350,7 +350,7 @@ async def agent_register(sid, data):
             if new_tools >= old_tools:
                 stale = _connected_agents.pop(old_sid, None)
                 if stale:
-                    print(f"[AGENT] Replaced stale agent: {machine_id} ({old_tools}→{new_tools} tools, old SID: {old_sid})")
+                    log.info(f"[AGENT] Replaced stale agent: {machine_id} ({old_tools}→{new_tools} tools, old SID: {old_sid})")
     _connected_agents[sid] = {
         'agent_type': 'desktop',
         'machine_id': machine_id,
@@ -360,9 +360,9 @@ async def agent_register(sid, data):
         'connected_at': datetime.now().isoformat(),
         'sid': sid,
     }
-    print(f"[AGENT] ✅ Registered: {machine_id} ({platform}) — {len(tools)} tools, {app_count} apps in registry")
-    print(f"[AGENT]    SID: {sid}")
-    print(f"[AGENT]    Available tools: {', '.join(tools[:10])}{'...' if len(tools) > 10 else ''}")
+    log.info(f"[AGENT] ✅ Registered: {machine_id} ({platform}) — {len(tools)} tools, {app_count} apps in registry")
+    log.info(f"[AGENT]    SID: {sid}")
+    log.info(f"[AGENT]    Available tools: {', '.join(tools[:10])}{'...' if len(tools) > 10 else ''}")
     await sio.emit('agent_connection_status', {
         'connected': True,
         'machine_id': machine_id,
@@ -378,7 +378,7 @@ async def agent_disconnect(sid, data=None):
     if agent:
         machine_id = agent.get('machine_id', sid)
         agent_type = agent.get('agent_type', 'desktop')
-        print(f"[AGENT] Agent disconnected (explicit): {machine_id} (type={agent_type})")
+        log.info(f"[AGENT] Agent disconnected (explicit): {machine_id} (type={agent_type})")
         await sio.emit('agent_connection_status', {
             'connected': False,
             'machine_id': machine_id,
@@ -398,7 +398,7 @@ async def agent_tool_result(sid, data):
         future.set_result(result)
         _pending_agent_results.pop(callback_id, None)
     else:
-        print(f"[AGENT] Orphaned tool result: {callback_id} (agent: {_connected_agents.get(sid, {}).get('machine_id', sid)})")
+        log.info(f"[AGENT] Orphaned tool result: {callback_id} (agent: {_connected_agents.get(sid, {}).get('machine_id', sid)})")
 
 @sio.event
 async def agent_pong(sid, data):
@@ -412,15 +412,15 @@ async def agent_push(sid, data):
     """Agent-initiated push — agent sends updates without being asked."""
     agent_info = _connected_agents.get(sid)
     if not agent_info:
-        print(f"[AGENT_PUSH] Unknown agent {sid}, ignoring")
+        log.info(f"[AGENT_PUSH] Unknown agent {sid}, ignoring")
         return
     push_type = data.get("type", "unknown")
     task_id = data.get("task_id", "")
     text = data.get("text", "")
-    print(f"[AGENT_PUSH] type={push_type} task={task_id} from={agent_info.get('machine_id', sid)}")
+    log.info(f"[AGENT_PUSH] type={push_type} task={task_id} from={agent_info.get('machine_id', sid)}")
 
     if not audio_loop:
-        print("[AGENT_PUSH] audio_loop not initialized")
+        log.info("[AGENT_PUSH] audio_loop not initialized")
         return
 
     # Handle OpenCode-specific updates
@@ -444,7 +444,7 @@ async def agent_push(sid, data):
                     await save_task(task_id, task.folder, task.prompt, "failed",
                                   error=text, output_summary=task.summary())
         except Exception as e:
-            print(f"[AGENT_PUSH] Error handling {push_type}: {e}")
+            log.info(f"[AGENT_PUSH] Error handling {push_type}: {e}")
 
     # Inject into SODA's Gemini session for voice response
     formatted = f"[Agent update: {push_type}] {text}"
@@ -454,7 +454,7 @@ async def agent_push(sid, data):
 async def start_audio(sid, data=None):
     global audio_loop, loop_task
     
-    print("Starting Audio Loop...")
+    log.info("Starting Audio Loop...")
 
     agent_type = (data or {}).get('agent_type', 'desktop')
     
@@ -467,14 +467,14 @@ async def start_audio(sid, data=None):
             device_index = data['device_index']
         if 'device_name' in data:
             device_name = data['device_name']
-    print(f"Using input device: Name='{device_name}', Index={device_index}, mic_source={mic_source}")
+    log.info(f"Using input device: Name='{device_name}', Index={device_index}, mic_source={mic_source}")
     
     if audio_loop:
         if loop_task and (loop_task.done() or loop_task.cancelled()):
-             print("Audio loop task appeared finished/cancelled. Clearing and restarting...")
+             log.info("Audio loop task appeared finished/cancelled. Clearing and restarting...")
              audio_loop = None
         else:
-             print("Audio loop already running. Re-connecting client to session.")
+             log.info("Audio loop already running. Re-connecting client to session.")
              await sio.emit('status', {'msg': 'S.O.D.A Already Running'})
              return
 
@@ -490,12 +490,12 @@ async def start_audio(sid, data=None):
     # Callback to send Confirmation Request to frontend
     def on_tool_confirmation(data):
         # data = {"id": "uuid", "tool": "tool_name", "args": {...}}
-        print(f"Requesting confirmation for tool: {data.get('tool')}")
+        log.info(f"Requesting confirmation for tool: {data.get('tool')}")
         asyncio.create_task(sio.emit('tool_confirmation_request', data))
 
     # Callback to send Project Update to frontend
     def on_project_update(project_name):
-        print(f"Sending Project Update: {project_name}")
+        log.info(f"Sending Project Update: {project_name}")
         asyncio.create_task(sio.emit('project_update', {'project': project_name}))
 
     # Callback to send Error to frontend
@@ -509,7 +509,7 @@ async def start_audio(sid, data=None):
 
     # Initialize SODA
     try:
-        print(f"Initializing AudioLoop with device_index={device_index}")
+        log.info(f"Initializing AudioLoop with device_index={device_index}")
         audio_loop = soda.AudioLoop(
             video_mode="none",
             sio=sio,
@@ -525,7 +525,7 @@ async def start_audio(sid, data=None):
             mic_source=mic_source,
         )
         audio_loop._owner_sid = sid
-        print("AudioLoop initialized successfully.")
+        log.info("AudioLoop initialized successfully.")
 
         # Build greeting for start message — reference the previous session when known
         start_msg = ("Greet your owner warmly and funnily in ONE short sentence. "
@@ -572,16 +572,16 @@ async def start_audio(sid, data=None):
             from translation_agent import translation_agent
             if SETTINGS.get("user_native_lang"):
                 translation_agent.set_native_language(SETTINGS["user_native_lang"])
-                print(f"[SERVER] Applied native language: {SETTINGS['user_native_lang']}")
+                log.info(f"[SERVER] Applied native language: {SETTINGS['user_native_lang']}")
         except Exception as e:
             log.warning(f"Translation agent init failed: {e}")
         
         # Check initial mute state
         if data and data.get('muted', False):
-            print("Starting with Audio Paused")
+            log.info("Starting with Audio Paused")
             audio_loop.set_paused(True)
 
-        print("Creating asyncio task for AudioLoop.run()")
+        log.info("Creating asyncio task for AudioLoop.run()")
         loop_task = asyncio.create_task(audio_loop.run())
 
         # Wake Kali WSL in background (non-blocking, proper event loop)
@@ -605,10 +605,8 @@ async def start_audio(sid, data=None):
             try:
                 task.result()
             except asyncio.CancelledError:
-                print("Audio Loop Cancelled")
                 log.info("Audio Loop Cancelled")
             except Exception as e:
-                print(f"Audio Loop Crashed: {e}")
                 log.error(f"Audio Loop Crashed: {e}")
 
         loop_task.add_done_callback(handle_loop_exit)
@@ -624,7 +622,7 @@ async def start_audio(sid, data=None):
 
         _scheduler_task.add_done_callback(handle_scheduler_exit)
 
-        print("Emitting 'SODA Started'")
+        log.info("Emitting 'SODA Started'")
         await sio.emit('status', {'msg': 'SODA Started'})
         
     except Exception as e:
@@ -638,7 +636,7 @@ async def stop_audio(sid):
     global audio_loop, loop_task, _scheduler_task
     if audio_loop:
         audio_loop.stop()
-        print("Stopping Audio Loop")
+        log.info("Stopping Audio Loop")
         # Cancel the loop task if running
         if loop_task and not loop_task.done():
             loop_task.cancel()
@@ -663,7 +661,7 @@ async def pause_audio(sid):
     global audio_loop
     if audio_loop:
         audio_loop.set_paused(True)
-        print("Pausing Audio")
+        log.info("Pausing Audio")
         await sio.emit('status', {'msg': 'Audio Paused'})
 
 @sio.event
@@ -671,7 +669,7 @@ async def resume_audio(sid):
     global audio_loop
     if audio_loop:
         audio_loop.set_paused(False)
-        print("Resuming Audio")
+        log.info("Resuming Audio")
         await sio.emit('status', {'msg': 'Audio Resumed'})
 
 @sio.event
@@ -680,12 +678,12 @@ async def confirm_tool(sid, data):
     request_id = data.get('id')
     confirmed = data.get('confirmed', False)
 
-    print(f"[SERVER DEBUG] Received confirmation response for {request_id}: {confirmed}")
+    log.debug(f"[SERVER DEBUG] Received confirmation response for {request_id}: {confirmed}")
 
     if audio_loop:
         audio_loop.resolve_tool_confirmation(request_id, confirmed)
     else:
-        print("Audio loop not active, cannot resolve confirmation.")
+        log.info("Audio loop not active, cannot resolve confirmation.")
 
 
 @sio.event
@@ -738,7 +736,7 @@ async def force_tool(sid, data):
     if not tool:
         await sio.emit('error', {'msg': 'force_tool: missing tool name'}, room=sid)
         return
-    print(f"[SERVER] force_tool: {tool} args={args}")
+    log.info(f"[SERVER] force_tool: {tool} args={args}")
     try:
         if tool == 'terminal_execute':
             from system_app import _run_terminal_command_unchecked
@@ -861,15 +859,6 @@ async def force_tool(sid, data):
         elif tool == 'open_app':
             from system_app import open_app
             r = open_app(args.get('app_name', ''))
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'clipboard_read':
-            from system_local import clipboard_read
-            r = clipboard_read()
-            await sio.emit('clipboard_content', {'text': r.get('text', ''), 'length': r.get('length', 0), 'success': r.get('success', False), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'clipboard_write':
-            from system_local import clipboard_write
-            r = clipboard_write(args.get('text', ''))
             await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
         elif tool == 'screenshot':
             from system_local import take_screenshot
@@ -1081,34 +1070,34 @@ async def shutdown(sid, data=None):
     """Gracefully shutdown the server when the application closes."""
     global audio_loop, loop_task, _scheduler_task
     
-    print("[SERVER] ========================================")
-    print("[SERVER] SHUTDOWN SIGNAL RECEIVED FROM FRONTEND")
-    print("[SERVER] ========================================")
+    log.warning("========================================")
+    log.warning("SHUTDOWN SIGNAL RECEIVED FROM FRONTEND")
+    log.warning("========================================")
     
     # Stop audio loop
     if audio_loop:
-        print("[SERVER] Stopping Audio Loop...")
+        log.warning("[SERVER] Stopping Audio Loop...")
         audio_loop.stop()
         audio_loop = None
     
     # Cancel the loop task if running
     if loop_task and not loop_task.done():
-        print("[SERVER] Cancelling loop task...")
+        log.info("[SERVER] Cancelling loop task...")
         loop_task.cancel()
         loop_task = None
     
     # Cancel scheduler task
     if _scheduler_task and not _scheduler_task.done():
-        print("[SERVER] Cancelling scheduler task...")
+        log.info("[SERVER] Cancelling scheduler task...")
         _scheduler_task.cancel()
         _scheduler_task = None
     
-    print("[SERVER] Graceful shutdown complete. Terminating process...")
+    log.info("[SERVER] Graceful shutdown complete. Terminating process...")
 
 @sio.event
 async def user_input(sid, data):
     text = data.get('text')
-    print(f"[SERVER DEBUG] User input received: '{text}'")
+    log.debug(f"[SERVER DEBUG] User input received: '{text}'")
 
     if not audio_loop:
         log.warning("Audio loop is None. Cannot send text.")
@@ -1121,7 +1110,7 @@ async def user_input(sid, data):
         return
 
     if text:
-        print(f"[SERVER DEBUG] Sending message to model: '{text}'")
+        log.debug(f"[SERVER DEBUG] Sending message to model: '{text}'")
 
         # Log User Input to Project History
         if audio_loop and hasattr(audio_loop, 'project_manager') and audio_loop.project_manager:
@@ -1134,7 +1123,7 @@ async def user_input(sid, data):
             stored = memory_store.extract_and_store_people(text)
             if stored:
                 names = ", ".join(s["name"] for s in stored)
-                print(f"[MEMORY] Auto-stored people from introduction: {names}")
+                log.info(f"[MEMORY] Auto-stored people from introduction: {names}")
                 await sio.emit('memory_update', {
                     'type': 'people',
                     'stored': stored,
@@ -1144,12 +1133,12 @@ async def user_input(sid, data):
             log.error(f"Passive memory extraction error: {e}")
 
         await audio_loop.session.send(input=text, end_of_turn=True)
-        print(f"[SERVER DEBUG] Message sent to model successfully.")
+        log.debug(f"[SERVER DEBUG] Message sent to model successfully.")
 
 @sio.event
 async def announce(sid, data):
     text = data.get('text', '')
-    print(f"[SERVER] Announce: '{text}'")
+    log.info(f"[SERVER] Announce: '{text}'")
     
     # Announcement should speak WITHOUT conversation
     # Send a system-like message that gets processed as TTS only
@@ -1159,7 +1148,7 @@ async def announce(sid, data):
             # Use a special format to indicate this is announcement-only
             announcement_text = f"[ANNOUNCEMENT] {text}"
             await audio_loop.session.send(input=announcement_text, end_of_turn=True)
-            print("[SERVER] Announcement sent to model for TTS")
+            log.info("[SERVER] Announcement sent to model for TTS")
         except Exception as e:
             log.error(f"Announce error: {e}")
 
@@ -1168,14 +1157,14 @@ async def video_frame(sid, data):
     # data should contain 'image' which is binary (blob) or base64 encoded
     image_data = data.get('image')
     if image_data and audio_loop:
-        print(f"[SERVER] video_frame received: {len(str(image_data))} chars")
+        log.debug(f"[SERVER] video_frame received: {len(str(image_data))} chars")
         # We don't await this because we don't want to block the socket handler
         # But send_frame is async, so we create a task
         asyncio.create_task(audio_loop.send_frame(image_data))
     elif not image_data:
-        print(f"[SERVER] video_frame: no image data in payload, keys={list(data.keys())}")
+        log.debug(f"[SERVER] video_frame: no image data in payload, keys={list(data.keys())}")
     elif not audio_loop:
-        print(f"[SERVER] video_frame: audio_loop is None, frame dropped")
+        log.debug(f"[SERVER] video_frame: audio_loop is None, frame dropped")
 
 @sio.event
 async def camera_frame(sid, data):
@@ -1208,7 +1197,7 @@ async def save_memory(sid, data):
     try:
         messages = data.get('messages', [])
         if not messages:
-            print("No messages to save.")
+            log.info("No messages to save.")
             return
 
         # Ensure directory exists
@@ -1235,7 +1224,7 @@ async def save_memory(sid, data):
                 sender = msg.get('sender', 'Unknown')
                 text = msg.get('text', '')
                 f.write(f"[{sender}] {text}\n")
-        print(f"Conversation saved to {filename}")
+        log.info(f"Conversation saved to {filename}")
         await sio.emit('status', {'msg': 'Memory Saved Successfully'})
 
     except Exception as e:
@@ -1244,11 +1233,11 @@ async def save_memory(sid, data):
 
 @sio.event
 async def upload_memory(sid, data):
-    print(f"Received memory upload request")
+    log.info(f"Received memory upload request")
     try:
         memory_text = data.get('memory', '')
         if not memory_text:
-            print("No memory data provided.")
+            log.info("No memory data provided.")
             return
 
         if not audio_loop:
@@ -1262,11 +1251,11 @@ async def upload_memory(sid, data):
              return
 
         # Send to model
-        print("Sending memory context to model...")
+        log.info("Sending memory context to model...")
         context_msg = f"System Notification: The user has uploaded a long-term memory file. Please load the following context into your understanding. The format is a text log of previous conversations:\n\n{memory_text}"
         
         await audio_loop.session.send(input=context_msg, end_of_turn=True)
-        print("Memory context sent successfully.")
+        log.info("Memory context sent successfully.")
         await sio.emit('status', {'msg': 'Memory Loaded into Context'})
 
     except Exception as e:
@@ -1280,7 +1269,7 @@ async def get_settings(sid):
 @sio.event
 async def update_settings(sid, data):
     # Generic update
-    print(f"Updating settings: {data}")
+    log.info(f"Updating settings: {data}")
     
     # Handle specific keys if needed
     if "tool_permissions" in data:
@@ -1290,14 +1279,14 @@ async def update_settings(sid, data):
 
     if "camera_flipped" in data:
         SETTINGS["camera_flipped"] = data["camera_flipped"]
-        print(f"[SERVER] Camera flip set to: {data['camera_flipped']}")
+        log.info(f"[SERVER] Camera flip set to: {data['camera_flipped']}")
 
     if "user_native_lang" in data:
         SETTINGS["user_native_lang"] = data["user_native_lang"]
         # Update translation agent
         from translation_agent import translation_agent
         translation_agent.set_native_language(data["user_native_lang"])
-        print(f"[SERVER] Native language set to: {data['user_native_lang']}")
+        log.info(f"[SERVER] Native language set to: {data['user_native_lang']}")
 
     save_settings()
     # Broadcast new full settings
@@ -1311,7 +1300,7 @@ async def get_tool_permissions(sid):
 
 @sio.event
 async def update_tool_permissions(sid, data):
-    print(f"Updating permissions (legacy event): {data}")
+    log.info(f"Updating permissions (legacy event): {data}")
     SETTINGS["tool_permissions"].update(data)
     save_settings()
     
@@ -1332,10 +1321,10 @@ async def audio_control(sid, data=None):
     
     if audio_loop:
         audio_loop.set_paused(muted)
-        print(f"Audio {'muted' if muted else 'unmuted'}")
+        log.info(f"Audio {'muted' if muted else 'unmuted'}")
         await sio.emit('status', {'msg': f"Audio {'muted' if muted else 'unmuted'}"})
     else:
-        print("No audio loop running")
+        log.info("No audio loop running")
 
 @sio.event
 async def close_panel(sid, data=None):
@@ -1343,7 +1332,7 @@ async def close_panel(sid, data=None):
     if not data:
         return
     panel = data.get('panel', '')
-    print(f"[SODA] Backend closing panel: {panel}")
+    log.info(f"[SODA] Backend closing panel: {panel}")
     await sio.emit('close_panel', {'panel': panel}, room=sid)
 
 
@@ -1352,7 +1341,7 @@ async def handle_wake_up(sid, data=None):
     global _audio_loop
     if _audio_loop:
         await _audio_loop._exit_idle_mode()
-        print("[SODA] Widget click wake_up — exited idle mode")
+        log.info("[SODA] Widget click wake_up — exited idle mode")
 
 @sio.on("client_log")
 async def handle_client_log(sid, data):
@@ -1385,7 +1374,7 @@ async def notepad_save(sid, data=None):
     try:
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(content)
-        print(f"[SODA] Notepad saved: {filepath} ({len(content)} chars)")
+        log.info(f"[SODA] Notepad saved: {filepath} ({len(content)} chars)")
         await sio.emit('status', {'msg': f'Notepad saved as {filename}'}, room=sid)
     except Exception as e:
         log.error(f"Notepad save error: {e}")
@@ -1414,7 +1403,7 @@ async def control_window(sid, data=None):
     if not data:
         return
     action = data.get('action', '')
-    print(f"[SODA] Backend received control_window: {action}")
+    log.info(f"[SODA] Backend received control_window: {action}")
     # Send to all clients
     await sio.emit('window_control', {'action': action})
 
@@ -1426,7 +1415,7 @@ async def create_folder(sid, data=None):
     folder_path = data['path']
     try:
         os.makedirs(folder_path, exist_ok=True)
-        print(f"[SERVER] Created folder: {folder_path}")
+        log.info(f"[SERVER] Created folder: {folder_path}")
         await sio.emit('command_output', {
             'command': 'mkdir',
             'output': f'Created folder: {folder_path}',
@@ -1456,7 +1445,7 @@ async def webview_action_result(sid, data=None):
     if not data or not data.get('id'):
         return
     action_id = data['id']
-    print(f"[SODA] Webview action result: {data.get('action')} id={action_id}")
+    log.info(f"[SODA] Webview action result: {data.get('action')} id={action_id}")
     if hasattr(audio_loop, '_pending_webview_results'):
         future = audio_loop._pending_webview_results.get(action_id)
         if future and not future.done():
@@ -1490,13 +1479,13 @@ async def face_frame_response(sid, data=None):
     if not data or not data.get('id'):
         return
     request_id = data['id']
-    print(f"[SERVER] face_frame_response id={request_id[:8]}...")
+    log.info(f"[SERVER] face_frame_response id={request_id[:8]}...")
     if hasattr(audio_loop, '_pending_face_frames'):
         future = audio_loop._pending_face_frames.get(request_id)
         if future and not future.done():
             future.set_result(data.get('image'))
     else:
-        print(f"[SERVER] audio_loop has no _pending_face_frames")
+        log.info(f"[SERVER] audio_loop has no _pending_face_frames")
 
 
 @sio.event
@@ -1510,7 +1499,7 @@ async def frame_response(sid, data=None):
         if future and not future.done():
             future.set_result(data.get('image'))
     else:
-        print(f"[SERVER] frame_response: audio_loop has no _pending_frames")
+        log.info(f"[SERVER] frame_response: audio_loop has no _pending_frames")
 
 @sio.event
 async def browser_url_response(sid, data=None):
@@ -1524,23 +1513,8 @@ async def browser_url_response(sid, data=None):
             future.set_result(url)
         audio_loop._pending_browser_url = None
     else:
-        print("[SERVER] No pending browser URL request")
+        log.info("[SERVER] No pending browser URL request")
 
-
-@sio.event
-async def pastebox_content(sid, data=None):
-    """Receive pasted content from the frontend paste box."""
-    text = (data or {}).get("text", "")
-    if not text:
-        return
-    if hasattr(audio_loop, '_pending_pastebox') and audio_loop._pending_pastebox is not None:
-        future = audio_loop._pending_pastebox
-        if not future.done():
-            future.set_result(text)
-        audio_loop._pending_pastebox = None
-        print(f"[SERVER] pastebox_content: received {len(text)} chars")
-    else:
-        print("[SERVER] No pending pastebox request")
 
 
 @sio.event
@@ -1561,6 +1535,6 @@ async def browser_audio(sid, data):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
-    print(f"[SERVER] Starting on port {port}...")
-    print(f"[SERVER] Expecting local agent at desktop PC")
+    log.info(f"[SERVER] Starting on port {port}...")
+    log.info(f"[SERVER] Expecting local agent at desktop PC")
     uvicorn.run(app_socketio, host="0.0.0.0", port=port)

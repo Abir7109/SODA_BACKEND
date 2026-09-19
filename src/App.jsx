@@ -90,8 +90,6 @@ import PentestProgressIndicator from './components/PentestProgressIndicator'
 import GitHubPanel from './components/panels/GitHubPanel'
 import DeployPanel from './components/panels/DeployPanel'
 import PageSpeedPanel from './components/panels/PageSpeedPanel'
-import BrowserPanel from './components/panels/BrowserPanel'
-import LeadFinderPanel from './components/panels/LeadFinderPanel'
 import ResearchResultsPanel from './components/panels/ResearchResultsPanel'
 import BackgroundTaskPanel from './components/panels/BackgroundTaskPanel'
 import EmailPanel from './components/panels/EmailPanel'
@@ -103,7 +101,6 @@ import IELTSSpeakingPanel from './components/panels/IELTSSpeakingPanel'
 import IELTSReadingPanel from './components/panels/IELTSReadingPanel'
 import IELTSVocabPanel from './components/panels/IELTSVocabPanel'
 import IELTSProgressPanel from './components/panels/IELTSProgressPanel'
-import SpotifySearchPanel from './components/panels/SpotifySearchPanel'
 import WikipediaPanel from './components/panels/WikipediaPanel'
 import NewsPanel from './components/panels/NewsPanel'
 import CodePanel from './components/panels/CodePanel'
@@ -124,7 +121,6 @@ import NightWinddown from './components/NightWinddown'
 import DailyBriefingPanel from './components/panels/DailyBriefingPanel'
 import Notepad from './components/Notepad'
 import BackgroundWidget from './components/BackgroundWidget'
-import PasteBox from './components/pastebox/PasteBox'
 import CameraWidget from './components/CameraWidget'
 import useBrowserMic, { resumeMicAudio } from './services/useBrowserMic'
 // --- Frontend Error Logging ---
@@ -221,7 +217,7 @@ const STATUS_COLORS = {
 
 const TOOLS_WITH_OUTPUT = new Set([
   'write_file', 'read_file', 'read_directory',
-  'clipboard_read', 'clipboard_write', 'screenshot',
+  'screenshot',
   'run_code', 'list_processes', 'get_active_window',
   'create_project', 'switch_project', 'list_projects',
 ])
@@ -233,7 +229,7 @@ const TOOLS_WITH_INFO_PANEL = new Set([
   'get_user_profile', 'set_preference',
   'forget_fact', 'list_memory',
   'remember_person', 'recall_person', 'remember_lesson',
-  'list_reminders', 'cancel_reminder',
+  'reminder',
   'create_memory_schema', 'list_custom_schemas',
   'store_custom_memory', 'query_custom_memory',
 ])
@@ -247,7 +243,7 @@ const TOOLS_WITH_AGENT = new Set([
 ])
 
 const AI_CARD_TOOLS = new Set([
-  'get_system_status', 'get_weather', 'terminal_execute', 'set_reminder', 'search_and_send_telegram', 'shutdown_soda',
+  'get_system_status', 'get_weather', 'terminal_execute', 'reminder',
 ])
 
 const VISION_TOOLS = new Set([
@@ -528,9 +524,6 @@ function FloatingContent({ content }) {
     case 'schedule':
       return <ScheduleWindow data={content.data} />
 
-    case 'pastebox':
-      return <PasteBox id={content.id} />
-
     case 'camera':
       return <CameraWidget socket={socket} />
 
@@ -574,7 +567,7 @@ function WidgetApp() {
   }, [])
 
   const handleRestore = () => {
-    socket.emit('wake_up')
+    // wake_up removed — no longer needed
   }
 
   if (!ready) return null
@@ -605,10 +598,6 @@ export default function App() {
   // Daily routine briefing panel (right)
   const [dailyBrief, setDailyBrief] = useState({ visible: false, data: null })
   const [nightWinddown, setNightWinddown] = useState(false)
-
-  // Spotify search results panel state (right)
-  const [spotifySearch, setSpotifySearch] = useState({ visible: false, query: '', results: [] })
-  const spotifySearchTimerRef = useRef(null)
 
   // File/clipboard/code output panel state (bottom)
   const [fileOutput, setFileOutput] = useState({ visible: false, type: 'file', title: '', content: '', success: null })
@@ -663,8 +652,6 @@ export default function App() {
   const [gitHubPanel, setGitHubPanel] = useState({ visible: false, data: null })
   const [deployPanel, setDeployPanel] = useState({ visible: false, data: null })
   const [pageSpeedPanel, setPageSpeedPanel] = useState({ visible: false, data: null })
-  const [browserPanel, setBrowserPanel] = useState({ visible: false, data: null })
-  const [leadFinderPanel, setLeadFinderPanel] = useState({ visible: false, data: null })
   const [researchResultsPanel, setResearchResultsPanel] = useState({ visible: false, data: null })
   const [backgroundTaskPanel, setBackgroundTaskPanel] = useState({ visible: false, data: null })
   const [emailPanel, setEmailPanel] = useState({ visible: false, data: null })
@@ -965,8 +952,8 @@ export default function App() {
 
       const toolName = data.tool
 
-      // Pre-schedule native notification for set_reminder with future time
-      if (toolName === 'set_reminder' && result) {
+      // Pre-schedule native notification for reminder with future time
+      if (toolName === 'reminder' && result) {
         let parsed = result
         if (typeof result.result === 'string') {
           try { parsed = JSON.parse(result.result) } catch (e) { parsed = result }
@@ -1013,12 +1000,6 @@ export default function App() {
             return
           case 'PageSpeedPanel':
             setPageSpeedPanel({ visible: true, data: result })
-            return
-          case 'BrowserPanel':
-            setBrowserPanel({ visible: true, data: result })
-            return
-          case 'LeadFinderPanel':
-            setLeadFinderPanel({ visible: true, data: result })
             return
           case 'ResearchResultsPanel':
             setResearchResultsPanel({ visible: true, data: result })
@@ -1072,17 +1053,14 @@ export default function App() {
           setInfoPanel(prev => ({ ...prev, visible: false }))
         }, 3000)
       } else if (TOOLS_WITH_OUTPUT.has(toolName)) {
-        // File, clipboard, code output → bottom panel
+        // File, code output → bottom panel
         let fileType = 'file'
-        if (toolName === 'clipboard_read' || toolName === 'clipboard_write') fileType = 'clipboard'
-        else if (toolName === 'run_code') fileType = 'code'
+        if (toolName === 'run_code') fileType = 'code'
 
         let content = ''
         if (toolName === 'write_file') content = result.result || 'File written.'
         else if (toolName === 'read_file') content = result.result?.length > 500 ? `${result.result.slice(0, 500)}...\n\n[truncated, ${result.result.length} chars total]` : (result.result || 'File read.')
         else if (toolName === 'read_directory') content = result.result || 'Directory listed.'
-        else if (toolName === 'clipboard_read') content = result.text || '(empty)'
-        else if (toolName === 'clipboard_write') content = result.success ? `Copied ${result.length} chars` : `Error: ${result.error}`
         else if (toolName === 'run_code') content = result.stdout || result.stderr || 'No output.'
         else if (toolName === 'screenshot') content = result.success ? `Saved to ${result.path}` : `Error: ${result.error}`
         else if (toolName === 'list_processes') {
@@ -1092,7 +1070,7 @@ export default function App() {
         }
         else if (toolName === 'get_active_window') content = result.title || '(unknown)'
         else if (toolName === 'create_project' || toolName === 'switch_project') content = result.result || 'Done.'
-        else if (toolName === 'list_projects') content = result.result || 'No projects.'
+        else if (toolName === 'project_registry') content = result.result || 'No projects.'
         else content = JSON.stringify(result, null, 2)
 
         if (fileTimerRef.current) clearTimeout(fileTimerRef.current)
@@ -1164,10 +1142,6 @@ export default function App() {
           if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
           setSearch(prev => ({ ...prev, visible: false }))
           break
-        case 'spotify_search':
-          if (spotifySearchTimerRef.current) clearTimeout(spotifySearchTimerRef.current)
-          setSpotifySearch(prev => ({ ...prev, visible: false }))
-          break
         case 'task_terminal':
           setTaskTerminalVisible(false)
           break
@@ -1190,8 +1164,6 @@ export default function App() {
           setTerminal(prev => ({ ...prev, visible: false }))
           if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
           setSearch(prev => ({ ...prev, visible: false }))
-          if (spotifySearchTimerRef.current) clearTimeout(spotifySearchTimerRef.current)
-          setSpotifySearch(prev => ({ ...prev, visible: false }))
           if (fileTimerRef.current) clearTimeout(fileTimerRef.current)
           setFileOutput(prev => ({ ...prev, visible: false }))
           if (infoTimerRef.current) clearTimeout(infoTimerRef.current)
@@ -1298,11 +1270,6 @@ export default function App() {
     const onMicLevel = (data) => { if (data && typeof data.level === 'number') setOrbMicLevel(data.level) }
     socket.on('mic_level', onMicLevel)
     socket.on('search_results', onSearchResults)
-    socket.on('spotify_search_results', (data) => {
-      if (!data || !data.results) return
-      if (spotifySearchTimerRef.current) clearTimeout(spotifySearchTimerRef.current)
-      setSpotifySearch({ visible: true, query: data.query || '', results: data.results || [] })
-    })
     socket.on('webpage_content', onWebpageContent)
     socket.on('file_list', onFileList)
     socket.on('tool_result', onToolResult)
@@ -1334,10 +1301,6 @@ export default function App() {
       if (data) setEmailPanel({ visible: true, data })
     }
     socket.on('email_data', onEmailData)
-    const onLeadData = (data) => {
-      if (data) setLeadFinderPanel({ visible: true, data })
-    }
-    socket.on('lead_data', onLeadData)
     const onResearchData = (data) => {
       if (data) setResearchResultsPanel({ visible: true, data })
     }
@@ -1362,11 +1325,6 @@ export default function App() {
       openFloatingWindow(id, 'NOTEPAD', { type: 'notepad', id, tabs }, 100, 80, 520, 400)
     }
     socket.on('open_notepad', onOpenNotepad)
-
-    const onOpenPastebox = () => {
-      openFloatingWindow('pastebox', 'PASTE BOX', { type: 'pastebox' }, 300, 150, 520, 380)
-    }
-    socket.on('open_pastebox', onOpenPastebox)
 
     const onCameraOpen = () => {
       try { localStorage.removeItem('float_pos_camera') } catch {}
@@ -1545,7 +1503,6 @@ export default function App() {
       socket.off('audio_data', onAudioData)
       socket.off('mic_level', onMicLevel)
       socket.off('search_results', onSearchResults)
-      socket.off('spotify_search_results')
       socket.off('webpage_content', onWebpageContent)
       socket.off('file_list', onFileList)
       socket.off('scraped_data', onScrapedData)
@@ -1575,7 +1532,6 @@ export default function App() {
       socket.off('pentest_scan_progress', onPentestProgress)
       socket.off('pentest_output', onPentestOutput)
       socket.off('email_data', onEmailData)
-      socket.off('lead_data', onLeadData)
       socket.off('research_data', onResearchData)
       socket.off('bg_task_status', onBgTaskStatus)
       if (clearTaskTimeoutRef.current) clearTimeout(clearTaskTimeoutRef.current)
@@ -1592,11 +1548,6 @@ export default function App() {
   const closeSearch = () => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
     setSearch((prev) => ({ ...prev, visible: false }))
-  }
-
-  const closeSpotifySearch = () => {
-    if (spotifySearchTimerRef.current) clearTimeout(spotifySearchTimerRef.current)
-    setSpotifySearch((prev) => ({ ...prev, visible: false }))
   }
 
   const closeFileOutput = () => {
@@ -1815,14 +1766,6 @@ export default function App() {
         onComplete={() => setNightWinddown(false)}
       />
 
-      {/* Spotify Search Results Panel — slides from RIGHT */}
-      <SpotifySearchPanel
-        visible={spotifySearch.visible}
-        query={spotifySearch.query}
-        results={spotifySearch.results}
-        onClose={closeSpotifySearch}
-      />
-
       {/* File/Clipboard/Code Output Panel — slides from BOTTOM */}
       <FileOutputPanel
         visible={fileOutput.visible}
@@ -1913,16 +1856,6 @@ export default function App() {
         onClose={() => setDeployPanel(prev => ({ ...prev, visible: false }))} />
       <PageSpeedPanel visible={pageSpeedPanel.visible} data={pageSpeedPanel.data}
         onClose={() => setPageSpeedPanel(prev => ({ ...prev, visible: false }))} />
-      <BrowserPanel visible={browserPanel.visible} data={browserPanel.data}
-        onClose={() => setBrowserPanel(prev => ({ ...prev, visible: false }))} />
-      <LeadFinderPanel visible={leadFinderPanel.visible} data={leadFinderPanel.data}
-        onClose={() => setLeadFinderPanel(prev => ({ ...prev, visible: false }))}
-        onBuildWebsite={(leads) => {
-          setLeadFinderPanel(prev => ({ ...prev, visible: false }))
-          const prompt = `Build professional single-page websites for these businesses that don't have one: ${leads.map(l => l.name).join(', ')}. Generate HTML/CSS/JS for each.`
-          setBackgroundTaskPanel({ visible: true, data: {} })
-          // ponytail: socket emit handled by backend bg_spawn — this just opens the panel
-        }} />
       <ResearchResultsPanel visible={researchResultsPanel.visible} data={researchResultsPanel.data}
         onClose={() => setResearchResultsPanel(prev => ({ ...prev, visible: false }))} />
       <BackgroundTaskPanel visible={backgroundTaskPanel.visible} data={backgroundTaskPanel.data}

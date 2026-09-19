@@ -7,96 +7,41 @@ PROJECTS_DIR = os.path.join(WORKBASE_DIR, "projects")
 INDEX_PATH = os.path.join(WORKBASE_DIR, "index.json")
 
 
-workbase_list_tool = {
-    "name": "workbase_list",
-    "description": "List all projects registered in the Workbase project tracking system. Returns project names, statuses, and descriptions.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-    }
-}
-
-workbase_get_tool = {
-    "name": "workbase_get",
-    "description": "Get detailed context, tech stack, status, progress log, and suggestions for a specific Workbase project.",
+workbase_tool = {
+    "name": "workbase",
+    "description": "Workbase project tracking system. Use action to select:\n"
+        "  list — List all registered projects\n"
+        "  get — Get detailed context, tech stack, status, progress log, and suggestions for a project\n"
+        "  save_progress — Append a progress or status update to a project's log\n"
+        "  import — Import an existing project folder into Workbase\n"
+        "  save_context — Save a summary of current conversation about a project\n"
+        "  compare — Compare project's current state against last saved context",
     "parameters": {
         "type": "OBJECT",
         "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "Workbase operation",
+                "enum": ["list", "get", "save_progress", "import", "save_context", "compare"]
+            },
             "project_name": {
                 "type": "STRING",
-                "description": "The internal name of the project to retrieve (e.g. 'ai-autoresponder')."
-            }
-        },
-        "required": ["project_name"]
-    }
-}
-
-workbase_save_progress_tool = {
-    "name": "workbase_save_progress",
-    "description": "Append a progress or status update entry to a Workbase project's log for future reference across sessions.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "project_name": {
-                "type": "STRING",
-                "description": "The internal project name (e.g. 'ai-autoresponder')."
+                "description": "Internal project name (e.g. 'ai-autoresponder'). Required for get/save_progress/save_context/compare."
             },
             "entry": {
                 "type": "STRING",
-                "description": "The progress or status update text to record."
-            }
-        },
-        "required": ["project_name", "entry"]
-    }
-}
-
-workbase_import_tool = {
-    "name": "workbase_import",
-    "description": "Import an existing project folder into Workbase. Scans for context files (context.md, README.md, etc.) and creates a tracked project entry.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
+                "description": "Progress or status update text. Required for save_progress."
+            },
             "folder_path": {
                 "type": "STRING",
-                "description": "Full filesystem path to the project folder to import."
-            }
-        },
-        "required": ["folder_path"]
-    }
-}
-
-workbase_save_context_tool = {
-    "name": "workbase_save_context",
-    "description": "Save a summary of the current conversation about a Workbase project. Call this whenever you have meaningfully discussed a project's status, recent work, known issues, decisions, or plans. Include enough context so that the next session can pick up seamlessly where you left off.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "project_name": {
-                "type": "STRING",
-                "description": "The internal project name (e.g. 'ai-autoresponder')."
+                "description": "Filesystem path to project folder. Required for import."
             },
             "context": {
                 "type": "STRING",
-                "description": "A thorough summary of what was discussed: current project state, issues found, decisions made, recent progress, next steps agreed upon."
+                "description": "Summary of conversation/discussion. Required for save_context."
             }
         },
-        "required": ["project_name", "context"]
-    }
-}
-
-workbase_compare_tool = {
-    "name": "workbase_compare",
-    "description": "Compare a project's current state against its last saved context. Returns the full progress log, last context summary, folder snapshot, and project document — so you can analyze what changed and give the user intelligent suggestions for next steps.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "project_name": {
-                "type": "STRING",
-                "description": "The internal project name (e.g. 'ai-autoresponder')."
-            }
-        },
-        "required": ["project_name"]
+        "required": ["action"]
     }
 }
 

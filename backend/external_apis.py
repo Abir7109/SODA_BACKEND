@@ -455,24 +455,6 @@ view_file_tool = {
     }
 }
 
-go_to_sleep_tool = {
-    "name": "go_to_sleep",
-    "description": "Put SODA to sleep. Minimizes the window and stops responding to all voice and text commands. Only the wake command 'wake up' will be recognized. Use when the user says 'sleep', 'go to sleep', 'take a nap', 'goodnight', or wants SODA to stop listening and minimize its window.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {}
-    }
-}
-
-wake_up_tool = {
-    "name": "wake_up",
-    "description": "Wake SODA up from sleep mode. Restores the window and resumes normal operation. Use when the user says 'wake up', 'come back', 'resume', 'good morning', or wants SODA to start listening again.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {}
-    }
-}
-
 close_panel_tool = {
     "name": "close_panel",
     "description": (
@@ -863,23 +845,6 @@ get_pagespeed_insights_tool = {
             }
         },
         "required": ["url"]
-    }
-}
-
-
-shutdown_soda_tool = {
-    "name": "shutdown_soda",
-    "description": (
-        "Completely shut down SODA — stops the server and closes everything. "
-        "Use ONLY when the user explicitly says 'soda turn off', 'shut down soda', "
-        "'stop soda', 'power off', 'exit soda', or wants to fully terminate SODA. "
-        "This is NOT sleep mode — the server process will exit and must be manually restarted. "
-        "Example: shutdown_soda() — terminates the entire SODA server."
-    ),
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
     }
 }
 

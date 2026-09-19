@@ -65,10 +65,10 @@ def log_activity(label: str, tool: str = "") -> None:
 
 # Tools whose results are too noisy/verbose to clutter the day recap
 _SILENT_TOOLS = {
-    "read_file", "list_files", "list_projects", "get_system_status",
-    "get_weather", "get_bangladeshi_news", "get_ip_info", "list_schedules",
-    "list_reminders", "show_calendar", "brief_me_day", "day_recap", "good_night",
-    "wake_up", "go_to_sleep", "webview_action", "list_installed_apps",
+    "read_file", "list_files", "project_registry", "get_system_status",
+    "get_weather", "get_bangladeshi_news", "get_ip_info", "schedule",
+    "reminder", "show_calendar", "brief_me_day", "day_recap", "good_night",
+    "webview_action", "list_installed_apps",
 }
 
 # Human-readable labels for the most common tools
@@ -83,11 +83,10 @@ _TOOL_LABELS = {
     "browse_webpage": "Browsed webpage",
     "open_app": "Opened app",
     "screenshot": "Took a screenshot",
-    "send_email": "Sent email",
-    "read_emails": "Checked emails",
-    "set_reminder": "Set a reminder",
-    "set_schedule": "Saved a schedule",
-    "plan_tasks": "Planned tasks",
+    "email": "Email action",
+    "reminder": "Set a reminder",
+    "schedule": "Saved a schedule",
+    "plan": "Planned tasks",
     "remember_fact": "Saved a fact",
     "analyze_screen": "Analyzed screen",
     "close_window": "Closed window",

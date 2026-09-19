@@ -1,6 +1,0 @@
-{
-  "name": "SODA Tactical HUD",
-  "description": "Tactical HUD interface featuring a highly reactive, bilingual holographic orb displaying audio wave responsiveness and voice states.",
-  "requestFramePermissions": ["microphone"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

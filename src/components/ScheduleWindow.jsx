@@ -185,7 +185,7 @@ export default function ScheduleWindow({ data }) {
       const res = await fetch('/api/tool', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool: 'delete_schedule', args: { id: sid } }),
+        body: JSON.stringify({ tool: 'schedule', args: { action: 'delete', id: sid } }),
       })
       const result = await res.json()
       if (result.success) {

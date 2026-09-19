@@ -114,82 +114,31 @@ def feelings_get_profile():
 
 FEELINGS_TOOLS_SCHEMA = [
     {
-        "name": "feelings_resolve_episode",
+        "name": "feelings",
         "description": (
-            "Mark an emotional episode as resolved when the user indicates "
-            "they're doing better about something they previously shared. "
-            "Look for signals: 'I'm okay now', 'moved on', "
-            "'not bothering me anymore', or a clear shift to a better place."
+            "Emotional memory management. Use action to select:\n"
+            "  resolve_episode — Mark an episode as resolved (signals: 'I'm okay now', 'moved on')\n"
+            "  add_note — Add new information to an existing emotional episode\n"
+            "  get_history — Retrieve the user's emotional history (recurring struggles, emotional arc)\n"
+            "  check_followup — Check if past episodes need a gentle proactive check-in\n"
+            "  get_profile — Get the user's overall emotional profile, patterns, stressors, support preferences"
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "episode_id": {"type": "STRING", "description": "The episode ID from feelings_get_history"},
-                "resolution": {"type": "STRING", "description": "Brief description of how it resolved (optional)"},
+                "action": {
+                    "type": "STRING",
+                    "description": "Feelings operation",
+                    "enum": ["resolve_episode", "add_note", "get_history", "check_followup", "get_profile"]
+                },
+                "episode_id": {"type": "STRING", "description": "Episode ID. Required for resolve_episode and add_note."},
+                "resolution": {"type": "STRING", "description": "How it resolved (optional). For resolve_episode."},
+                "note": {"type": "STRING", "description": "New information to add. Required for add_note."},
+                "days": {"type": "INTEGER", "description": "How far back to look (default 30). For get_history."},
+                "category": {"type": "STRING", "description": "Filter by category (optional). For get_history."},
+                "include_resolved": {"type": "BOOLEAN", "description": "Include resolved episodes (default true). For get_history."},
             },
-            "required": ["episode_id"],
-        },
-    },
-    {
-        "name": "feelings_add_note",
-        "description": (
-            "Add new information to an existing emotional episode. "
-            "Use when the user reveals more detail about an ongoing situation "
-            "that connects to something already stored."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "episode_id": {"type": "STRING", "description": "The episode ID to update"},
-                "note": {"type": "STRING", "description": "The new information to add"},
-            },
-            "required": ["episode_id", "note"],
-        },
-    },
-    {
-        "name": "feelings_get_history",
-        "description": (
-            "Retrieve the user's emotional history. "
-            "Call when they mention recurring struggles, when you want to "
-            "understand their emotional arc, or to check if a current emotion "
-            "is a pattern. Returns past episodes with timestamps and summaries."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "days": {"type": "INTEGER", "description": "How far back to look (default 30)"},
-                "category": {"type": "STRING", "description": "Filter by category (optional)"},
-                "include_resolved": {"type": "BOOLEAN", "description": "Include resolved episodes (default true)"},
-            },
-            "required": [],
-        },
-    },
-    {
-        "name": "feelings_check_followup",
-        "description": (
-            "Check if any past emotional episodes need a gentle proactive check-in. "
-            "Call this at the start of a new session or during a natural pause. "
-            "If it returns episodes, consider weaving a gentle check-in into "
-            "the conversation naturally."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {},
-            "required": [],
-        },
-    },
-    {
-        "name": "feelings_get_profile",
-        "description": (
-            "Get the user's overall emotional profile — their patterns, "
-            "stressors, joys, and support preferences. "
-            "Call when you want to understand what kind of support "
-            "they respond best to."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {},
-            "required": [],
+            "required": ["action"],
         },
     },
 ]

@@ -7,10 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from traceback import format_exception
 
-LOG_DIR = Path(__file__).parent / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-
 DATE = datetime.now().strftime("%Y-%m-%d")
+IS_RENDER = bool(os.environ.get("RENDER") or os.environ.get("RENDER_SERVICE_ID"))
 
 _loggers = {}
 
@@ -29,27 +27,43 @@ def get_logger(name="soda"):
 
     formatter = FileLineFormatter()
 
-    main_handler = logging.handlers.TimedRotatingFileHandler(
-        LOG_DIR / f"soda-{DATE}.log", when="midnight", interval=1, backupCount=30, encoding="utf-8"
-    )
-    main_handler.setLevel(logging.DEBUG)
-    main_handler.setFormatter(formatter)
+    if IS_RENDER:
+        # Render: WARNING+ to stdout only. No file I/O.
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler.setLevel(logging.WARNING)
+        stdout_handler.setFormatter(formatter)
+        logger.addHandler(stdout_handler)
+    else:
+        # Local: file-based logging as before
+        log_dir = Path(__file__).parent / "logs"
+        log_dir.mkdir(exist_ok=True)
 
-    debug_handler = logging.handlers.TimedRotatingFileHandler(
-        LOG_DIR / f"soda-{DATE}.debug.log", when="midnight", interval=1, backupCount=14, encoding="utf-8"
-    )
-    debug_handler.setLevel(logging.DEBUG)
-    debug_handler.setFormatter(formatter)
+        main_handler = logging.handlers.TimedRotatingFileHandler(
+            log_dir / f"soda-{DATE}.log", when="midnight", interval=1, backupCount=30, encoding="utf-8"
+        )
+        main_handler.setLevel(logging.DEBUG)
+        main_handler.setFormatter(formatter)
 
-    error_handler = logging.handlers.RotatingFileHandler(
-        LOG_DIR / "soda.errors.log", maxBytes=5_242_880, backupCount=5, encoding="utf-8"
-    )
-    error_handler.setLevel(logging.ERROR)
-    error_handler.setFormatter(formatter)
+        debug_handler = logging.handlers.TimedRotatingFileHandler(
+            log_dir / f"soda-{DATE}.debug.log", when="midnight", interval=1, backupCount=14, encoding="utf-8"
+        )
+        debug_handler.setLevel(logging.DEBUG)
+        debug_handler.setFormatter(formatter)
 
-    logger.addHandler(main_handler)
-    logger.addHandler(debug_handler)
-    logger.addHandler(error_handler)
+        error_handler = logging.handlers.RotatingFileHandler(
+            log_dir / "soda.errors.log", maxBytes=5_242_880, backupCount=5, encoding="utf-8"
+        )
+        error_handler.setLevel(logging.ERROR)
+        error_handler.setFormatter(formatter)
+
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler.setLevel(logging.DEBUG)
+        stdout_handler.setFormatter(formatter)
+
+        logger.addHandler(main_handler)
+        logger.addHandler(debug_handler)
+        logger.addHandler(error_handler)
+        logger.addHandler(stdout_handler)
 
     _loggers[name] = logger
     return logger

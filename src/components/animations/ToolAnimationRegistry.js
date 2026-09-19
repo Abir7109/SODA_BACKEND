@@ -15,7 +15,7 @@ export const TOOL_ANIMATIONS = {
   open_file:       { component: 'FileTreeAnim',    variant: 'open' },
   create_project:  { component: 'FileTreeAnim',    variant: 'create' },
   switch_project:  { component: 'FileTreeAnim',    variant: 'create' },
-  list_projects:   { component: 'FileTreeAnim',    variant: 'list' },
+  project_registry: { component: 'FileTreeAnim',    variant: 'list' },
   list_files:      { component: 'FileTreeAnim',    variant: 'list' },
 
   // ── Web / Search ─────────────────────────────────────────────
@@ -38,22 +38,13 @@ export const TOOL_ANIMATIONS = {
   send_whatsapp: { component: 'MessageAnimation', variant: 'whatsapp' },
   send_discord:  { component: 'MessageAnimation', variant: 'discord' },
 
-  // ── Telegram ─────────────────────────────────────────────────
-  send_telegram_message: { component: 'TelegramAnim', variant: 'message' },
-  send_telegram_file:    { component: 'TelegramAnim', variant: 'file' },
-
-  // ── Shutdown ─────────────────────────────────────────────────
-  shutdown_soda: { component: 'CloseAnim', variant: 'window' },
-
   // ── Search + Send ────────────────────────────────────────────
   search_and_send_telegram: { component: 'SearchSendAnim', variant: 'default' },
 
   // ── Code ─────────────────────────────────────────────────────
   run_code: { component: 'CodeAnim', variant: 'exec' },
 
-  // ── Clipboard / Screenshot ───────────────────────────────────
-  clipboard_read:  { component: 'ClipboardAnim',   variant: 'read' },
-  clipboard_write: { component: 'ClipboardAnim',   variant: 'write' },
+  // ── Screenshot ───────────────────────────────────────────────
   screenshot:      { component: 'ScreenshotAnim',  variant: 'capture' },
 
   // ── Memory / Profile ─────────────────────────────────────────
@@ -72,10 +63,8 @@ export const TOOL_ANIMATIONS = {
   recall_person:    { component: 'MemoryAnim', variant: 'recall' },
   remember_lesson:  { component: 'MemoryAnim', variant: 'store' },
 
-  // ── Reminders ────────────────────────────────────────────────
-  set_reminder:    { component: 'AiSchedulerAlarm', variant: 'default' },
-  list_reminders:  { component: 'ReminderAnim', variant: 'list' },
-  cancel_reminder: { component: 'ReminderAnim', variant: 'cancel' },
+  // ── Reminders (consolidated) ────────────────────────────────────
+  reminder: { component: 'AiSchedulerAlarm', variant: 'default' },
 
   // ── Screen Analysis ──────────────────────────────────────────
   analyze_screen:   { component: 'ScreenAnim', variant: 'analyze' },
@@ -99,77 +88,45 @@ export const TOOL_ANIMATIONS = {
   // ── Webview ──────────────────────────────────────────────────
   webview_action: { component: 'WebpageAnim', variant: 'open' },
 
-  // ── Browser Automation (Hermes-style) ────────────────────────
-  browser_navigate:     { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-  browser_snapshot:     { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-  browser_click:        { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-  browser_type:         { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-  browser_scroll:       { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-  browser_back:         { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-  browser_press:        { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-  browser_vision:       { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-  browser_console:      { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-  browser_get_images:   { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-  browser_dialog:       { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-  browser_cdp:          { component: 'WebpageAnim', variant: 'open', panel: 'BrowserPanel', panelDir: 'right' },
-
-  // ── Lead Finder ──────────────────────────────────────────────
-  find_leads:      { component: 'SearchAnimation', variant: 'radar', panel: 'LeadFinderPanel', panelDir: 'right' },
-  enrich_leads:    { component: 'DefaultAnimation', variant: 'default' },
-  export_leads:    { component: 'DefaultAnimation', variant: 'default' },
-
   // ── Research Engine V2 ───────────────────────────────────────
   deep_research:   { component: 'SearchAnimation', variant: 'results', panel: 'ResearchResultsPanel', panelDir: 'right' },
   export_research: { component: 'DefaultAnimation', variant: 'default' },
 
-  // ── Spotify Music Control ───────────────────────────────────
-  spotify_search:      { component: 'SpotifyAnim', variant: 'search' },
-  spotify_play:        { component: 'SpotifyAnim', variant: 'play' },
-  spotify_control:     { component: 'SpotifyAnim', variant: 'control' },
-  spotify_now_playing: { component: 'SpotifyAnim', variant: 'info' },
+  // ── Background Agent Management (consolidated) ───────────────
+  bg_tasks: { component: 'BackgroundCommandAnim', variant: 'exec', panel: 'BackgroundTaskPanel', panelDir: 'right' },
 
-  // ── Background Agent Management ──────────────────────────────
-  bg_spawn:        { component: 'BackgroundCommandAnim', variant: 'exec', panel: 'BackgroundTaskPanel', panelDir: 'right' },
-  bg_status:       { component: 'DefaultAnimation', variant: 'default' },
-  bg_kill:         { component: 'CloseAnim', variant: 'panel' },
-  bg_list:         { component: 'DefaultAnimation', variant: 'default', panel: 'BackgroundTaskPanel', panelDir: 'right' },
+  // ── Task Planning (consolidated) ──────────────────────────────
+  plan: { component: 'AiTerminalCompiler', variant: 'default' },
 
-  // ── Task Planning ────────────────────────────────────────────
-  plan_tasks:  { component: 'AiTerminalCompiler', variant: 'default' },
-  update_task: { component: 'AiTerminalCompiler', variant: 'default' },
+  // ── GitHub (consolidated) ──────────────────────────────────────
+  github: { component: 'GitDeployAnim', variant: 'branch', panel: 'GitHubPanel', panelDir: 'bottom' },
 
-  // ── GitHub ───────────────────────────────────────────────────
-  github_list_repos:    { component: 'GitDeployAnim', variant: 'branch', panel: 'GitHubPanel', panelDir: 'bottom' },
-  github_create_repo:   { component: 'GitDeployAnim', variant: 'branch', panel: 'GitHubPanel', panelDir: 'bottom' },
-  github_get_repo:      { component: 'GitDeployAnim', variant: 'branch', panel: 'GitHubPanel', panelDir: 'bottom' },
-  github_create_pr:     { component: 'GitDeployAnim', variant: 'branch', panel: 'GitHubPanel', panelDir: 'bottom' },
-  github_list_issues:   { component: 'GitDeployAnim', variant: 'branch', panel: 'GitHubPanel', panelDir: 'bottom' },
-  github_create_issue:  { component: 'GitDeployAnim', variant: 'branch', panel: 'GitHubPanel', panelDir: 'bottom' },
+  // ── Vercel (consolidated) ──────────────────────────────────────
+  vercel: { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
 
-  // ── Vercel ───────────────────────────────────────────────────
-  vercel_list_projects:     { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
-  vercel_deploy:            { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
-  vercel_list_deployments:  { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
-  vercel_get_deployment:    { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
+  // ── Netlify (consolidated) ─────────────────────────────────────
+  netlify: { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
 
-  // ── Netlify ──────────────────────────────────────────────────
-  netlify_list_sites:   { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
-  netlify_get_site:     { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
-  netlify_deploy:       { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
-  netlify_create_site:  { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
-  netlify_list_deploys: { component: 'GitDeployAnim', variant: 'deploy', panel: 'DeployPanel', panelDir: 'bottom' },
+  // ── Email (consolidated) ───────────────────────────────────────
+  email: { component: 'DataAnim', variant: 'email', panel: 'EmailPanel', panelDir: 'right' },
 
-  // ── Email ─────────────────────────────────────────────────────
-  read_emails:  { component: 'DataAnim', variant: 'email', panel: 'EmailPanel', panelDir: 'right' },
-  send_email:   { component: 'MessageAnimation', variant: 'email' },
-  email_config: { component: 'DefaultAnimation', variant: 'default' },
+  // ── Project Registry (consolidated) ────────────────────────────
+  project_registry: { component: 'DefaultAnimation', variant: 'default', panel: 'ProjectStatsPanel', panelDir: 'right' },
 
-  // ── Project Registry ──────────────────────────────────────────
-  register_project:   { component: 'DefaultAnimation', variant: 'default' },
-  list_projects:      { component: 'DefaultAnimation', variant: 'default', panel: 'ProjectStatsPanel', panelDir: 'right' },
-  query_project:      { component: 'DefaultAnimation', variant: 'default', panel: 'ProjectStatsPanel', panelDir: 'right' },
-  query_all_projects: { component: 'DefaultAnimation', variant: 'default', panel: 'ProjectStatsPanel', panelDir: 'right' },
-  remove_project:     { component: 'DefaultAnimation', variant: 'default' },
+  // ── Scheduled Tasks (consolidated) ────────────────────────────
+  scheduled_task: { component: 'AiSchedulerAlarm', variant: 'default' },
+
+  // ── Window (consolidated) ──────────────────────────────────────
+  window: { component: 'DefaultAnimation', variant: 'default' },
+
+  // ── File Manager (consolidated) ────────────────────────────────
+  file_manager: { component: 'FileTreeAnim', variant: 'list' },
+
+  // ── Credential (consolidated) ──────────────────────────────────
+  credential: { component: 'DefaultAnimation', variant: 'default' },
+
+  // ── Schedule (consolidated) ────────────────────────────────────
+  schedule: { component: 'AiSchedulerAlarm', variant: 'default' },
 
   // ── Agent Sub-Agent Tools ────────────────────────────────────
   show_agents:       { component: 'DataAnim',        variant: 'analytics', panel: 'AgentsPanel',    panelDir: 'bottom' },

@@ -24,10 +24,8 @@ const AiWeatherDiagnostics = lazy(() => import('./AiWeatherDiagnostics'))
 const AiTerminalCompiler  = lazy(() => import('./AiTerminalCompiler'))
 const AiSchedulerAlarm    = lazy(() => import('./AiSchedulerAlarm'))
 const GitDeployAnim       = lazy(() => import('./GitDeployAnim'))
-const TelegramAnim        = lazy(() => import('./TelegramAnim'))
 const SearchSendAnim      = lazy(() => import('./SearchSendAnim'))
 const BackgroundCommandAnim = lazy(() => import('./BackgroundCommandAnim'))
-const SpotifyAnim         = lazy(() => import('./SpotifyAnim'))
 
 // ── Animation map (component name → lazy component) ─────────────
 export const ANIMATION_MAP = {
@@ -53,10 +51,8 @@ export const ANIMATION_MAP = {
   AiTerminalCompiler,
   AiSchedulerAlarm,
   GitDeployAnim,
-  TelegramAnim,
   SearchSendAnim,
   BackgroundCommandAnim,
-  SpotifyAnim,
 }
 
 // ── Full 34-tool category mapping (backward compatible) ─────────
@@ -81,7 +77,7 @@ export const TOOL_CATEGORY = {
   open_file: CATEGORIES.FILE,
   create_project: CATEGORIES.FILE,
   switch_project: CATEGORIES.FILE,
-  list_projects: CATEGORIES.FILE,
+  project_registry: CATEGORIES.FILE,
   list_files: CATEGORIES.FILE,
 
   // Search / Web
@@ -92,7 +88,6 @@ export const TOOL_CATEGORY = {
 
   // System
   control_system: CATEGORIES.SYSTEM,
-  shutdown_soda: CATEGORIES.SYSTEM,
   open_app: CATEGORIES.SYSTEM,
   search_web: CATEGORIES.SYSTEM,
   search_youtube: CATEGORIES.SYSTEM,
@@ -110,10 +105,8 @@ export const TOOL_CATEGORY = {
   // Code
   run_code: CATEGORIES.CODE,
 
-  // Clipboard / Screenshot
-  clipboard_read: CATEGORIES.CLIPBOARD,
-  clipboard_write: CATEGORIES.CLIPBOARD,
-  screenshot: CATEGORIES.CLIPBOARD,
+  // Screenshot
+  screenshot: CATEGORIES.SCREEN,
 
   // Memory / Profile
   remember_fact: CATEGORIES.MEMORY,
@@ -127,9 +120,7 @@ export const TOOL_CATEGORY = {
   remember_lesson: CATEGORIES.MEMORY,
 
   // Reminders
-  set_reminder: CATEGORIES.REMINDER,
-  list_reminders: CATEGORIES.REMINDER,
-  cancel_reminder: CATEGORIES.REMINDER,
+  reminder: CATEGORIES.REMINDER,
 
   // Screen Analysis
   analyze_screen: CATEGORIES.SCREEN,
@@ -149,34 +140,13 @@ export const TOOL_CATEGORY = {
   get_wikipedia_summary: CATEGORIES.DATA,
 
   // Git / Deploy
-  plan_tasks: CATEGORIES.SYSTEM,
-  update_task: CATEGORIES.SYSTEM,
-  github_list_repos: CATEGORIES.DATA,
-  github_create_repo: CATEGORIES.DATA,
-  github_get_repo: CATEGORIES.DATA,
-  github_create_pr: CATEGORIES.DATA,
-  github_list_issues: CATEGORIES.DATA,
-  github_create_issue: CATEGORIES.DATA,
-  vercel_list_projects: CATEGORIES.DATA,
-  vercel_deploy: CATEGORIES.DATA,
-  vercel_list_deployments: CATEGORIES.DATA,
-  vercel_get_deployment: CATEGORIES.DATA,
-  netlify_list_sites: CATEGORIES.DATA,
-  netlify_get_site: CATEGORIES.DATA,
-  netlify_deploy: CATEGORIES.DATA,
-  netlify_create_site: CATEGORIES.DATA,
-  netlify_list_deploys: CATEGORIES.DATA,
+  plan: CATEGORIES.SYSTEM,
+  github: CATEGORIES.DATA,
+  vercel: CATEGORIES.DATA,
+  netlify: CATEGORIES.DATA,
 
   // Email
-  read_emails: CATEGORIES.DATA,
-  send_email: CATEGORIES.MESSAGE,
-  email_config: CATEGORIES.SYSTEM,
-
-  // Spotify
-  spotify_search: CATEGORIES.DATA,
-  spotify_play: CATEGORIES.DATA,
-  spotify_control: CATEGORIES.SYSTEM,
-  spotify_now_playing: CATEGORIES.DATA,
+  email: CATEGORIES.DATA,
 
   // Navigation
   get_navigation_route: CATEGORIES.DATA,
