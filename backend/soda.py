@@ -1454,8 +1454,21 @@ class AudioLoop:
                             self._tools_running = True
                             self._last_tool_start = time.time()
 
+                            # Emit batch start so frontend can show parallel tool panel
+                            if self.sio:
+                                batch_tools = [
+                                    {"id": fc.id, "name": fc.name, "args": fc.args}
+                                    for fc in response.tool_call.function_calls
+                                    if fc.id in self._processed_fc_ids
+                                ]
+                                loop = asyncio.get_event_loop()
+                                loop.create_task(self.sio.emit("tool_batch_start", {
+                                    "tools": batch_tools,
+                                }))
+
                         if tasks:
                             raw = await asyncio.gather(*tasks, return_exceptions=True)
+                            batch_results = []
                             for result in raw:
                                 if isinstance(result, Exception):
                                     log.warning(f"Tool call failed: {result}")
@@ -1476,6 +1489,17 @@ class AudioLoop:
                                         loop.create_task(self.sio.emit("tool_result", {
                                             "tool": result.name, "result": result_data,
                                         }))
+                                    batch_results.append({
+                                        "id": result.id, "name": result.name,
+                                        "result": result.response,
+                                    })
+
+                            # Emit batch result so frontend can update parallel tool panel
+                            if self.sio and batch_results:
+                                loop = asyncio.get_event_loop()
+                                loop.create_task(self.sio.emit("tool_batch_result", {
+                                    "results": batch_results,
+                                }))
 
                         if function_responses:
                             # Save user's last input so reconnect has context if send fails

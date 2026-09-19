@@ -73,6 +73,7 @@ import SearchResultsPanel from './components/panels/SearchResultsPanel'
 import FileOutputPanel from './components/panels/FileOutputPanel'
 import InfoPanel from './components/panels/InfoPanel'
 import ToolOutputPanel from './components/panels/ToolOutputPanel'
+import ParallelToolPanel from './components/panels/ParallelToolPanel'
 import WebpageSummaryPanel from './components/panels/WebpageSummaryPanel'
 import FileBrowserPanel from './components/panels/FileBrowserPanel'
 
@@ -609,6 +610,10 @@ export default function App() {
 
   // Tool output / confirmation panel (bottom)
   const [toolPanel, setToolPanel] = useState({ visible: false, toolName: '', status: 'running', output: null, args: null })
+
+  // Parallel tool execution panel
+  const [toolQueue, setToolQueue] = useState([])
+  const [parallelPanelOpen, setParallelPanelOpen] = useState(false)
 
   // Agent result panels
   const [wikipediaPanel, setWikipediaPanel] = useState({ visible: false, data: null })
@@ -1273,6 +1278,32 @@ export default function App() {
     socket.on('webpage_content', onWebpageContent)
     socket.on('file_list', onFileList)
     socket.on('tool_result', onToolResult)
+
+    // Parallel tool batch events
+    const onToolBatchStart = (data) => {
+      if (!data || !data.tools || !data.tools.length) return
+      const newTools = data.tools.map(t => ({
+        id: t.id, name: t.name, args: t.args,
+        status: 'running', result: null,
+      }))
+      setToolQueue(prev => [...prev, ...newTools])
+      setParallelPanelOpen(true)
+    }
+    const onToolBatchResult = (data) => {
+      if (!data || !data.results) return
+      setToolQueue(prev => prev.map(tool => {
+        const r = data.results.find(res => res.id === tool.id)
+        if (!r) return tool
+        const hasError = (() => {
+          const text = JSON.stringify(r.result || '').toLowerCase()
+          return text.includes('error') || text.includes('fail')
+        })()
+        return { ...tool, status: hasError ? 'error' : 'done', result: r.result }
+      }))
+    }
+    socket.on('tool_batch_start', onToolBatchStart)
+    socket.on('tool_batch_result', onToolBatchResult)
+
     socket.on('now_playing', (data) => {
       setTaskData(data)
       setTimeout(() => setTaskData(null), 4000)
@@ -1507,6 +1538,8 @@ export default function App() {
       socket.off('file_list', onFileList)
       socket.off('scraped_data', onScrapedData)
       socket.off('tool_result', onToolResult)
+      socket.off('tool_batch_start', onToolBatchStart)
+      socket.off('tool_batch_result', onToolBatchResult)
       socket.off('now_playing')
       socket.off('panel_open', onPanelOpen)
       socket.off('error', onError)
@@ -1808,6 +1841,17 @@ export default function App() {
         onClose={closeToolPanel}
       />
 
+      {/* Parallel Tool Execution Panel — slides from RIGHT */}
+      <ParallelToolPanel
+        visible={parallelPanelOpen && toolQueue.length > 0}
+        tools={toolQueue}
+        onClose={() => {
+          setParallelPanelOpen(false)
+          // Clear queue after panel closes (with delay for animation)
+          setTimeout(() => setToolQueue([]), 400)
+        }}
+      />
+
       {/* Webpage Summary Panel — slides from BOTTOM */}
       <WebpageSummaryPanel
         visible={webpageSummary.visible}
@@ -1961,6 +2005,15 @@ export default function App() {
               >
                 <HolographicOrb size={orbSize} micLevel={orbMicLevel} mood={personalityMood} idle={idleMode} waking={waking} />
               </div>
+              {toolQueue.length > 0 && !task && (
+                <div
+                  className="orb-tool-badge"
+                  onClick={() => setParallelPanelOpen(true)}
+                  title={`${toolQueue.length} tools running`}
+                >
+                  {toolQueue.filter(t => t.status === 'running').length || toolQueue.length}
+                </div>
+              )}
               {idleMode && (
                 <div className="idle-label">SODA is in Idle Mode</div>
               )}
