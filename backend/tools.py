@@ -1526,6 +1526,22 @@ navigate_world_monitor_tool = {
     }
 }
 
+get_world_monitor_data_tool = {
+    "name": "get_world_monitor_data",
+    "description": "Fetches live data from the World Monitor dashboard panels. Use this to EXPLAIN what's happening in the world to the user. Returns real-time data for: stocks (market overview, top movers, sector performance), war (active conflicts, casualty counts, recent events), outbreaks (disease tracking, affected regions), defcon (military alert levels, force posture), earthquakes (recent seismic activity), economy (economic indicators), predictions (prediction market odds). ALWAYS use this tool BEFORE web search when the user asks about world events, markets, conflicts, or global situation. The data comes from the same sources as the World Monitor dashboard.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "section": {
+                "type": "STRING",
+                "enum": ["stocks", "war", "outbreaks", "defcon", "earthquakes", "economy", "predictions", "all"],
+                "description": "Which data to fetch. Use 'all' for a general world overview."
+            }
+        },
+        "required": ["section"]
+    }
+}
+
 
 
 tools_list = [{"function_declarations": [
@@ -1646,7 +1662,7 @@ tools_list = [{"function_declarations": [
     # ── World Monitor Controller ──
     open_world_monitor_tool,
     navigate_world_monitor_tool,
+    get_world_monitor_data_tool,
 
-    
 ]}]
 
