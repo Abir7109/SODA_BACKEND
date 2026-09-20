@@ -1060,6 +1060,22 @@ async def force_tool(sid, data):
                     mime = 'text/markdown' if fmt == 'markdown' else 'text/csv' if fmt == 'csv' else 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                     await sio.emit('view_file_content', {'payload': {'type': 'text', 'content': None, 'mime': mime, 'path': r['path']}})
                 await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
+        elif tool == 'camera_control':
+            action = (args or {}).get('action', '')
+            if action == 'close':
+                if audio_loop:
+                    audio_loop._camera_active = False
+                    audio_loop._latest_camera_frame = None
+                await sio.emit('camera_fullscreen_close', {})
+                r = {'result': 'Full-screen camera closed.'}
+            elif action in ('open', 'analyze', 'snapshot'):
+                if audio_loop:
+                    audio_loop._camera_active = True
+                await sio.emit('camera_fullscreen_open', {})
+                r = {'result': 'Full-screen camera opened.'}
+            else:
+                r = {'result': f'Unsupported camera_control action via UI: {action}'}
+            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
         else:
             await sio.emit('error', {'msg': f'force_tool: unknown tool {tool!r}'}, room=sid)
     except Exception as e:
@@ -1168,9 +1184,23 @@ async def video_frame(sid, data):
 
 @sio.event
 async def camera_frame(sid, data):
+    """Live frames from the full-screen camera view — forward to Gemini via send_frame."""
     image_data = data.get('image')
     if image_data and audio_loop:
-        audio_loop._latest_camera_frame = {"mime_type": "image/jpeg", "data": image_data}
+        log.debug(f"[SERVER] camera_frame received: {len(str(image_data))} chars")
+        asyncio.create_task(audio_loop.send_frame(image_data))
+    elif not image_data:
+        log.debug(f"[SERVER] camera_frame: no image data in payload, keys={list(data.keys()) if data else None}")
+    elif not audio_loop:
+        log.debug(f"[SERVER] camera_frame: audio_loop is None, frame dropped")
+
+@sio.event
+async def camera_fullscreen_close(sid, data=None):
+    """User closed the full-screen camera view via the UI close button."""
+    if audio_loop:
+        audio_loop._camera_active = False
+        audio_loop._latest_camera_frame = None
+        log.info("[SERVER] camera_fullscreen_close: camera deactivated via UI")
 
 @sio.event
 async def speaking_timer_expired(sid, data):

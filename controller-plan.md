@@ -1,7 +1,7 @@
 # World Monitor × SODA Integration Plan
 
 **Date**: September 2026
-**Status**: In Progress
+**Status**: Complete
 **Author**: Opencode (ponytail mode)
 
 ---
@@ -120,10 +120,10 @@ Integrate [World Monitor](https://github.com/koala73/worldmonitor) (87k+ GitHub 
 | 5.1 | Commit all changes | Done |
 | 5.2 | Deploy frontend to Netlify | Done |
 | 5.3 | Push backend to Render | Done |
-| 5.4 | Test: "Open the controller" → fullscreen opens | Pending |
-| 5.5 | Test: "Close the controller" → fullscreen closes | Pending |
-| 5.6 | Test: Navigation commands when controller is open | Pending |
-| 5.7 | Test: Navigation commands when controller is closed → error | Pending |
+| 5.4 | Test: "Open the controller" → fullscreen opens | Done |
+| 5.5 | Test: "Close the controller" → fullscreen closes | Done |
+| 5.6 | Test: Navigation commands when controller is open | Done |
+| 5.7 | Test: Navigation commands when controller is closed → error | Done |
 
 **Depends on**: Phase 2 + Phase 4 complete.
 
@@ -132,13 +132,13 @@ Integrate [World Monitor](https://github.com/koala73/worldmonitor) (87k+ GitHub 
 
 | Step | Task | Status |
 |------|------|--------|
-| 6.1 | Clone worldmonitor repo to `world-monitor/` | Pending |
-| 6.2 | Install dependencies | Pending |
-| 6.3 | Generate required secrets | Pending |
-| 6.4 | Start dev server on port 3000 | Pending |
-| 6.5 | Update WorldMonitorPanel to use `localhost:3000` | Pending |
-| 6.6 | Rebuild + redeploy frontend | Pending |
-| 6.7 | Test: "Open the controller" → fullscreen opens | Pending |
+| 6.1 | Clone worldmonitor repo to `world-monitor/` | Done |
+| 6.2 | Install dependencies | Done |
+| 6.3 | Generate required secrets | Done |
+| 6.4 | Start dev server on port 3000 | Done |
+| 6.5 | Update WorldMonitorPanel to use `localhost:3000` | Done |
+| 6.6 | Rebuild + redeploy frontend | Done |
+| 6.7 | Test: "Open the controller" → fullscreen opens | Done |
 
 **Files**: `world-monitor/` (new, gitignored), `src/components/panels/WorldMonitorPanel.jsx` (URL change)
 **Depends on**: Phase 5 CSP issue discovered.
