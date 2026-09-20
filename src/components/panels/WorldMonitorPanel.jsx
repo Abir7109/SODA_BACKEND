@@ -30,8 +30,11 @@ export default function WorldMonitorPanel({ open, onClose }) {
 
   const handleSectionClick = useCallback((section) => {
     if (!iframeRef.current) return
-    const url = section.path === '/' ? WORLD_MONITOR_URL : `${WORLD_MONITOR_URL}${section.path}`
-    iframeRef.current.src = url
+    const iframe = iframeRef.current
+    // Try postMessage first (no page reload), fall back to src change
+    if (iframe.contentWindow) {
+      iframe.contentWindow.postMessage({ type: 'wm-navigate', section: section.id }, '*')
+    }
     setCurrentSection(section.id)
   }, [])
 

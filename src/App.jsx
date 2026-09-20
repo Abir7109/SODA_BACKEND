@@ -1369,14 +1369,8 @@ export default function App() {
     const onWorldMonitorNavigate = (data) => {
       if (!data || !data.section) return
       const iframe = document.getElementById('world-monitor-iframe')
-      if (iframe) {
-        const sectionMap = {
-          map: '/', wire: '/wire', globe: '/globe', stocks: '/stocks',
-          chat: '/chat', predictions: '/predictions', cameras: '/cameras',
-          defcon: '/defcon', outbreaks: '/outbreaks', streams: '/streams',
-        }
-        const path = sectionMap[data.section] || '/'
-        iframe.src = path === '/' ? 'http://localhost:3000' : `http://localhost:3000${path}`
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'wm-navigate', section: data.section }, '*')
       }
     }
     socket.on('world_monitor_navigate', onWorldMonitorNavigate)
