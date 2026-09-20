@@ -550,78 +550,59 @@ async def close_window(window_name: str):
 # 8. File Browser Tools (interactive file navigation)
 
 async def list_files(path: str = "", search: str = "") -> dict:
-    """List directory contents with structured metadata (name, type, size)."""
-    import asyncio
-    import string
-    import json
+    """List directory contents with structured metadata (name, type, size).
+    Cross-platform — uses Python pathlib, no PowerShell dependency."""
+    from pathlib import Path
+    from datetime import datetime
+    import platform
     try:
         path = path.strip().strip('"').strip("'") if path else ""
-        # Drive enumeration
+        # Root / drive enumeration
         if not path or path.lower() in (".", "drives", "this pc", "computer", "my computer"):
+            if platform.system() == "Windows":
+                import string as _string
+                drives = []
+                for letter in _string.ascii_uppercase:
+                    dp = Path(f"{letter}:\\")
+                    if dp.exists():
+                        drives.append({"number": len(drives) + 1, "name": f"{letter}:", "type": "folder", "size": 0, "modified": "", "ext": "", "path": str(dp)})
+                return {"success": True, "path": "Available Drives", "items": drives}
+            else:
+                path = "/"
+
+        p = Path(path).resolve()
+        if not p.exists():
+            return {"success": False, "path": path, "items": [], "error": f"Path not found: {path}"}
+        if not p.is_dir():
+            return {"success": False, "path": path, "items": [], "error": f"Not a directory: {path}"}
+
+        items = []
+        for entry in sorted(p.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
             try:
-                ps_drive = "Get-PSDrive -PSProvider FileSystem | Select-Object @{N='Name';E={$_.Root}}, @{N='Type';E={'folder'}} | ConvertTo-Json -Compress"
-                proc = await asyncio.create_subprocess_exec('powershell', '-Command', ps_drive, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-                out, _ = await proc.communicate()
-                drives = json.loads(out.decode('utf-8', errors='replace').strip())
-                if isinstance(drives, dict): drives = [drives]
-                items = []
-                for d in drives:
-                    root = d.get('Name', '')
-                    if root:
-                        items.append({"number": len(items) + 1, "name": root, "type": "folder", "size": 0, "modified": "", "ext": "", "path": root})
-                return {"success": True, "path": "Available Drives", "items": items}
-            except Exception:
-                return {"success": False, "path": "drives", "items": [], "error": "Could not enumerate drives"}
-
-        # Normalize path
-        if len(path) == 2 and path[1] == ':':
-            path += '\\'
-
-        ps_script = (
-            "Get-ChildItem -Path '" + path + "' -Force -ErrorAction SilentlyContinue | "
-            "Select-Object Name, @{N='Type';E={if($_.PSIsContainer){'folder'}else{'file'}}}, Length, LastWriteTime | "
-            "ConvertTo-Json -Compress"
-        )
-        proc = await asyncio.create_subprocess_exec(
-            'powershell', '-Command', ps_script,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await proc.communicate()
-        output = stdout.decode('utf-8', errors='replace').strip()
-        if not output:
-            err_msg = stderr.decode('utf-8', errors='replace').strip()
-            if "access denied" in err_msg.lower() or "permission denied" in err_msg.lower():
-                return {"success": False, "path": path, "items": [], "error": f"Access denied: {path}"}
-            if "not found" in err_msg.lower():
-                return {"success": False, "path": path, "items": [], "error": f"Path not found: {path}"}
-            return {"success": True, "path": path, "items": [], "error": "Directory is empty"}
-        items = json.loads(output)
-        if isinstance(items, dict):
-            items = [items]
-        result = []
-        for item in items:
-            name = item.get('Name', '')
-            item_type = item.get('Type', 'file')
-            size = item.get('Length', 0)
-            modified = item.get('LastWriteTime', '')
-            ext = os.path.splitext(name)[1].lower() if item_type == 'file' else ''
-            result.append({
-                "number": len(result) + 1,
-                "name": name,
-                "type": item_type,
-                "size": size,
-                "modified": modified,
-                "ext": ext,
-                "path": os.path.join(path, name)
-            })
-        # Apply search filter
+                s = entry.stat()
+                is_dir = entry.is_dir()
+                mtime = datetime.fromtimestamp(s.st_mtime).strftime("%Y-%m-%d %H:%M:%S") if s.st_mtime else ""
+                items.append({
+                    "number": len(items) + 1,
+                    "name": entry.name,
+                    "type": "folder" if is_dir else "file",
+                    "size": s.st_size if not is_dir else 0,
+                    "modified": mtime,
+                    "ext": "" if is_dir else str(entry.suffix).lower(),
+                    "path": str(entry),
+                })
+            except (PermissionError, OSError):
+                items.append({
+                    "number": len(items) + 1,
+                    "name": entry.name,
+                    "type": "folder" if entry.is_dir() else "file",
+                    "size": 0, "modified": "", "ext": "", "path": str(entry),
+                })
         if search:
             search_lower = search.lower()
-            result = [i for i in result if search_lower in i['name'].lower()]
-        return {"success": True, "path": path, "items": result}
+            items = [i for i in items if search_lower in i["name"].lower()]
+        return {"success": True, "path": str(p), "items": items, "parent": str(p.parent)}
     except Exception as e:
-        print(f"[list_files] Failed: {e}")
         return {"success": False, "path": path, "items": [], "error": str(e)}
 
 

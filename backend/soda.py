@@ -437,7 +437,9 @@ def _build_system_prompt():
         "CAMERA — ONE silent snapshot at startup → read energy → ONE warm greeting. "
         "Do NOT mention the photo. After greeting, stop. "
         "For visual questions: camera_control(action='analyze'). "
-        "open_camera opens a floating window — NOT open_app('Camera').\n\n"
+        "open_camera opens a FULL-SCREEN live camera view (with 'Camera On' label) — NOT open_app('Camera'). "
+        "camera_control(action='close') closes it. "
+        "While the full-screen view is open you receive a live feed — no need to re-capture for every look.\n\n"
 
         # ── TOOLS GUIDE ───────────────────────────────────────────
         "TOOL GUIDE:\n"
@@ -1162,11 +1164,13 @@ class AudioLoop:
                     result = await asyncio.to_thread(self._get_frame, cap)
                     cap.release()
                     if result and self.video_queue:
+                        # Keep the camera active so send_video() forwards this frame.
+                        # (send_video drains the queue while inactive — resetting
+                        # _camera_active here dropped the one-shot frame almost always.)
                         self._camera_active = True
                         self._last_camera_use = time.time()
                         await self.video_queue.put(result)
                         log.info("Camera: first frame sent")
-                        self._camera_active = False
                     return
                 if cap:
                     cap.release()
@@ -1826,6 +1830,18 @@ class AudioLoop:
                 })
             return types.FunctionResponse(id=fc.id, name=name, response=result)
         elif name in LOCAL_AGENT_TOOLS and not _connected_agents:
+            # list_files has a cross-platform server-side fallback
+            if name == "list_files":
+                log.info(f"[AGENT] No agent connected — using server-side list_files fallback")
+                r = await list_files(args.get("path", ""), args.get("search", ""))
+                if r.get("success"):
+                    await self.sio.emit("file_list", {
+                        "path": r.get("path", args.get("path", "")),
+                        "items": r.get("items", []),
+                        "success": True,
+                        "searchQuery": args.get("search", ""),
+                    })
+                return types.FunctionResponse(id=fc.id, name=name, response=r)
             log.warning(
                 f"[AGENT] {name} requested but NO local agent connected. "
                 f"Agent must run on the user's PC. Start with: py -3.11 backend\\local_agent.py"
@@ -2346,13 +2362,14 @@ TEXT: {text}"""
         elif name == "open_camera":
             self._camera_active = True
             self._last_camera_use = time.time()
-            await self.sio.emit("camera_open", {})
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera opened on your screen, sir."})
+            await self.sio.emit("camera_fullscreen_open", {})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": "Full-screen camera opened on your screen, sir."})
 
         elif name == "camera_control":
             action = args.get("action", "")
 
             async def _request_frontend_frame():
+                """Ask the frontend for a fresh frame. Returns base64 jpeg or None."""
                 request_id = str(uuid.uuid4())
                 future = asyncio.get_event_loop().create_future()
                 self._pending_frames[request_id] = future
@@ -2360,13 +2377,12 @@ TEXT: {text}"""
                     await self.sio.emit("request_frame", {"id": request_id})
                     frame_data = await asyncio.wait_for(future, timeout=5.0)
                     raw = base64.b64decode(frame_data)
-                    payload = {"mime_type": "image/jpeg", "data": frame_data}
                     await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type="image/jpeg"))
-                    if self.video_queue:
-                        await self.video_queue.put(payload)
-                    return True
+                    self._latest_image_payload = {"mime_type": "image/jpeg", "data": frame_data}
+                    self._last_camera_use = time.time()
+                    return frame_data
                 except asyncio.TimeoutError:
-                    return False
+                    return None
                 finally:
                     self._pending_frames.pop(request_id, None)
 
@@ -2383,53 +2399,58 @@ TEXT: {text}"""
                     except Exception:
                         continue
                 if not cap:
-                    return False
+                    return None
                 try:
                     ret, frame = cap.read()
                     cap.release()
                     if not ret:
-                        return False
+                        return None
                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     img = PIL.Image.fromarray(frame_rgb)
                     img.thumbnail([1280, 1280])
                     buf = io.BytesIO()
                     img.save(buf, format="jpeg", quality=85)
-                    b64 = base64.b64encode(buf.getvalue()).decode()
-                    payload = {"mime_type": "image/jpeg", "data": b64}
                     raw = buf.getvalue()
+                    b64 = base64.b64encode(raw).decode()
                     await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type="image/jpeg"))
-                    if self.video_queue:
-                        await self.video_queue.put(payload)
-                    return True
+                    self._latest_image_payload = {"mime_type": "image/jpeg", "data": b64}
+                    self._last_camera_use = time.time()
+                    return b64
                 except Exception:
-                    return False
+                    return None
 
             if action == "snapshot":
                 self._camera_active = True
                 self._last_camera_use = time.time()
-                sent = await _request_frontend_frame()
-                if sent:
-                    return types.FunctionResponse(id=fc.id, name=name, response={"result": "Front camera snapshot captured and sent to your view."})
-                sent = await _send_server_frame()
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Server camera snapshot {'captured and sent' if sent else 'failed — no camera available'}."})
+                frame = await _request_frontend_frame()
+                if not frame:
+                    frame = await _send_server_frame()
+                if frame:
+                    return types.FunctionResponse(id=fc.id, name=name, response={"result": "Snapshot captured and sent to your view."})
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Snapshot failed — no camera available."})
             elif action == "analyze":
                 self._camera_active = True
                 self._last_camera_use = time.time()
-                sent = await _request_frontend_frame()
-                if sent:
-                    return types.FunctionResponse(id=fc.id, name=name, response={"result": "Live camera frame captured from your device. Describe what you see in detail to the user now."})
-                sent = await _send_server_frame()
-                if sent:
-                    return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera snapshot taken via server camera. Describe what you see in detail to the user now."})
+                frame = await _request_frontend_frame()
+                if not frame:
+                    frame = await _send_server_frame()
+                if frame:
+                    return types.FunctionResponse(id=fc.id, name=name, response={"result": "Live camera frame captured and sent to your view. Describe what you see in detail to the user now."})
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": "No camera available. Ask the user to open the camera."})
             elif action == "save":
                 import camera_capture
                 desc = args.get("description", "Camera photo")
                 self._camera_active = True
                 self._last_camera_use = time.time()
-                sent = await _request_frontend_frame()
-                result = camera_capture.save_photo("", desc)
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Photo saved. {result.get('record', {})}"})
+                frame = await _request_frontend_frame()
+                if not frame:
+                    frame = await _send_server_frame()
+                if not frame:
+                    return types.FunctionResponse(id=fc.id, name=name, response={"result": "Save failed — no camera frame available."})
+                result = camera_capture.save_photo(frame, desc)
+                if result.get("success"):
+                    return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Photo saved. {result.get('record', {})}"})
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Save failed: {result.get('error', 'unknown error')}"})
             elif action == "switch":
                 self._last_camera_use = time.time()
                 await self.sio.emit("camera_switch", {})
@@ -2442,8 +2463,8 @@ TEXT: {text}"""
             elif action == "close":
                 self._camera_active = False
                 self._latest_camera_frame = None
-                await self.sio.emit("camera_close", {})
-                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Camera closed."})
+                await self.sio.emit("camera_fullscreen_close", {})
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Full-screen camera closed."})
             return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Unknown action: {action}"})
 
         # ── Email Tools ─────────────────────────────────────────────
