@@ -1,36 +1,38 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
-const WORLD_MONITOR_URL = 'https://worldmonitor.app'
+const WORLD_MONITOR_URL = 'http://localhost:3000'
 
 const SECTIONS = [
-  { id: 'map', label: 'MAP' },
-  { id: 'wire', label: 'WIRE' },
-  { id: 'globe', label: 'GLOBE' },
-  { id: 'stocks', label: 'STOCKS' },
-  { id: 'chat', label: 'CHAT' },
-  { id: 'predictions', label: 'PREDICTIONS' },
-  { id: 'cameras', label: 'CAMERAS' },
-  { id: 'defcon', label: 'DEFCON' },
-  { id: 'outbreaks', label: 'OUTBREAKS' },
-  { id: 'streams', label: 'STREAMS' },
+  { id: 'map', label: 'MAP', path: '/' },
+  { id: 'wire', label: 'WIRE', path: '/wire' },
+  { id: 'globe', label: 'GLOBE', path: '/globe' },
+  { id: 'stocks', label: 'STOCKS', path: '/stocks' },
+  { id: 'chat', label: 'CHAT', path: '/chat' },
+  { id: 'predictions', label: 'PREDICTIONS', path: '/predictions' },
+  { id: 'cameras', label: 'CAMERAS', path: '/cameras' },
+  { id: 'defcon', label: 'DEFCON', path: '/defcon' },
+  { id: 'outbreaks', label: 'OUTBREAKS', path: '/outbreaks' },
+  { id: 'streams', label: 'STREAMS', path: '/streams' },
 ]
 
-export default function WorldMonitorPanel({ open, onClose, onNavigate }) {
+export default function WorldMonitorPanel({ open, onClose }) {
   const iframeRef = useRef(null)
+  const [currentSection, setCurrentSection] = useState('map')
   const onCloseRef = useRef(onClose)
-  const onNavigateRef = useRef(onNavigate)
 
   useEffect(() => {
     onCloseRef.current = onClose
-    onNavigateRef.current = onNavigate
-  }, [onClose, onNavigate])
+  }, [onClose])
 
   const handleClose = useCallback(() => {
     if (onCloseRef.current) onCloseRef.current()
   }, [])
 
-  const handleSectionClick = useCallback((sectionId) => {
-    if (onNavigateRef.current) onNavigateRef.current(sectionId)
+  const handleSectionClick = useCallback((section) => {
+    if (!iframeRef.current) return
+    const url = section.path === '/' ? WORLD_MONITOR_URL : `${WORLD_MONITOR_URL}${section.path}`
+    iframeRef.current.src = url
+    setCurrentSection(section.id)
   }, [])
 
   useEffect(() => {
@@ -47,12 +49,16 @@ export default function WorldMonitorPanel({ open, onClose, onNavigate }) {
   return (
     <div className="world-monitor-panel">
       <div className="wm-control-bar">
+        <div className="wm-brand">
+          <span className="wm-brand-dot" />
+          WORLD MONITOR
+        </div>
         <div className="wm-sections">
           {SECTIONS.map((s) => (
             <button
               key={s.id}
-              className="wm-section-btn"
-              onClick={() => handleSectionClick(s.id)}
+              className={`wm-section-btn ${currentSection === s.id ? 'active' : ''}`}
+              onClick={() => handleSectionClick(s)}
               title={`Open ${s.label}`}
             >
               {s.label}
@@ -70,7 +76,6 @@ export default function WorldMonitorPanel({ open, onClose, onNavigate }) {
         className="wm-iframe"
         title="World Monitor"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
       />
     </div>
   )

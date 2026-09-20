@@ -1762,6 +1762,31 @@ body.widget-mode #root {
   background: rgba(10, 10, 15, 0.85);
   border-bottom: 1px solid rgba(0, 251, 251, 0.15);
   backdrop-filter: blur(8px);
+  gap: 12px;
+}
+.wm-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: #00fbfb;
+  white-space: nowrap;
+  text-shadow: 0 0 8px rgba(0, 251, 251, 0.4);
+}
+.wm-brand-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00fbfb;
+  box-shadow: 0 0 8px #00fbfb;
+  animation: wm-dot-pulse 2s ease-in-out infinite;
+}
+@keyframes wm-dot-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px #00fbfb; }
+  50% { opacity: 0.4; box-shadow: 0 0 2px #00fbfb; }
 }
 .wm-sections {
   display: flex;
@@ -1783,6 +1808,12 @@ body.widget-mode #root {
   background: rgba(0, 251, 251, 0.1);
   border-color: rgba(0, 251, 251, 0.5);
   color: #00fbfb;
+}
+.wm-section-btn.active {
+  background: rgba(0, 251, 251, 0.15);
+  border-color: #00fbfb;
+  color: #00fbfb;
+  text-shadow: 0 0 6px rgba(0, 251, 251, 0.5);
 }
 .wm-close-btn {
   padding: 5px 14px;

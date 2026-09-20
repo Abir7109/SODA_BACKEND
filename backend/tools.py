@@ -1506,13 +1506,13 @@ project_registry_tool = {
 
 open_world_monitor_tool = {
     "name": "open_world_monitor",
-    "description": "Opens the World Monitor global intelligence dashboard in fullscreen. Use when user says 'open the controller', 'open world map', 'show me the world', 'open the dashboard', 'show global map', 'open world monitor', or any variation of wanting to see the world monitor.",
+    "description": "Opens the World Monitor global intelligence dashboard in fullscreen. MUST be called before navigate_world_monitor. Use when user says 'open the controller', 'open world map', 'show me the world', 'open the dashboard', 'show global map', 'open world monitor', 'what's happening in the world', or any variation of wanting to see the world monitor dashboard.",
     "parameters": {"type": "OBJECT", "properties": {}, "required": []}
 }
 
 navigate_world_monitor_tool = {
     "name": "navigate_world_monitor",
-    "description": "Navigates within the World Monitor controller. ONLY use when the controller is already open. Sections: map, wire, globe, stocks, chat, predictions, cameras, defcon, outbreaks, streams. Use when user says things like 'open stocks', 'show the chat', 'switch to cameras', 'what are the predictions', etc.",
+    "description": "Switches to a specific section inside the World Monitor controller. ONLY call this AFTER open_world_monitor has been called. Sections: map (default overview), wire (news feed), globe (3D view), stocks (markets), chat (analyst), predictions (forecasts), cameras (live feeds), defcon (threat level), outbreaks (disease tracking), streams (live data).",
     "parameters": {
         "type": "OBJECT",
         "properties": {

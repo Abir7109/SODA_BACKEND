@@ -1370,7 +1370,13 @@ export default function App() {
       if (!data || !data.section) return
       const iframe = document.getElementById('world-monitor-iframe')
       if (iframe) {
-        iframe.contentWindow.postMessage({ type: 'wm-navigate', section: data.section }, '*')
+        const sectionMap = {
+          map: '/', wire: '/wire', globe: '/globe', stocks: '/stocks',
+          chat: '/chat', predictions: '/predictions', cameras: '/cameras',
+          defcon: '/defcon', outbreaks: '/outbreaks', streams: '/streams',
+        }
+        const path = sectionMap[data.section] || '/'
+        iframe.src = path === '/' ? 'http://localhost:3000' : `http://localhost:3000${path}`
       }
     }
     socket.on('world_monitor_navigate', onWorldMonitorNavigate)
@@ -2101,12 +2107,6 @@ export default function App() {
     <WorldMonitorPanel
       open={worldMonitorOpen}
       onClose={() => setWorldMonitorOpen(false)}
-      onNavigate={(section) => {
-        const iframe = document.getElementById('world-monitor-iframe')
-        if (iframe) {
-          iframe.contentWindow.postMessage({ type: 'wm-navigate', section }, '*')
-        }
-      }}
     />
     <WakeSequence active={waking} onComplete={() => setWaking(false)} />
     </>

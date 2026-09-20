@@ -442,14 +442,16 @@ def _build_system_prompt():
         "While the full-screen view is open you receive a live feed — no need to re-capture for every look.\n\n"
 
         # ── WORLD MONITOR ─────────────────────────────────────────
-        "WORLD MONITOR — Global intelligence dashboard:\n"
+        "WORLD MONITOR — Global intelligence dashboard running at localhost:3000:\n"
         "- open_world_monitor: Opens the controller in fullscreen. Use for 'open the controller', "
-        "'show me the world', 'open world map', 'world monitor', or any global dashboard request.\n"
-        "- navigate_world_monitor: Navigates to a section (map, wire, globe, stocks, chat, predictions, "
-        "cameras, defcon, outbreaks, streams). ONLY works when controller is already open.\n"
-        "- IMPORTANT: If user asks for stocks/chat/cameras/predictions WITHOUT the controller open, "
-        "call open_world_monitor FIRST, then navigate_world_monitor.\n"
-        "- close_panel(panel='world_monitor') closes the controller.\n\n"
+        "'show me the world', 'open world map', 'world monitor', 'open dashboard', or any global "
+        "intelligence request. ALWAYS call this FIRST before navigate_world_monitor.\n"
+        "- navigate_world_monitor: Switches to a section. ONLY call after open_world_monitor. "
+        "Sections: map (default), wire, globe, stocks, chat, predictions, cameras, defcon, outbreaks, streams.\n"
+        "- close_panel(panel='world_monitor'): Closes the controller. Use when user says 'close controller', "
+        "'close world monitor', 'close the dashboard'.\n"
+        "- If user asks for a specific section (stocks, chat, cameras, etc.) WITHOUT the controller open, "
+        "call open_world_monitor FIRST, then navigate_world_monitor with the requested section.\n\n"
 
         # ── TOOLS GUIDE ───────────────────────────────────────────
         "TOOL GUIDE:\n"
@@ -1967,6 +1969,8 @@ class AudioLoop:
             panel = (args.get("panel", "") or "").strip()
             if not panel:
                 panel = "all"
+            if panel in ("world_monitor", "all"):
+                self._world_monitor_open = False
             if self.sio:
                 await self.sio.emit("close_panel", {"panel": panel})
             return types.FunctionResponse(id=fc.id, name=name, response={"result": "Closed."})
