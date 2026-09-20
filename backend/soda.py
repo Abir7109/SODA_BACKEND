@@ -441,6 +441,16 @@ def _build_system_prompt():
         "camera_control(action='close') closes it. "
         "While the full-screen view is open you receive a live feed — no need to re-capture for every look.\n\n"
 
+        # ── WORLD MONITOR ─────────────────────────────────────────
+        "WORLD MONITOR — Global intelligence dashboard:\n"
+        "- open_world_monitor: Opens the controller in fullscreen. Use for 'open the controller', "
+        "'show me the world', 'open world map', 'world monitor', or any global dashboard request.\n"
+        "- navigate_world_monitor: Navigates to a section (map, wire, globe, stocks, chat, predictions, "
+        "cameras, defcon, outbreaks, streams). ONLY works when controller is already open.\n"
+        "- IMPORTANT: If user asks for stocks/chat/cameras/predictions WITHOUT the controller open, "
+        "call open_world_monitor FIRST, then navigate_world_monitor.\n"
+        "- close_panel(panel='world_monitor') closes the controller.\n\n"
+
         # ── TOOLS GUIDE ───────────────────────────────────────────
         "TOOL GUIDE:\n"
         "- open_app(app_name=...) — ONLY tool for opening apps. Full cascade (Start Menu, registry, PATH, AppX). "
@@ -612,6 +622,7 @@ class AudioLoop:
         self._model_is_speaking = False
         self._tools_running = False
         self._last_tool_start = 0.0
+        self._world_monitor_open = False
         self._current_emotion = None
         self._last_emotion_inject = 0.0
         self.chat_buffer = {"sender": None, "text": ""}
@@ -1959,6 +1970,20 @@ class AudioLoop:
             if self.sio:
                 await self.sio.emit("close_panel", {"panel": panel})
             return types.FunctionResponse(id=fc.id, name=name, response={"result": "Closed."})
+
+        elif name == "open_world_monitor":
+            self._world_monitor_open = True
+            if self.sio:
+                await self.sio.emit("world_monitor_open", {})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": "World Monitor controller opened in fullscreen."})
+
+        elif name == "navigate_world_monitor":
+            if not self._world_monitor_open:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Controller not open. Tell the user to open the controller first, then try again."})
+            section = args.get("section", "map")
+            if self.sio:
+                await self.sio.emit("world_monitor_navigate", {"section": section})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Navigated to {section} view."})
 
         elif name == "scroll_file_list":
             action = args.get("action", "down")

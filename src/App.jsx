@@ -123,6 +123,7 @@ import DailyBriefingPanel from './components/panels/DailyBriefingPanel'
 import Notepad from './components/Notepad'
 import BackgroundWidget from './components/BackgroundWidget'
 import FullscreenCamera from './components/FullscreenCamera'
+import WorldMonitorPanel from './components/panels/WorldMonitorPanel'
 import useBrowserMic, { resumeMicAudio } from './services/useBrowserMic'
 // --- Frontend Error Logging ---
 if (typeof socket !== 'undefined') {
@@ -675,6 +676,7 @@ export default function App() {
   const [speakingState, setSpeakingState] = useState('idle')
   const [waking, setWaking] = useState(false)
   const [cameraFullscreen, setCameraFullscreen] = useState(false)
+  const [worldMonitorOpen, setWorldMonitorOpen] = useState(false)
   const personalityTimerRef = useRef(null)
 
   // ── Browser mic capture (web) ──
@@ -1162,6 +1164,9 @@ export default function App() {
           if (infoTimerRef.current) clearTimeout(infoTimerRef.current)
           setInfoPanel(prev => ({ ...prev, visible: false }))
           break
+        case 'world_monitor':
+          setWorldMonitorOpen(false)
+          break
         case 'all':
           if (terminalTimerRef.current) clearTimeout(terminalTimerRef.current)
           setTerminal(prev => ({ ...prev, visible: false }))
@@ -1205,6 +1210,7 @@ export default function App() {
           setAgentsPanel(prev => ({ ...prev, visible: false }))
           setFloatingWindows([])
           setCameraFullscreen(false)
+          setWorldMonitorOpen(false)
           break
       }
     }
@@ -1357,6 +1363,17 @@ export default function App() {
 
     const onCameraFullscreenOpen = () => setCameraFullscreen(true)
     socket.on('camera_fullscreen_open', onCameraFullscreenOpen)
+
+    const onWorldMonitorOpen = () => setWorldMonitorOpen(true)
+    socket.on('world_monitor_open', onWorldMonitorOpen)
+    const onWorldMonitorNavigate = (data) => {
+      if (!data || !data.section) return
+      const iframe = document.getElementById('world-monitor-iframe')
+      if (iframe) {
+        iframe.contentWindow.postMessage({ type: 'wm-navigate', section: data.section }, '*')
+      }
+    }
+    socket.on('world_monitor_navigate', onWorldMonitorNavigate)
 
     const onViewFile = (data) => {
       if (!data || !data.payload) return
@@ -2081,6 +2098,16 @@ export default function App() {
     {cameraFullscreen && (
       <FullscreenCamera socket={socket} onClose={() => setCameraFullscreen(false)} />
     )}
+    <WorldMonitorPanel
+      open={worldMonitorOpen}
+      onClose={() => setWorldMonitorOpen(false)}
+      onNavigate={(section) => {
+        const iframe = document.getElementById('world-monitor-iframe')
+        if (iframe) {
+          iframe.contentWindow.postMessage({ type: 'wm-navigate', section }, '*')
+        }
+      }}
+    />
     <WakeSequence active={waking} onComplete={() => setWaking(false)} />
     </>
     </RootErrorBoundary>

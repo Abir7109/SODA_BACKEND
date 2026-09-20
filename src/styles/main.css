@@ -1629,75 +1629,181 @@ body.widget-mode #root {
   border-color: var(--border-accent);
 }
 
-/* ── Camera Widget ── */
-.camera-widget {
-  display: flex;
-  flex-direction: column;
+/* ── Full-screen Camera ── */
+.fullscreen-camera {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  overflow: hidden;
+}
+.fsc-video {
   width: 100%;
   height: 100%;
-  overflow: hidden;
-  background: #000;
-}
-.camera-video {
-  flex: 1;
-  width: 100%;
   object-fit: cover;
   display: block;
-  background: #111;
+  background: #000;
 }
-.camera-controls {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 24px;
-  padding: 8px 12px;
-  background: rgba(0,0,0,0.85);
-  border-top: 1px solid rgba(0,251,251,0.15);
-}
-.camera-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
+.fsc-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 51, 85, 0.5);
+  color: #ff4466;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.fsc-close:hover {
+  background: rgba(255, 51, 85, 0.15);
+  border-color: #ff4466;
+}
+.fsc-switch {
+  position: absolute;
+  top: 16px;
+  right: 110px;
+  width: 38px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s, box-shadow 0.15s;
-  background: transparent;
-  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(0, 251, 251, 0.35);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
 }
-.camera-btn:hover {
-  transform: scale(1.08);
+.fsc-switch:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
 }
-.camera-btn:active {
-  transform: scale(0.94);
+.fsc-label {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--accent-dim);
+  color: var(--accent);
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
+  box-shadow: 0 0 18px var(--accent-glow);
 }
-.camera-btn-capture {
-  background: rgba(255,255,255,0.15);
-  border: 2px solid rgba(255,255,255,0.5);
-}
-.camera-btn-capture .camera-btn-icon {
-  width: 16px;
-  height: 16px;
+.fsc-dot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #fff;
-  display: block;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: fsc-pulse 1.6s ease-in-out infinite;
 }
-.camera-btn-switch {
-  background: rgba(0,251,251,0.1);
-  border: 1px solid rgba(0,251,251,0.3);
-  color: #00fbfb;
+@keyframes fsc-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--accent); }
+  50% { opacity: 0.35; box-shadow: 0 0 2px var(--accent); }
+}
+.fsc-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff4466;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  background: #000;
 }
 @media (max-width: 480px) {
-  .camera-controls {
-    padding: 6px 10px;
-    gap: 20px;
+  .fsc-close {
+    top: 10px;
+    right: 10px;
   }
-  .camera-btn {
-    width: 40px;
-    height: 40px;
+  .fsc-switch {
+    top: 10px;
+    right: 92px;
   }
+  .fsc-label {
+    bottom: 18px;
+  }
+}
+
+/* ── World Monitor Panel (fullscreen iframe) ── */
+.world-monitor-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #0a0a0f;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.wm-control-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(10, 10, 15, 0.85);
+  border-bottom: 1px solid rgba(0, 251, 251, 0.15);
+  backdrop-filter: blur(8px);
+}
+.wm-sections {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.wm-section-btn {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid rgba(0, 251, 251, 0.2);
+  color: rgba(0, 251, 251, 0.6);
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wm-section-btn:hover {
+  background: rgba(0, 251, 251, 0.1);
+  border-color: rgba(0, 251, 251, 0.5);
+  color: #00fbfb;
+}
+.wm-close-btn {
+  padding: 5px 14px;
+  background: rgba(255, 51, 85, 0.1);
+  border: 1px solid rgba(255, 51, 85, 0.4);
+  color: #ff4466;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wm-close-btn:hover {
+  background: rgba(255, 51, 85, 0.2);
+  border-color: #ff4466;
+}
+.wm-iframe {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: #0a0a0f;
 }
 
 /* ── Tool Showcase Animation Keyframes ──────────────────── */

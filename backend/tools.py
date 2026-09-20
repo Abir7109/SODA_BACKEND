@@ -1215,10 +1215,10 @@ take_photo_tool = {
 
 open_camera_tool = {
     "name": "open_camera",
-    "description": "Open a live camera viewfinder window on the user's screen. "
+    "description": "Open a FULL-SCREEN live camera view on the user's screen with a 'Camera On' label. "
                    "Call this when the user says 'open the camera', 'show me the camera', "
                    "'turn on the camera', or wants to take a photo or see themselves. "
-                   "The window is small, draggable, and mobile-friendly. "
+                   "While it is open you receive a continuous live video feed — you can see the user in real time. "
                    "After opening, use camera_control to capture, analyze, save, switch, or close.",
     "parameters": {
         "type": "OBJECT",
@@ -1228,17 +1228,18 @@ open_camera_tool = {
 
 camera_control_tool = {
     "name": "camera_control",
-    "description": "Control the live camera window after it is open. "
+    "description": "Control the live camera view after it is open. "
                    "snapshot = capture current frame silently for you to see. "
                    "analyze = capture current frame and describe what you see to the user. "
                    "save = capture current frame and store it in the database with a description. "
                    "switch = toggle between front and back camera. "
-                   "close = close the camera window. "
+                   "close = close the full-screen camera view. "
                    "Use analyze when the user asks 'what do you see', 'what's in front of me', "
                    "or anything requiring visual description. "
                    "Use snapshot for silent capture without commentary. "
                    "Use save when the user says 'save this photo' or 'remember this image'. "
                    "Use switch when the user says 'switch camera', 'back camera', 'selfie'. "
+                   "Use close when the user says 'close the camera' or 'turn off the camera'. "
                    "Do NOT ask for permission — just call the appropriate action.",
     "parameters": {
         "type": "OBJECT",
@@ -1501,6 +1502,30 @@ project_registry_tool = {
     }
 }
 
+# ── World Monitor Controller ──
+
+open_world_monitor_tool = {
+    "name": "open_world_monitor",
+    "description": "Opens the World Monitor global intelligence dashboard in fullscreen. Use when user says 'open the controller', 'open world map', 'show me the world', 'open the dashboard', 'show global map', 'open world monitor', or any variation of wanting to see the world monitor.",
+    "parameters": {"type": "OBJECT", "properties": {}, "required": []}
+}
+
+navigate_world_monitor_tool = {
+    "name": "navigate_world_monitor",
+    "description": "Navigates within the World Monitor controller. ONLY use when the controller is already open. Sections: map, wire, globe, stocks, chat, predictions, cameras, defcon, outbreaks, streams. Use when user says things like 'open stocks', 'show the chat', 'switch to cameras', 'what are the predictions', etc.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "section": {
+                "type": "STRING",
+                "enum": ["map", "wire", "globe", "stocks", "chat", "predictions", "cameras", "defcon", "outbreaks", "streams"],
+                "description": "Which section to navigate to"
+            }
+        },
+        "required": ["section"]
+    }
+}
+
 
 
 tools_list = [{"function_declarations": [
@@ -1617,6 +1642,10 @@ tools_list = [{"function_declarations": [
 
     # ── Project Registry ──
     project_registry_tool,
+
+    # ── World Monitor Controller ──
+    open_world_monitor_tool,
+    navigate_world_monitor_tool,
 
     
 ]}]
