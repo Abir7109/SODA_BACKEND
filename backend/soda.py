@@ -1720,8 +1720,7 @@ class AudioLoop:
                 'tool': name,
                 'args': args,
             }, room=agent_sid)
-            log.info(f"[BRIDGE] 📤 Emitted to {agent_sid}, waiting for response (timeout={timeout}s)")
-            # Per-tool timeouts — WhatsApp needs extra time (app launch + search + typing)
+            # Per-tool timeouts
             _TOOL_TIMEOUTS = {
                 "send_whatsapp": 45.0,
                 "whatsapp_find_and_message": 45.0,
@@ -1736,11 +1735,11 @@ class AudioLoop:
                 "list_installed_apps": 15.0,
                 "refresh_app_registry": 30.0,
                 "credential": 15.0,
-                # Terminal/command execution needs extra time for retries
                 "terminal_execute": 90.0,
                 "execute_command": 90.0,
             }
             timeout = _TOOL_TIMEOUTS.get(name, 30.0)
+            log.info(f"[BRIDGE] 📤 Emitted to {agent_sid}, waiting for response (timeout={timeout}s)")
             try:
                 result = await asyncio.wait_for(future, timeout=timeout)
                 _success = result.pop('_success', True)
