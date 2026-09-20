@@ -2002,131 +2002,34 @@ class AudioLoop:
             return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Navigated to {section} view."})
 
         elif name == "get_world_monitor_data":
-            import aiohttp as _aiohttp
+            import uuid as _uuid
             section = args.get("section", "all")
-            results = {}
-            timeout = _aiohttp.ClientTimeout(total=8)
+            sections = [section] if section != "all" else ["markets", "predictions", "news", "intelligence", "cyber", "panels"]
+
+            if not self._world_monitor_open:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "World Monitor is not open. Ask the user to open the controller first."})
+            if not self.sio:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Socket not connected."})
+
+            request_id = str(_uuid.uuid4())[:8]
+            result_container = {}
+            event = asyncio.Event()
+
+            def on_response(data):
+                if data and data.get("requestId") == request_id:
+                    result_container["data"] = data.get("data", {})
+                    event.set()
+
+            self.sio.on("world_monitor_data_response", on_response)
+            await self.sio.emit("get_world_monitor_data", {"requestId": request_id, "sections": sections})
             try:
-                async with _aiohttp.ClientSession(timeout=timeout) as session:
-                    if section in ("stocks", "all"):
-                        try:
-                            async with session.get("https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=1d&interval=5m") as resp:
-                                if resp.status == 200:
-                                    d = await resp.json()
-                                    meta = d["chart"]["result"][0]["meta"]
-                                    results["stocks"] = {
-                                        "symbol": "S&P 500",
-                                        "price": meta.get("regularMarketPrice"),
-                                        "change": round(meta.get("regularMarketPrice", 0) - meta.get("chartPreviousClose", 0), 2),
-                                        "changePct": round((meta.get("regularMarketPrice", 0) - meta.get("chartPreviousClose", 1)) / meta.get("chartPreviousClose", 1) * 100, 2),
-                                        "previousClose": meta.get("chartPreviousClose"),
-                                    }
-                                else:
-                                    results["stocks"] = {"error": "Yahoo Finance unavailable"}
-                        except Exception as e:
-                            results["stocks"] = {"error": str(e)[:100]}
-
-                    if section in ("earthquakes", "all"):
-                        try:
-                            async with session.get("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_week.geojson") as resp:
-                                if resp.status == 200:
-                                    d = await resp.json()
-                                    quakes = []
-                                    for f in d.get("features", [])[:5]:
-                                        p = f["properties"]
-                                        quakes.append({
-                                            "place": p.get("place"),
-                                            "magnitude": p.get("mag"),
-                                            "time": p.get("time"),
-                                            "tsunami": p.get("tsunami", 0),
-                                        })
-                                    results["earthquakes"] = {"count": len(quakes), "events": quakes}
-                                else:
-                                    results["earthquakes"] = {"error": "USGS unavailable"}
-                        except Exception as e:
-                            results["earthquakes"] = {"error": str(e)[:100]}
-
-                    if section in ("war", "all"):
-                        try:
-                            async with session.get("https://api.gdeltproject.org/api/v2/doc/doc?query=conflict%20OR%20military%20OR%20strike%20OR%20attack&mode=artlist&maxrecords=10&format=json&sort=DateDesc") as resp:
-                                if resp.status == 200:
-                                    d = await resp.json()
-                                    articles = []
-                                    for a in d.get("articles", [])[:8]:
-                                        articles.append({
-                                            "title": a.get("title"),
-                                            "source": a.get("domain"),
-                                            "date": a.get("seendate"),
-                                        })
-                                    results["war"] = {"count": len(articles), "events": articles}
-                                else:
-                                    results["war"] = {"error": "GDELT unavailable"}
-                        except Exception as e:
-                            results["war"] = {"error": str(e)[:100]}
-
-                    if section in ("outbreaks", "all"):
-                        try:
-                            async with session.get("https://www.reliefweb.int/api/v1/reports?appname=soda&filter[field]=primary_country.iso3&filter[value]=&limit=5&sort[]=date:desc&fields[include][]=title&fields[include][]=date&fields[include][]=body_html_url&fields[include][]=source.name") as resp:
-                                if resp.status == 200:
-                                    d = await resp.json()
-                                    reports = []
-                                    for r in d.get("data", [])[:5]:
-                                        attrs = r.get("fields", {})
-                                        reports.append({
-                                            "title": attrs.get("title"),
-                                            "date": attrs.get("date"),
-                                            "source": (attrs.get("source") or [{}])[0].get("name") if attrs.get("source") else None,
-                                        })
-                                    results["outbreaks"] = {"count": len(reports), "events": reports}
-                                else:
-                                    results["outbreaks"] = {"error": "ReliefWeb unavailable"}
-                        except Exception as e:
-                            results["outbreaks"] = {"error": str(e)[:100]}
-
-                    if section in ("predictions", "all"):
-                        try:
-                            async with session.get("https://gamma-api.polymarket.com/markets?limit=10&active=true&order=volume24hr&ascending=false") as resp:
-                                if resp.status == 200:
-                                    d = await resp.json()
-                                    markets = []
-                                    for m in d[:8]:
-                                        markets.append({
-                                            "question": m.get("question"),
-                                            "outcomeYes": m.get("outcomePrices", "[0,0]").strip("[]").split(",")[0] if m.get("outcomePrices") else None,
-                                            "volume24hr": m.get("volume24hr"),
-                                            "liquidity": m.get("liquidity"),
-                                        })
-                                    results["predictions"] = {"count": len(markets), "markets": markets}
-                                else:
-                                    results["predictions"] = {"error": "Polymarket unavailable"}
-                        except Exception as e:
-                            results["predictions"] = {"error": str(e)[:100]}
-
-                    if section in ("defcon", "all"):
-                        results["defcon"] = {"level": "UNKNOWN", "note": "DEFCON level is not publicly updated in real-time. Current estimated level: 3 (elevated). Check official sources for updates."}
-
-                    if section in ("economy", "all"):
-                        try:
-                            async with session.get("https://api.gdeltproject.org/api/v2/doc/doc?query=economy%20OR%20inflation%20OR%20recession%20OR%20fed%20rate&mode=artlist&maxrecords=8&format=json&sort=DateDesc") as resp:
-                                if resp.status == 200:
-                                    d = await resp.json()
-                                    articles = []
-                                    for a in d.get("articles", [])[:6]:
-                                        articles.append({
-                                            "title": a.get("title"),
-                                            "source": a.get("domain"),
-                                            "date": a.get("seendate"),
-                                        })
-                                    results["economy"] = {"count": len(articles), "events": articles}
-                                else:
-                                    results["economy"] = {"error": "GDELT unavailable"}
-                        except Exception as e:
-                            results["economy"] = {"error": str(e)[:100]}
-
-            except Exception as e:
-                results = {"error": f"Failed to fetch data: {str(e)[:200]}"}
-
-            return types.FunctionResponse(id=fc.id, name=name, response={"result": results})
+                await asyncio.wait_for(event.wait(), timeout=10)
+                result = result_container.get("data", {})
+            except asyncio.TimeoutError:
+                result = {"error": "Timed out waiting for World Monitor data. Make sure the dashboard is open and loaded."}
+            finally:
+                self.sio.off("world_monitor_data_response", on_response)
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": result})
 
         elif name == "scroll_file_list":
             action = args.get("action", "down")
