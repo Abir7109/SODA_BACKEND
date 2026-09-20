@@ -1002,6 +1002,7 @@ class AudioLoop:
             log.warning(f"Context refresh failed: {e}")
 
     async def send_audio(self):
+        consecutive_errors = 0
         while True:
             try:
                 try:
@@ -1010,10 +1011,19 @@ class AudioLoop:
                         self.session.send_realtime_input(audio=types.Blob(data=msg["data"], mime_type=msg["mime_type"])),
                         timeout=5.0
                     )
+                    consecutive_errors = 0
                 except asyncio.TimeoutError:
                     pass
+            except (websockets.exceptions.ConnectionClosedError,
+                    websockets.exceptions.ConnectionClosed) as e:
+                log.warning(f"send_audio: session dead ({e}) — stopping")
+                raise
             except Exception as e:
-                log.error(f"send_audio error: {e}")
+                consecutive_errors += 1
+                if consecutive_errors >= 5:
+                    log.warning(f"send_audio: {consecutive_errors} consecutive errors — stopping")
+                    raise
+                log.error(f"send_audio error ({consecutive_errors}): {e}")
                 await asyncio.sleep(0.1)
 
     async def send_video(self):
@@ -1273,6 +1283,10 @@ class AudioLoop:
                     self.audio_queue = asyncio.Queue(maxsize=500)
                     self.video_queue = asyncio.Queue(maxsize=5)
                     self._model_is_speaking = False
+                    self._tools_running = False
+                    self._last_tool_start = 0.0
+                    self._processed_fc_ids.clear()
+                    self._pending_confirmations.clear()
 
                     tg.create_task(self.send_audio())
                     tg.create_task(self.send_video())
@@ -1315,8 +1329,16 @@ class AudioLoop:
             except Exception as e:
                 log.error(f"Connection error: {e}")
                 traceback.print_exc()
+                self._model_is_speaking = False
+                self._tools_running = False
+                self._last_tool_start = 0.0
                 if self.on_error:
-                    self.on_error(f"Gemini connection failed: {e}")
+                    self.on_error(f"Gemini reconnecting...")
+                if self.sio:
+                    try:
+                        await self.sio.emit("speaking_state", {"state": "idle"})
+                    except Exception:
+                        pass
                 if self.stop_event.is_set():
                     break
                 log.warning(f"Reconnecting in {retry_delay}s...")
@@ -1565,12 +1587,18 @@ class AudioLoop:
                 websockets.exceptions.ConnectionClosed) as e:
             code = getattr(e, 'code', '?')
             log.warning(f"Session disconnected (code {code}): {e}")
+            self._model_is_speaking = False
+            self._tools_running = False
+            self._last_tool_start = 0.0
             if self.on_error:
                 self.on_error(f"Session disconnected: {e}")
             raise e
         except Exception as e:
             log.error(f"Error in receive_audio: {e}")
             traceback.print_exc()
+            self._model_is_speaking = False
+            self._tools_running = False
+            self._last_tool_start = 0.0
             if self.on_error:
                 self.on_error(f"receive_audio crashed: {e}")
             raise e
