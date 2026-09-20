@@ -117,9 +117,9 @@ Integrate [World Monitor](https://github.com/koala73/worldmonitor) (87k+ GitHub 
 
 | Step | Task | Status |
 |------|------|--------|
-| 5.1 | Commit all changes | Pending |
-| 5.2 | Deploy frontend to Netlify | Pending |
-| 5.3 | Push backend to Render | Pending |
+| 5.1 | Commit all changes | Done |
+| 5.2 | Deploy frontend to Netlify | Done |
+| 5.3 | Push backend to Render | Done |
 | 5.4 | Test: "Open the controller" → fullscreen opens | Pending |
 | 5.5 | Test: "Close the controller" → fullscreen closes | Pending |
 | 5.6 | Test: Navigation commands when controller is open | Pending |
@@ -127,9 +127,21 @@ Integrate [World Monitor](https://github.com/koala73/worldmonitor) (87k+ GitHub 
 
 **Depends on**: Phase 2 + Phase 4 complete.
 
----
+### Phase 6: Fix CSP Block — Run World Monitor Locally
+**Goal**: worldmonitor.app blocks iframe embedding via CSP. Fix by running it locally on port 3000.
 
-## Voice Command System
+| Step | Task | Status |
+|------|------|--------|
+| 6.1 | Clone worldmonitor repo to `world-monitor/` | Pending |
+| 6.2 | Install dependencies | Pending |
+| 6.3 | Generate required secrets | Pending |
+| 6.4 | Start dev server on port 3000 | Pending |
+| 6.5 | Update WorldMonitorPanel to use `localhost:3000` | Pending |
+| 6.6 | Rebuild + redeploy frontend | Pending |
+| 6.7 | Test: "Open the controller" → fullscreen opens | Pending |
+
+**Files**: `world-monitor/` (new, gitignored), `src/components/panels/WorldMonitorPanel.jsx` (URL change)
+**Depends on**: Phase 5 CSP issue discovered.
 
 ### Two Sectors
 

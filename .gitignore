@@ -44,3 +44,6 @@ backend_remote/
 # Stale directories
 animation-workspace/
 google-ai-studio/
+
+# World Monitor (separate project, run locally)
+world-monitor/
