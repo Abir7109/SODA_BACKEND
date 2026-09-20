@@ -1714,13 +1714,13 @@ class AudioLoop:
                     "attempt": 1, "total": 5,
                     "output": "", "error": "", "success": None,
                 }))
-            self.log.info(f"[BRIDGE] 📤 Dispatching {name} to agent {agent_sid}")
+            log.info(f"[BRIDGE] 📤 Dispatching {name} to agent {agent_sid}")
             await self.sio.emit('agent_execute', {
                 'callback_id': callback_id,
                 'tool': name,
                 'args': args,
             }, room=agent_sid)
-            self.log.info(f"[BRIDGE] 📤 Emitted to {agent_sid}, waiting for response (timeout={timeout}s)")
+            log.info(f"[BRIDGE] 📤 Emitted to {agent_sid}, waiting for response (timeout={timeout}s)")
             # Per-tool timeouts — WhatsApp needs extra time (app launch + search + typing)
             _TOOL_TIMEOUTS = {
                 "send_whatsapp": 45.0,
@@ -1781,7 +1781,7 @@ class AudioLoop:
                         callback_id = str(_uuid.uuid4())
                         future = asyncio.Future()
                         _pending_agent_results[callback_id] = future
-                        self.log.info(f"[BRIDGE] 🔄 Retry: dispatching {name} (attempt {total_attempts}/{max_attempts})")
+                        log.info(f"[BRIDGE] 🔄 Retry: dispatching {name} (attempt {total_attempts}/{max_attempts})")
                         await self.sio.emit('agent_execute', {
                             'callback_id': callback_id,
                             'tool': name,

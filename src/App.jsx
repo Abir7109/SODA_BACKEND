@@ -122,7 +122,7 @@ import NightWinddown from './components/NightWinddown'
 import DailyBriefingPanel from './components/panels/DailyBriefingPanel'
 import Notepad from './components/Notepad'
 import BackgroundWidget from './components/BackgroundWidget'
-import CameraWidget from './components/CameraWidget'
+import FullscreenCamera from './components/FullscreenCamera'
 import useBrowserMic, { resumeMicAudio } from './services/useBrowserMic'
 // --- Frontend Error Logging ---
 if (typeof socket !== 'undefined') {
@@ -525,9 +525,6 @@ function FloatingContent({ content }) {
     case 'schedule':
       return <ScheduleWindow data={content.data} />
 
-    case 'camera':
-      return <CameraWidget socket={socket} />
-
     default:
       return (
         <pre className="sp-output-pre" style={{ color: '#c8c8c8' }}>
@@ -677,6 +674,7 @@ export default function App() {
   const [backgroundMode, setBackgroundMode] = useState(false)
   const [speakingState, setSpeakingState] = useState('idle')
   const [waking, setWaking] = useState(false)
+  const [cameraFullscreen, setCameraFullscreen] = useState(false)
   const personalityTimerRef = useRef(null)
 
   // ── Browser mic capture (web) ──
@@ -1189,7 +1187,6 @@ export default function App() {
           setPageSpeedPanel(prev => ({ ...prev, visible: false }))
           setEmailPanel(prev => ({ ...prev, visible: false }))
           setProjectStatsPanel(prev => ({ ...prev, visible: false }))
-          setNavigation(prev => ({ ...prev, visible: false }))
           setIeltsDashboard(prev => ({ ...prev, visible: false }))
           setIeltsWriting(prev => ({ ...prev, visible: false }))
           setIeltsSpeaking(prev => ({ ...prev, visible: false }))
@@ -1207,6 +1204,7 @@ export default function App() {
           setResearchPanel(prev => ({ ...prev, visible: false }))
           setAgentsPanel(prev => ({ ...prev, visible: false }))
           setFloatingWindows([])
+          setCameraFullscreen(false)
           break
       }
     }
@@ -1357,15 +1355,8 @@ export default function App() {
     }
     socket.on('open_notepad', onOpenNotepad)
 
-    const onCameraOpen = () => {
-      try { localStorage.removeItem('float_pos_camera') } catch {}
-      const vw = window.innerWidth
-      const camW = Math.min(320, vw - 16)
-      const camX = Math.max(0, Math.floor((vw - camW) / 2))
-      const camY = Math.max(0, Math.floor((window.innerHeight - 280) / 2))
-      openFloatingWindow('camera_window', 'CAMERA', { type: 'camera' }, camX, camY, camW, 280)
-    }
-    socket.on('camera_open', onCameraOpen)
+    const onCameraFullscreenOpen = () => setCameraFullscreen(true)
+    socket.on('camera_fullscreen_open', onCameraFullscreenOpen)
 
     const onViewFile = (data) => {
       if (!data || !data.payload) return
@@ -1548,7 +1539,7 @@ export default function App() {
       socket.off('open_url', onOpenUrl)
       socket.off('open_schedule', onOpenSchedule)
       socket.off('open_notepad', onOpenNotepad)
-      socket.off('camera_open', onCameraOpen)
+      socket.off('camera_fullscreen_open', onCameraFullscreenOpen)
       socket.off('view_file_content', onViewFile)
       socket.off('telegram_message', onTelegramMessage)
       socket.off('webview_action', onWebviewAction)
@@ -2086,7 +2077,10 @@ export default function App() {
     </div>
     </PanelSpaceProvider>
     </AnimationErrorBoundary>
-    {task && VISION_TOOLS.has(task.tool) && <CameraCapture />}
+    {(task && VISION_TOOLS.has(task.tool)) || cameraFullscreen ? <CameraCapture /> : null}
+    {cameraFullscreen && (
+      <FullscreenCamera socket={socket} onClose={() => setCameraFullscreen(false)} />
+    )}
     <WakeSequence active={waking} onComplete={() => setWaking(false)} />
     </>
     </RootErrorBoundary>
