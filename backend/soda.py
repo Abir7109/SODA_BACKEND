@@ -1232,15 +1232,26 @@ class AudioLoop:
     async def play_audio(self):
         silent_ticks = 0
         was_tools_running = False
-        # Batch audio chunks before emitting — reduces per-chunk overhead and eliminates
-        # tiny-BufferSource click/pop artifacts on the frontend
         _batch_buf = bytearray()
-        _BATCH_TARGET = 4800  # ~100ms at 24kHz 16-bit mono
-        _BATCH_MAX_WAIT = 0.08  # max 80ms before flushing partial batch
+        _BATCH_TARGET = 4800
+        _BATCH_MAX_WAIT = 0.08
         _last_flush = asyncio.get_event_loop().time()
-        _batches_sent = 0
-        _total_bytes = 0
-        _log_time = asyncio.get_event_loop().time()
+
+        # Open PyAudio output stream for local speaker playback (like ada_v2)
+        _stream = None
+        if pya:
+            try:
+                _stream = await asyncio.to_thread(
+                    pya.open,
+                    format=pyaudio.paInt16,
+                    channels=CHANNELS,
+                    rate=RECEIVE_SAMPLE_RATE,
+                    output=True,
+                )
+                log.info("[PLAY AUDIO] PyAudio output stream opened")
+            except Exception as e:
+                log.warning(f"[PLAY AUDIO] PyAudio open failed: {e}")
+
         while True:
             try:
                 data = await asyncio.wait_for(self.audio_in_queue.get(), timeout=0.5)
@@ -1255,32 +1266,37 @@ class AudioLoop:
                         self.on_mic_level(level)
                     else:
                         self.on_mic_level(0.0)
+                # Play locally through PyAudio
+                if _stream:
+                    try:
+                        await asyncio.to_thread(_stream.write, data)
+                    except Exception:
+                        pass
+                # Also send to frontend for orb visualization
                 if self.on_audio_data:
                     _batch_buf.extend(data)
                     now = asyncio.get_event_loop().time()
                     if len(_batch_buf) >= _BATCH_TARGET or (now - _last_flush) >= _BATCH_MAX_WAIT:
                         if _batch_buf:
                             self.on_audio_data(bytes(_batch_buf))
-                            _batches_sent += 1
-                            _total_bytes += len(_batch_buf)
                             _batch_buf.clear()
                             _last_flush = now
             except asyncio.TimeoutError:
-                # Flush any partial batch on timeout
                 if _batch_buf and self.on_audio_data:
                     self.on_audio_data(bytes(_batch_buf))
-                    _batches_sent += 1
-                    _total_bytes += len(_batch_buf)
                     _batch_buf.clear()
                     _last_flush = asyncio.get_event_loop().time()
                 silent_ticks += 1
-                now = asyncio.get_event_loop().time()
-                if now - _log_time >= 5:
-                    log.info(f"[PLAY AUDIO] sent={_batches_sent} bytes={_total_bytes} silent_ticks={silent_ticks} speaking={self._model_is_speaking} tools={self._tools_running} queue={self.audio_in_queue.qsize()}")
-                    _batches_sent = 0
-                    _total_bytes = 0
-                    _log_time = now
                 if self._tools_running:
+                    was_tools_running = True
+                elif was_tools_running:
+                    was_tools_running = False
+                    silent_ticks = 0
+                elif self._model_is_speaking and silent_ticks >= 8:
+                    self._model_is_speaking = False
+                    if self.sio:
+                        loop = asyncio.get_event_loop()
+                        loop.create_task(self.sio.emit("speaking_state", {"state": "idle"}))
                     was_tools_running = True
                 elif was_tools_running:
                     was_tools_running = False

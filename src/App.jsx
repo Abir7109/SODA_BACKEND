@@ -684,9 +684,11 @@ export default function App() {
 
   // ── Frontend audio playback via Web Audio API ──
   const audioCtxRef = useRef(null)
+  const audioNextTime = useRef(0)
   const audioReadyRef = useRef(false)
 
   function stopAudio() {
+    audioNextTime.current = 0
     if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
       audioCtxRef.current.close().catch(() => {})
       audioCtxRef.current = null
@@ -734,7 +736,12 @@ export default function App() {
       const source = ctx.createBufferSource()
       source.buffer = buffer
       source.connect(ctx.destination)
-      source.start()
+      let startTime = audioNextTime.current
+      if (startTime < ctx.currentTime) {
+        startTime = ctx.currentTime
+      }
+      source.start(startTime)
+      audioNextTime.current = startTime + buffer.duration
     } catch (e) {
       console.warn('[Audio] Playback error:', e)
     }
