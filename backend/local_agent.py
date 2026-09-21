@@ -760,6 +760,17 @@ def _computer_use_loop(task: str, max_steps: int = 15) -> dict:
 
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
+        # Try loading from .env file
+        env_path = os.path.join(os.path.dirname(__file__), ".env")
+        if os.path.exists(env_path):
+            with open(env_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("GEMINI_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    elif line.startswith("GOOGLE_API_KEY=") and not api_key:
+                        api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+    if not api_key:
         return {"success": False, "error": "GEMINI_API_KEY not set"}
 
     client = genai.Client(http_options={"api_version": "v1beta"}, api_key=api_key)
@@ -800,7 +811,8 @@ IMPORTANT:
             with mss.mss() as sct:
                 monitor = sct.monitors[1]
                 img = sct.grab(monitor)
-                pil_img = Image.frombytes("RGB", img.size, img.rgb)
+                from PIL import Image as _Img
+                pil_img = _Img.frombytes("RGB", img.size, img.rgb)
                 buf = io.BytesIO()
                 pil_img.save(buf, format="PNG")
                 return base64.b64encode(buf.getvalue()).decode()
@@ -870,27 +882,36 @@ IMPORTANT:
             step_context += f"\nWarning: stuck {stuck_count} times on similar action. Try something different."
 
         # 3. Call Gemini with screenshot
-        try:
-            response = client.models.generate_content(
-                model="models/gemini-2.5-flash",
-                contents=[
-                    types.Content(
-                        parts=[
-                            types.Part(text=step_context),
-                            types.Part(inline_data={"mime_type": "image/png", "data": b64}),
-                        ]
-                    )
-                ],
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    temperature=0.2,
-                    max_output_tokens=512,
-                ),
-            )
-            text = response.text.strip() if response and response.text else ""
-        except Exception as e:
-            log.warning(f"[COMPUTER_USE] Gemini call failed at step {step}: {e}")
-            return {"success": False, "error": f"Gemini error at step {step}: {e}"}
+        for _retry in range(3):
+            try:
+                response = client.models.generate_content(
+                    model="models/gemini-3.6-flash",
+                    contents=[
+                        types.Content(
+                            parts=[
+                                types.Part(text=step_context),
+                                types.Part(inline_data={"mime_type": "image/png", "data": b64}),
+                            ]
+                        )
+                    ],
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        temperature=0.2,
+                        max_output_tokens=512,
+                    ),
+                )
+                text = response.text.strip() if response and response.text else ""
+                break
+            except Exception as e:
+                err_str = str(e)
+                if "503" in err_str or "UNAVAILABLE" in err_str or "429" in err_str:
+                    log.info(f"[COMPUTER_USE] Gemini overloaded, retry {_retry+1}/3...")
+                    _time.sleep(2 * (_retry + 1))
+                    continue
+                log.warning(f"[COMPUTER_USE] Gemini call failed at step {step}: {e}")
+                return {"success": False, "error": f"Gemini error at step {step}: {e}"}
+        else:
+            return {"success": False, "error": f"Gemini unavailable after 3 retries at step {step}"}
 
         # 4. Parse action
         try:
