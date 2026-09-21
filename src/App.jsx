@@ -708,24 +708,13 @@ export default function App() {
     return audioCtxRef.current
   }
 
-  function playPcmBytes(data) {
-    if (!data || !data.length) return
+  function playPcmBytes(bytes) {
+    if (!bytes || !bytes.length) return
     const ctx = initAudioCtx()
     if (!ctx) {
       console.warn('[Audio] No AudioContext available')
       return
     }
-
-    // Decode base64 string to Uint8Array
-    let bytes
-    if (typeof data === 'string') {
-      const binary = atob(data)
-      bytes = new Uint8Array(binary.length)
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-    } else {
-      bytes = data
-    }
-
     const len = Math.floor(bytes.length / 2)
     if (len === 0) return
     const float32 = new Float32Array(len)
@@ -740,11 +729,9 @@ export default function App() {
       source.buffer = buffer
       source.connect(ctx.destination)
       let startTime = audioNextTime.current
-      // If we're behind, only skip if more than 200ms — otherwise just play
-      // at current time to avoid gaps (ponytail: keep schedule tight, not perfect)
-      if (startTime < ctx.currentTime - 0.2) {
-        startTime = ctx.currentTime
-      } else if (startTime < ctx.currentTime) {
+      const behind = ctx.currentTime - startTime
+      if (behind > 0.15) {
+        // More than 150ms behind — reset to now to avoid cascade
         startTime = ctx.currentTime
       }
       source.start(startTime)
