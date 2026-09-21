@@ -700,13 +700,15 @@ export default function App() {
       const AC = window.AudioContext || window.webkitAudioContext
       if (!AC) return null
       audioCtxRef.current = new AC()
-      console.log('[Audio] Created AudioContext')
+      console.log('[Audio] Created AudioContext, sampleRate:', audioCtxRef.current.sampleRate)
     }
     if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume().catch(e => console.warn('[Audio] resume failed:', e))
     }
     return audioCtxRef.current
   }
+
+  const audioDebugRef = useRef({ count: 0, bytes: 0, lastLog: 0 })
 
   function playPcmBytes(data) {
     if (!data) return
@@ -729,6 +731,18 @@ export default function App() {
       const val = bytes[i * 2] | (bytes[i * 2 + 1] << 8)
       float32[i] = (val << 16 >> 16) / 32768.0
     }
+
+    const dbg = audioDebugRef.current
+    dbg.count++
+    dbg.bytes += bytes.length
+    const now = performance.now()
+    if (now - dbg.lastLog >= 3000) {
+      console.log(`[Audio] ${dbg.count} batches, ${dbg.bytes} bytes, ctx.currentTime=${ctx.currentTime.toFixed(2)}, audioNext=${audioNextTime.current.toFixed(2)}`)
+      dbg.count = 0
+      dbg.bytes = 0
+      dbg.lastLog = now
+    }
+
     try {
       const buffer = ctx.createBuffer(1, float32.length, 24000)
       buffer.copyToChannel(float32, 0)
@@ -1280,7 +1294,13 @@ export default function App() {
     }
     socket.on('background_cmd_status', onBackgroundCmdStatus)
     const onAudioData = (data) => {
-      if (data && data.data) playPcmBytes(data.data)
+      if (data && data.data) {
+        if (typeof data.data === 'string') {
+          playPcmBytes(data.data)
+        } else if (Array.isArray(data.data)) {
+          playPcmBytes(data.data)
+        }
+      }
     }
     socket.on('audio_data', onAudioData)
     const onMicLevel = (data) => { if (data && typeof data.level === 'number') setOrbMicLevel(data.level) }

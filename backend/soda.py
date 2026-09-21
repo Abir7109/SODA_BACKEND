@@ -1238,6 +1238,9 @@ class AudioLoop:
         _BATCH_TARGET = 4800  # ~100ms at 24kHz 16-bit mono
         _BATCH_MAX_WAIT = 0.08  # max 80ms before flushing partial batch
         _last_flush = asyncio.get_event_loop().time()
+        _batches_sent = 0
+        _total_bytes = 0
+        _log_time = asyncio.get_event_loop().time()
         while True:
             try:
                 data = await asyncio.wait_for(self.audio_in_queue.get(), timeout=0.5)
@@ -1258,15 +1261,25 @@ class AudioLoop:
                     if len(_batch_buf) >= _BATCH_TARGET or (now - _last_flush) >= _BATCH_MAX_WAIT:
                         if _batch_buf:
                             self.on_audio_data(bytes(_batch_buf))
+                            _batches_sent += 1
+                            _total_bytes += len(_batch_buf)
                             _batch_buf.clear()
                             _last_flush = now
             except asyncio.TimeoutError:
                 # Flush any partial batch on timeout
                 if _batch_buf and self.on_audio_data:
                     self.on_audio_data(bytes(_batch_buf))
+                    _batches_sent += 1
+                    _total_bytes += len(_batch_buf)
                     _batch_buf.clear()
                     _last_flush = asyncio.get_event_loop().time()
                 silent_ticks += 1
+                now = asyncio.get_event_loop().time()
+                if now - _log_time >= 5:
+                    log.info(f"[PLAY AUDIO] sent={_batches_sent} bytes={_total_bytes} silent_ticks={silent_ticks} speaking={self._model_is_speaking} tools={self._tools_running} queue={self.audio_in_queue.qsize()}")
+                    _batches_sent = 0
+                    _total_bytes = 0
+                    _log_time = now
                 if self._tools_running:
                     was_tools_running = True
                 elif was_tools_running:
@@ -1418,6 +1431,15 @@ class AudioLoop:
                             if self.sio:
                                 loop = asyncio.get_event_loop()
                                 loop.create_task(self.sio.emit("speaking_state", {"state": "model"}))
+                        if not hasattr(self, '_audio_debug_count'):
+                            self._audio_debug_count = 0
+                            self._audio_debug_last = 0
+                        self._audio_debug_count += 1
+                        now = time.time()
+                        if now - self._audio_debug_last >= 3:
+                            log.info(f"[AUDIO DEBUG] chunks={self._audio_debug_count} data_type={type(data).__name__} data_len={len(data) if hasattr(data,'__len__') else '?'} queue_size={self.audio_in_queue.qsize()}")
+                            self._audio_debug_count = 0
+                            self._audio_debug_last = now
                         try:
                             self.audio_in_queue.put_nowait(data)
                         except asyncio.QueueFull:
