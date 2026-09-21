@@ -686,12 +686,14 @@ export default function App() {
   const audioCtxRef = useRef(null)
   const audioReadyRef = useRef(false)
   const workletNodeRef = useRef(null)
+  const audioPendingRef = useRef([])
 
   function stopAudio() {
     if (workletNodeRef.current) {
       workletNodeRef.current.disconnect()
       workletNodeRef.current = null
     }
+    audioPendingRef.current = []
     if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
       audioCtxRef.current.close().catch(() => {})
       audioCtxRef.current = null
@@ -711,21 +713,23 @@ export default function App() {
     return audioCtxRef.current
   }
 
-  async function ensureWorklet() {
-    if (workletNodeRef.current) return workletNodeRef.current
+  function ensureWorklet() {
+    if (workletNodeRef.current) return
     const ctx = initAudioCtx()
-    if (!ctx) return null
-    try {
-      await ctx.audioWorklet.addModule('/audio-processor.js')
+    if (!ctx) return
+    ctx.audioWorklet.addModule('/audio-processor.js').then(() => {
       const node = new AudioWorkletNode(ctx, 'audio-processor')
       node.connect(ctx.destination)
       workletNodeRef.current = node
-      console.log('[Audio] AudioWorklet streaming active')
-      return node
-    } catch (e) {
-      console.warn('[Audio] AudioWorklet failed, falling back:', e)
-      return null
-    }
+      console.log('[Audio] AudioWorklet ready, flushing', audioPendingRef.current.length, 'pending batches')
+      const pending = audioPendingRef.current
+      audioPendingRef.current = []
+      for (const samples of pending) {
+        node.port.postMessage({ type: 'write', samples })
+      }
+    }).catch(e => {
+      console.warn('[Audio] AudioWorklet failed:', e)
+    })
   }
 
   function playPcmBytes(data) {
@@ -752,10 +756,8 @@ export default function App() {
     if (node) {
       node.port.postMessage({ type: 'write', samples: float32 })
     } else {
-      // Fallback: try to init worklet on first call
-      ensureWorklet().then((n) => {
-        if (n) n.port.postMessage({ type: 'write', samples: float32 })
-      })
+      audioPendingRef.current.push(float32)
+      if (audioPendingRef.current.length <= 1) ensureWorklet()
     }
   }
 
