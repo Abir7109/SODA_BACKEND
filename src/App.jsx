@@ -682,18 +682,11 @@ export default function App() {
   // ── Browser mic capture (web) ──
   const { micActive: browserMicActive, micError: browserMicError, start: startBrowserMic, stop: stopBrowserMic } = useBrowserMic(socket)
 
-  // ── Frontend audio playback via Web Audio API (AudioWorklet streaming) ──
+  // ── Frontend audio playback via Web Audio API ──
   const audioCtxRef = useRef(null)
   const audioReadyRef = useRef(false)
-  const workletNodeRef = useRef(null)
-  const audioPendingRef = useRef([])
 
   function stopAudio() {
-    if (workletNodeRef.current) {
-      workletNodeRef.current.disconnect()
-      workletNodeRef.current = null
-    }
-    audioPendingRef.current = []
     if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
       audioCtxRef.current.close().catch(() => {})
       audioCtxRef.current = null
@@ -713,27 +706,10 @@ export default function App() {
     return audioCtxRef.current
   }
 
-  function ensureWorklet() {
-    if (workletNodeRef.current) return
-    const ctx = initAudioCtx()
-    if (!ctx) return
-    ctx.audioWorklet.addModule('/audio-processor.js').then(() => {
-      const node = new AudioWorkletNode(ctx, 'audio-processor')
-      node.connect(ctx.destination)
-      workletNodeRef.current = node
-      console.log('[Audio] AudioWorklet ready, flushing', audioPendingRef.current.length, 'pending batches')
-      const pending = audioPendingRef.current
-      audioPendingRef.current = []
-      for (const samples of pending) {
-        node.port.postMessage({ type: 'write', samples })
-      }
-    }).catch(e => {
-      console.warn('[Audio] AudioWorklet failed:', e)
-    })
-  }
-
   function playPcmBytes(data) {
     if (!data) return
+    const ctx = initAudioCtx()
+    if (!ctx) return
 
     let bytes
     if (typeof data === 'string') {
@@ -752,12 +728,15 @@ export default function App() {
       float32[i] = (val << 16 >> 16) / 32768.0
     }
 
-    const node = workletNodeRef.current
-    if (node) {
-      node.port.postMessage({ type: 'write', samples: float32 })
-    } else {
-      audioPendingRef.current.push(float32)
-      if (audioPendingRef.current.length <= 1) ensureWorklet()
+    try {
+      const buffer = ctx.createBuffer(1, float32.length, 24000)
+      buffer.copyToChannel(float32, 0)
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
+      source.connect(ctx.destination)
+      source.start()
+    } catch (e) {
+      console.warn('[Audio] Playback error:', e)
     }
   }
 
