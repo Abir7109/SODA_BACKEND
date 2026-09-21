@@ -2791,18 +2791,7 @@ def _dispatch(tool, args):
         task = args.get("task", "") or args.get("prompt", "") or args.get("command", "")
         if not task:
             return {"success": False, "error": "task is required for hermes_execute"}
-        # Try Hermes first, fall back to built-in computer_use
-        try:
-            from hermes_bridge import is_alive as hermes_alive, execute_task
-            if hermes_alive():
-                r = execute_task(task, timeout=120)
-                if r.get("success"):
-                    return r
-                if "timeout" not in r.get("error", "") and "not_running" not in r.get("error", ""):
-                    return r
-        except (ImportError, Exception):
-            pass
-        # Fallback: built-in computer_use agentic loop
+        # Skip Hermes — it's too slow (55s+ per call). Use built-in computer_use directly.
         return _computer_use_loop(task)
 
     # ── Built-in computer_use (Gemini-powered agentic loop) ────────

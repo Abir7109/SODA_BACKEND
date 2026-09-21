@@ -1840,7 +1840,7 @@ class AudioLoop:
                 "credential": 15.0,
                 "terminal_execute": 90.0,
                 "execute_command": 90.0,
-                "hermes_execute": 120.0,
+                "hermes_execute": 90.0,
                 "computer_use": 180.0,
             }
             timeout = _TOOL_TIMEOUTS.get(name, 30.0)
