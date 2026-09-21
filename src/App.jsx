@@ -708,13 +708,24 @@ export default function App() {
     return audioCtxRef.current
   }
 
-  function playPcmBytes(bytes) {
-    if (!bytes || !bytes.length) return
+  function playPcmBytes(data) {
+    if (!data || !data.length) return
     const ctx = initAudioCtx()
     if (!ctx) {
       console.warn('[Audio] No AudioContext available')
       return
     }
+
+    // Decode base64 string to Uint8Array
+    let bytes
+    if (typeof data === 'string') {
+      const binary = atob(data)
+      bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    } else {
+      bytes = data
+    }
+
     const len = Math.floor(bytes.length / 2)
     if (len === 0) return
     const float32 = new Float32Array(len)
@@ -729,7 +740,11 @@ export default function App() {
       source.buffer = buffer
       source.connect(ctx.destination)
       let startTime = audioNextTime.current
-      if (startTime < ctx.currentTime) {
+      // If we're behind, only skip if more than 200ms — otherwise just play
+      // at current time to avoid gaps (ponytail: keep schedule tight, not perfect)
+      if (startTime < ctx.currentTime - 0.2) {
+        startTime = ctx.currentTime
+      } else if (startTime < ctx.currentTime) {
         startTime = ctx.currentTime
       }
       source.start(startTime)
@@ -1374,6 +1389,34 @@ export default function App() {
       }
     }
     socket.on('world_monitor_navigate', onWorldMonitorNavigate)
+
+    const pendingDataRequests = new Map()
+    const onWorldMonitorDataRequest = (data) => {
+      if (!data || !data.requestId) return
+      const iframe = document.getElementById('world-monitor-iframe')
+      if (!iframe || !iframe.contentWindow) {
+        socket.emit('world_monitor_data_response', { requestId: data.requestId, data: { error: 'World Monitor not open' } })
+        return
+      }
+      const handler = (event) => {
+        if (event.data?.type === 'wm-panel-data' && event.data.requestId === data.requestId) {
+          window.removeEventListener('message', handler)
+          pendingDataRequests.delete(data.requestId)
+          socket.emit('world_monitor_data_response', { requestId: data.requestId, data: event.data.data })
+        }
+      }
+      window.addEventListener('message', handler)
+      pendingDataRequests.set(data.requestId, handler)
+      iframe.contentWindow.postMessage({ type: 'wm-export-data', sections: data.sections || ['all'], requestId: data.requestId }, '*')
+      setTimeout(() => {
+        if (pendingDataRequests.has(data.requestId)) {
+          window.removeEventListener('message', handler)
+          pendingDataRequests.delete(data.requestId)
+          socket.emit('world_monitor_data_response', { requestId: data.requestId, data: { error: 'Timeout waiting for World Monitor data' } })
+        }
+      }, 10000)
+    }
+    socket.on('get_world_monitor_data', onWorldMonitorDataRequest)
 
     const onViewFile = (data) => {
       if (!data || !data.payload) return

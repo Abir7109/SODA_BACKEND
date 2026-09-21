@@ -1418,7 +1418,15 @@ class AudioLoop:
                             if self.sio:
                                 loop = asyncio.get_event_loop()
                                 loop.create_task(self.sio.emit("speaking_state", {"state": "model"}))
-                        self.audio_in_queue.put_nowait(data)
+                        try:
+                            self.audio_in_queue.put_nowait(data)
+                        except asyncio.QueueFull:
+                            # Drop oldest chunk if queue is full — prevents crash
+                            try:
+                                self.audio_in_queue.get_nowait()
+                            except asyncio.QueueEmpty:
+                                pass
+                            self.audio_in_queue.put_nowait(data)
 
                     if response.server_content:
                         if response.server_content.input_transcription:
