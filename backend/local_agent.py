@@ -98,7 +98,7 @@ LOCAL_TOOLS = [
     "browser_command",
     "app_search", "app_scroll",
     "credential",
-    "hermes_execute",
+    "hermes_execute", "computer_use",
 ]
 
 HAS_PYAUTOGUI = False
@@ -745,6 +745,209 @@ def _hermes_call(contact: str) -> dict:
         )
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+def _computer_use_loop(task: str, max_steps: int = 15) -> dict:
+    """Gemini-powered agentic desktop control loop.
+
+    Takes screenshot → sends to Gemini with task + available actions →
+    executes the recommended action → repeats until task is done or max_steps.
+    This is the core of Hermes's precision, implemented natively.
+    """
+    import base64, io, json, time as _time
+    from google import genai
+    from google.genai import types
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return {"success": False, "error": "GEMINI_API_KEY not set"}
+
+    client = genai.Client(http_options={"api_version": "v1beta"}, api_key=api_key)
+
+    system_prompt = """You are a desktop automation agent. You see screenshots of a Windows desktop and must complete tasks by issuing precise actions.
+
+RULES:
+1. Analyze the screenshot carefully before acting.
+2. Issue ONE action per step as a JSON object.
+3. Wait for the next screenshot to verify your action worked.
+4. If the task is complete, return {"action": "done", "summary": "what was accomplished"}.
+5. If stuck after 3 attempts on the same action, return {"action": "done", "summary": "Could not complete: reason"}.
+
+AVAILABLE ACTIONS (return exactly one per step):
+{"action": "click", "x": <pixel_x>, "y": <pixel_y>}  — click at coordinates
+{"action": "double_click", "x": <pixel_x>, "y": <pixel_y>}
+{"action": "right_click", "x": <pixel_x>, "y": <pixel_y>}
+{"action": "type", "text": "<text to type>"}  — type text at current cursor position
+{"action": "press", "key": "<key_name>"}  — press a key (enter, tab, escape, backspace, delete, space, up, down, left, right, home, end, pageup, pagedown, f1-f12, win)
+{"action": "hotkey", "keys": "<key1>+<key2>"}  — key combination (e.g. "ctrl+c", "alt+tab", "win+d")
+{"action": "scroll", "direction": "down|up|left|right", "amount": <pixels>}
+{"action": "wait", "seconds": <float>}  — wait for app to respond
+{"action": "screenshot"}  — take fresh screenshot without acting
+{"action": "done", "summary": "<what was accomplished>"}
+
+IMPORTANT:
+- Coordinates are in pixels from top-left of screen.
+- For "type": if a text field is not focused, click it first in a previous step.
+- For "press": use key names like enter, tab, escape, backspace, delete, space, up, down, left, right, home, end.
+- For "hotkey": separate keys with +, e.g. "ctrl+c", "alt+tab", "win+l".
+- Always verify the result by looking at the next screenshot.
+- Return ONLY the JSON object, no other text."""
+
+    def _take_screenshot():
+        """Capture screen and return base64 PNG."""
+        try:
+            import mss
+            with mss.mss() as sct:
+                monitor = sct.monitors[1]
+                img = sct.grab(monitor)
+                pil_img = Image.frombytes("RGB", img.size, img.rgb)
+                buf = io.BytesIO()
+                pil_img.save(buf, format="PNG")
+                return base64.b64encode(buf.getvalue()).decode()
+        except Exception:
+            if HAS_PYAUTOGUI:
+                pil_img = pyautogui.screenshot()
+                buf = io.BytesIO()
+                pil_img.save(buf, format="PNG")
+                return base64.b64encode(buf.getvalue()).decode()
+        return None
+
+    def _execute_action(action: dict):
+        """Execute a parsed action dict via pyautogui."""
+        if not HAS_PYAUTOGUI:
+            return "pyautogui not available"
+        act = action.get("action", "")
+        try:
+            if act == "click":
+                pyautogui.click(action["x"], action["y"])
+            elif act == "double_click":
+                pyautogui.doubleClick(action["x"], action["y"])
+            elif act == "right_click":
+                pyautogui.rightClick(action["x"], action["y"])
+            elif act == "type":
+                pyautogui.write(action["text"], interval=0.02)
+            elif act == "press":
+                pyautogui.press(action["key"])
+            elif act == "hotkey":
+                keys = [k.strip() for k in action["keys"].split("+")]
+                pyautogui.hotkey(*keys)
+            elif act == "scroll":
+                direction = action.get("direction", "down")
+                amount = action.get("amount", 3)
+                if direction == "down":
+                    pyautogui.scroll(-amount)
+                elif direction == "up":
+                    pyautogui.scroll(amount)
+                elif direction == "left":
+                    pyautogui.hscroll(-amount)
+                elif direction == "right":
+                    pyautogui.hscroll(amount)
+            elif act == "wait":
+                _time.sleep(min(float(action.get("seconds", 1)), 5))
+            elif act == "screenshot":
+                pass  # just take a fresh screenshot
+            return None
+        except Exception as e:
+            return str(e)
+
+    # ── Agentic loop ──
+    history = []
+    last_action_summary = ""
+    stuck_count = 0
+    t0 = _time.time()
+
+    for step in range(max_steps):
+        # 1. Take screenshot
+        b64 = _take_screenshot()
+        if not b64:
+            return {"success": False, "error": "Screenshot failed"}
+
+        # 2. Build prompt
+        step_context = f"Task: {task}\nStep: {step + 1}/{max_steps}"
+        if last_action_summary:
+            step_context += f"\nPrevious action: {last_action_summary}"
+        if stuck_count > 1:
+            step_context += f"\nWarning: stuck {stuck_count} times on similar action. Try something different."
+
+        # 3. Call Gemini with screenshot
+        try:
+            response = client.models.generate_content(
+                model="models/gemini-2.5-flash",
+                contents=[
+                    types.Content(
+                        parts=[
+                            types.Part(text=step_context),
+                            types.Part(inline_data={"mime_type": "image/png", "data": b64}),
+                        ]
+                    )
+                ],
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=0.2,
+                    max_output_tokens=512,
+                ),
+            )
+            text = response.text.strip() if response and response.text else ""
+        except Exception as e:
+            log.warning(f"[COMPUTER_USE] Gemini call failed at step {step}: {e}")
+            return {"success": False, "error": f"Gemini error at step {step}: {e}"}
+
+        # 4. Parse action
+        try:
+            # Extract JSON from response (may be wrapped in markdown)
+            json_str = text
+            if "```" in json_str:
+                json_str = json_str.split("```")[1]
+                if json_str.startswith("json"):
+                    json_str = json_str[4:]
+                json_str = json_str.strip()
+            action = json.loads(json_str)
+        except (json.JSONDecodeError, IndexError):
+            log.warning(f"[COMPUTER_USE] Could not parse action at step {step}: {text[:200]}")
+            history.append({"step": step, "response": text[:500], "parsed": False})
+            # Retry with fresh screenshot
+            continue
+
+        log.info(f"[COMPUTER_USE] Step {step}: {action.get('action', 'unknown')} {json.dumps({k:v for k,v in action.items() if k != 'action'})[:200]}")
+        history.append({"step": step, "action": action})
+
+        # 5. Check if done
+        if action.get("action") == "done":
+            elapsed = _time.time() - t0
+            return {
+                "success": True,
+                "summary": action.get("summary", "Task completed"),
+                "steps": step + 1,
+                "elapsed_seconds": round(elapsed, 1),
+                "history": history,
+            }
+
+        # 6. Execute action
+        err = _execute_action(action)
+        if err:
+            log.warning(f"[COMPUTER_USE] Action error at step {step}: {err}")
+            history[-1]["error"] = err
+
+        # Track stuck state
+        action_summary = f"{action.get('action')}:{json.dumps({k:v for k,v in action.items() if k != 'action'})}"
+        if action_summary == last_action_summary:
+            stuck_count += 1
+        else:
+            stuck_count = 0
+        last_action_summary = action_summary
+
+        # Brief pause for UI to update
+        if action.get("action") not in ("wait", "screenshot"):
+            _time.sleep(0.5)
+
+    elapsed = _time.time() - t0
+    return {
+        "success": False,
+        "error": f"Max steps ({max_steps}) reached",
+        "steps": max_steps,
+        "elapsed_seconds": round(elapsed, 1),
+        "history": history,
+    }
 
 
 def _dispatch(tool, args):
@@ -2567,16 +2770,26 @@ def _dispatch(tool, args):
         task = args.get("task", "") or args.get("prompt", "") or args.get("command", "")
         if not task:
             return {"success": False, "error": "task is required for hermes_execute"}
+        # Try Hermes first, fall back to built-in computer_use
         try:
             from hermes_bridge import is_alive as hermes_alive, execute_task
-            if not hermes_alive():
-                return {"success": False, "error": "Hermes Agent not running — install it with: iex (irm https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1)"}
-            r = execute_task(task, timeout=180)
-            return r
-        except ImportError:
-            return {"success": False, "error": "hermes_bridge module not available"}
-        except Exception as e:
-            return {"success": False, "error": f"Hermes error: {e}"}
+            if hermes_alive():
+                r = execute_task(task, timeout=120)
+                if r.get("success"):
+                    return r
+                if "timeout" not in r.get("error", "") and "not_running" not in r.get("error", ""):
+                    return r
+        except (ImportError, Exception):
+            pass
+        # Fallback: built-in computer_use agentic loop
+        return _computer_use_loop(task)
+
+    # ── Built-in computer_use (Gemini-powered agentic loop) ────────
+    elif tool == "computer_use":
+        task = args.get("task", "") or args.get("prompt", "") or args.get("action", "")
+        if not task:
+            return {"success": False, "error": "task is required for computer_use"}
+        return _computer_use_loop(task)
 
     # ── Fallback ──────────────────────────────────────────────────
     return {"error": f"Tool '{tool}' not implemented in local agent"}

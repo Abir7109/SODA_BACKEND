@@ -1686,5 +1686,26 @@ tools_list = [{"function_declarations": [
         },
     },
 
+    # ── Built-in computer_use (Gemini-powered agentic loop) ──
+    {
+        "name": "computer_use",
+        "description": (
+            "Control the desktop using Gemini vision AI. "
+            "Takes a screenshot, analyzes it with Gemini, and performs actions (click, type, scroll, etc.). "
+            "Use for multi-step desktop tasks: opening apps, navigating UIs, filling forms, "
+            "reading screen content, automating workflows. Works like Hermes but built-in — no external agent needed."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": "The desktop task to execute step by step. Be specific: 'Open Chrome, go to google.com, search for weather', 'Open Notepad and type Hello World', 'Find and click the Settings button'",
+                },
+            },
+            "required": ["task"],
+        },
+    },
+
 ]}]
 

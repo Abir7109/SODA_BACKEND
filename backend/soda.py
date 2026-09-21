@@ -229,6 +229,8 @@ LOCAL_AGENT_TOOLS = {
     "reconnect",
     # Hermes Agent (AI-powered desktop control)
     "hermes_execute",
+    # Built-in computer_use (Gemini-powered agentic loop)
+    "computer_use",
 }
 
 
@@ -426,7 +428,7 @@ def _build_system_prompt():
 
         # ── TRUST & OBEY ─────────────────────────────────────────
         "TRUST YOUR TOOLS — check_whatsapp, read_whatsapp_chat, open_app, "
-        "analyze_screen, etc. ALL actually work. Do NOT doubt them. "
+        "analyze_screen, computer_use, etc. ALL actually work. Do NOT doubt them. "
         "If a tool fails, the error message tells you — let the tool try first.\n\n"
         "OBEY COMMANDS — When Abir sir asks anything you have a tool for, call it. "
         "NEVER refuse, NEVER say 'you can do it yourself'. "
@@ -1839,6 +1841,7 @@ class AudioLoop:
                 "terminal_execute": 90.0,
                 "execute_command": 90.0,
                 "hermes_execute": 120.0,
+                "computer_use": 180.0,
             }
             timeout = _TOOL_TIMEOUTS.get(name, 30.0)
             log.info(f"[BRIDGE] 📤 Emitted to {agent_sid}, waiting for response (timeout={timeout}s)")
