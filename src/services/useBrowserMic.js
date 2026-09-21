@@ -2,6 +2,8 @@ import { useRef, useCallback, useEffect, useState } from 'react'
 
 const SAMPLE_RATE = 16000
 const CHUNK_SIZE = 512
+// ponytail: fixed software boost so far/quiet speech arrives loud enough to detect
+const MIC_GAIN = 3.0
 
 let audioCtx = null
 let scriptNode = null
@@ -29,6 +31,7 @@ export default function useBrowserMic(socket) {
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
         }
       })
 
@@ -45,7 +48,7 @@ export default function useBrowserMic(socket) {
         const input = event.inputBuffer.getChannelData(0)
         const pcm = new Int16Array(input.length)
         for (let i = 0; i < input.length; i++) {
-          const s = Math.max(-1, Math.min(1, input[i]))
+          const s = Math.max(-1, Math.min(1, input[i] * MIC_GAIN))
           pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
         }
         const bytes = new Uint8Array(pcm.buffer)

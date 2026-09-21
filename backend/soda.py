@@ -166,6 +166,7 @@ import user_memory
 import memory_store
 import code_runner
 import face_store
+import email_reader
 import github_tools
 import vercel_tools
 import netlify_tools
@@ -177,6 +178,7 @@ from external_apis import (
     get_bangladeshi_news,
     define_word, list_files, open_file,
     get_system_status, close_window, create_folder,
+    delete_items, rename_item, copy_item, move_item, list_drives,
     get_pagespeed_insights,
 )
 from soda_agents import AgentOrchestrator, get_global_orchestrator
@@ -278,7 +280,7 @@ CHANNELS = 1
 SEND_SAMPLE_RATE = 16000
 RECEIVE_SAMPLE_RATE = 24000
 CHUNK_SIZE = 512
-VAD_THRESHOLD = 400
+VAD_THRESHOLD = 150
 MODEL = "models/gemini-3.1-flash-live-preview"
 DEFAULT_MODE = "camera"
 
@@ -640,6 +642,7 @@ class AudioLoop:
         self._model_is_speaking = False
         self._tools_running = False
         self._last_tool_start = 0.0
+        self._consecutive_tool_failures = 0
         self._world_monitor_open = False
         self._current_emotion = None
         self._last_emotion_inject = 0.0
@@ -1318,6 +1321,15 @@ class AudioLoop:
             response_modalities=["AUDIO"],
             output_audio_transcription={},
             input_audio_transcription={},
+            # ponytail: HIGH start sensitivity + short prefix padding so quiet/far speech still triggers detection
+            realtime_input_config=types.RealtimeInputConfig(
+                automatic_activity_detection=types.AutomaticActivityDetection(
+                    start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
+                    end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
+                    prefix_padding_ms=300,
+                    silence_duration_ms=800,
+                )
+            ),
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(
@@ -1343,6 +1355,7 @@ class AudioLoop:
                     self._model_is_speaking = False
                     self._tools_running = False
                     self._last_tool_start = 0.0
+                    self._consecutive_tool_failures = 0
                     self._processed_fc_ids.clear()
                     self._pending_confirmations.clear()
 
@@ -1531,6 +1544,7 @@ class AudioLoop:
                         self._mark_activity()
                         function_responses = []
                         tasks = []
+                        pending_fcs = []
                         for fc in response.tool_call.function_calls:
                             if fc.id in self._processed_fc_ids:
                                 continue
@@ -1547,6 +1561,7 @@ class AudioLoop:
                                 }))
 
                             tasks.append(self._dispatch_tool(fc))
+                            pending_fcs.append(fc)
 
                         # Model's speech continues uninterrupted during tool dispatch.
                         # _model_is_speaking keeps mic muted; _tools_running prevents
@@ -1568,16 +1583,45 @@ class AudioLoop:
                                 }))
 
                         if tasks:
-                            raw = await asyncio.gather(*tasks, return_exceptions=True)
+                            try:
+                                # Bound the whole turn: one wedged tool must not
+                                # freeze the Gemini session forever.
+                                raw = await asyncio.wait_for(
+                                    asyncio.gather(*tasks, return_exceptions=True),
+                                    timeout=60,
+                                )
+                            except asyncio.TimeoutError:
+                                log.warning("[TOOLS] Turn timed out after 60s — unwedging with error responses")
+                                # ponytail: synthesize errors so Gemini gets a response per call, else it hangs mid-conv
+                                raw = [
+                                    types.FunctionResponse(
+                                        id=fc.id, name=fc.name,
+                                        response={"success": False, "error": f"Tool {fc.name} timed out after 60s. Tell the user and do NOT retry silently."},
+                                    )
+                                    for fc in pending_fcs
+                                ]
                             batch_results = []
-                            for result in raw:
+                            for fc, result in zip(pending_fcs, raw):
                                 if isinstance(result, Exception):
                                     log.warning(f"Tool call failed: {result}")
-                                    continue
+                                    # ponytail: convert crashes to error responses — dropping them leaves Gemini waiting forever
+                                    result = types.FunctionResponse(
+                                        id=fc.id, name=fc.name,
+                                        response={"success": False, "error": f"Tool {fc.name} failed: {result}. Tell the user and do NOT retry silently."},
+                                    )
+                                if result is None:
+                                    result = types.FunctionResponse(
+                                        id=fc.id, name=fc.name,
+                                        response={"success": False, "error": f"Tool {fc.name} returned nothing. Tell the user and do NOT retry silently."},
+                                    )
                                 if result is not None:
                                     function_responses.append(result)
-                                    result_text = str(result.response.get("result", ""))
-                                    if any(w in result_text.lower() for w in ["error", "fail", "could not", "not found", "invalid"]):
+                                    _resp = result.response or {}
+                                    result_text = str(_resp.get("result", ""))
+                                    # Agent-routed tools return a flat {success, error} dict
+                                    # (no nested "result" key) — check both shapes.
+                                    _top_failed = _resp.get("success") is False or bool(_resp.get("error"))
+                                    if _top_failed or any(w in result_text.lower() for w in ["error", "fail", "could not", "not found", "invalid"]):
                                         self.personality.mood.record_failure()
                                         await self._emit_personality("tool_failure", tool_name=result.name)
                                     else:
@@ -1602,6 +1646,32 @@ class AudioLoop:
                                     "results": batch_results,
                                 }))
 
+                            # Circuit breaker: repeated all-failure turns mean Gemini is
+                            # looping on a broken tool — tell it to stop and inform the user.
+                            _all_failed = bool(function_responses) and all(
+                                ((fr.response or {}).get("success") is False)
+                                or bool((fr.response or {}).get("error"))
+                                or (isinstance((fr.response or {}).get("result"), dict)
+                                    and (fr.response["result"].get("success") is False
+                                         or bool(fr.response["result"].get("error"))))
+                                for fr in function_responses
+                            )
+                            if _all_failed:
+                                self._consecutive_tool_failures = getattr(self, "_consecutive_tool_failures", 0) + 1
+                            else:
+                                self._consecutive_tool_failures = 0
+                            if self._consecutive_tool_failures >= 3:
+                                self._consecutive_tool_failures = 0
+                                for fr in function_responses:
+                                    try:
+                                        fr.response["stop_retrying"] = (
+                                            "STOP calling tools for this request. Tell the user what failed "
+                                            "and what they need to do (e.g. start the local agent with "
+                                            "py -3.11 backend\\local_agent.py)."
+                                        )
+                                    except Exception:
+                                        pass
+
                         if function_responses:
                             # Save user's last input so reconnect has context if send fails
                             user_text = self._last_input_transcription.strip()
@@ -1609,8 +1679,12 @@ class AudioLoop:
                                 self._exchange_history.append({"user": user_text[-300:]})
                                 self._save_context_history()
                             try:
-                                await self.session.send_tool_response(
-                                    function_responses=function_responses
+                                # ponytail: cap send so a wedged socket can't freeze the turn forever
+                                await asyncio.wait_for(
+                                    self.session.send_tool_response(
+                                        function_responses=function_responses
+                                    ),
+                                    timeout=10,
                                 )
                             except Exception as e:
                                 log.error(f"Error sending tool response: {e}")
@@ -1792,16 +1866,38 @@ class AudioLoop:
                 )
 
         # ── Route to local desktop agent if applicable ──
+        # Pick a FRESH agent that advertises this tool. Routing to a stale /
+        # zombie agent wedges the whole turn on timeout (receive_audio blocks
+        # on gather), so stale entries fail fast instead.
+        agent_sid = None
         if name in LOCAL_AGENT_TOOLS and _connected_agents:
+            for sid, info in _connected_agents.items():
+                if name not in info.get('tools', []):
+                    continue
+                last_pong = info.get('last_pong')
+                if last_pong:
+                    try:
+                        age = (datetime.now() - datetime.fromisoformat(last_pong)).total_seconds()
+                    except Exception:
+                        age = 0
+                    if age > 90:
+                        continue
+                else:
+                    connected_at = info.get('connected_at')
+                    if connected_at:
+                        try:
+                            age = (datetime.now() - datetime.fromisoformat(connected_at)).total_seconds()
+                        except Exception:
+                            age = 0
+                        if age > 120:
+                            continue
+                if agent_sid is None or len(info.get('tools', [])) > len(_connected_agents[agent_sid].get('tools', [])):
+                    agent_sid = sid
+        if agent_sid:
             import uuid as _uuid
             callback_id = str(_uuid.uuid4())
             future = asyncio.Future()
             _pending_agent_results[callback_id] = future
-            # Pick the agent with the most tools (newest version wins over zombies)
-            agent_sid = max(
-                _connected_agents,
-                key=lambda s: len(_connected_agents[s].get('tools', []))
-            )
             agent_info = _connected_agents.get(agent_sid, {})
             log.info(f"[AGENT] Routing {name} to agent {agent_info.get('machine_id', agent_sid)} (callback={callback_id})")
             if name in ("execute_command", "terminal_execute"):
@@ -1825,25 +1921,25 @@ class AudioLoop:
             }, room=agent_sid)
             # Per-tool timeouts
             _TOOL_TIMEOUTS = {
-                "send_whatsapp": 45.0,
-                "whatsapp_find_and_message": 45.0,
-                "whatsapp_find_and_call": 45.0,
-                "check_whatsapp": 45.0,
-                "reply_whatsapp": 45.0,
-                "read_whatsapp_chat": 60.0,
-                "browser_command": 15.0,
-                "app_search": 45.0,
-                "app_scroll": 30.0,
-                "open_app": 45.0,
-                "list_installed_apps": 15.0,
-                "refresh_app_registry": 30.0,
-                "credential": 15.0,
-                "terminal_execute": 90.0,
-                "execute_command": 90.0,
-                "hermes_execute": 90.0,
-                "computer_use": 180.0,
+                "send_whatsapp": 25.0,
+                "whatsapp_find_and_message": 25.0,
+                "whatsapp_find_and_call": 25.0,
+                "check_whatsapp": 25.0,
+                "reply_whatsapp": 25.0,
+                "read_whatsapp_chat": 30.0,
+                "browser_command": 10.0,
+                "app_search": 25.0,
+                "app_scroll": 15.0,
+                "open_app": 25.0,
+                "list_installed_apps": 10.0,
+                "refresh_app_registry": 15.0,
+                "credential": 10.0,
+                "terminal_execute": 45.0,
+                "execute_command": 45.0,
+                "hermes_execute": 45.0,
+                "computer_use": 60.0,
             }
-            timeout = _TOOL_TIMEOUTS.get(name, 30.0)
+            timeout = _TOOL_TIMEOUTS.get(name, 20.0)
             log.info(f"[BRIDGE] 📤 Emitted to {agent_sid}, waiting for response (timeout={timeout}s)")
             try:
                 result = await asyncio.wait_for(future, timeout=timeout)
@@ -1858,7 +1954,7 @@ class AudioLoop:
             # For command execution tools, emit status events and handle retries
             if name in ("execute_command", "terminal_execute"):
                 cmd = args.get("command", "")
-                max_attempts = 5
+                max_attempts = 2
                 total_attempts = 1
                 all_attempts = []
                 last_result = result
@@ -1866,8 +1962,11 @@ class AudioLoop:
                 if not result.get('success'):
                     from background_cmd import generate_alternatives
                     loop = asyncio.get_event_loop()
+                    # Transport failure (dead agent) — retrying the same dead
+                    # agent would wedge the turn. Fail fast.
+                    _transport_dead = "did not respond within" in str(result.get("error", "")) or "Agent timeout" in str(result.get("error", ""))
 
-                    while total_attempts < max_attempts:
+                    while total_attempts < max_attempts and not _transport_dead:
                         total_attempts += 1
                         alternatives = await generate_alternatives(cmd, result.get("error", ""), context=name)
                         if not alternatives:
@@ -1933,8 +2032,10 @@ class AudioLoop:
                     'searchQuery': args.get('search', ''),
                 })
             return types.FunctionResponse(id=fc.id, name=name, response=result)
-        elif name in LOCAL_AGENT_TOOLS and not _connected_agents:
-            # list_files has a cross-platform server-side fallback
+        elif name in LOCAL_AGENT_TOOLS:
+            # No fresh agent (none connected, stale, or tool not advertised).
+            # Fail fast with an explicit do-not-retry instruction so Gemini
+            # tells the user instead of looping on this tool silently.
             if name == "list_files":
                 log.info(f"[AGENT] No agent connected — using server-side list_files fallback")
                 r = await list_files(args.get("path", ""), args.get("search", ""))
@@ -1953,8 +2054,8 @@ class AudioLoop:
             return types.FunctionResponse(
                 id=fc.id, name=name,
                 response={"success": False, "_success": False,
-                          "error": f"Local agent is not connected. Please start it with: py -3.11 backend\\local_agent.py",
-                          "hint": "The local agent runs on your Windows PC and handles desktop tasks."}
+                          "error": "Local agent is not connected. Do NOT retry this tool — tell the user to start it with: py -3.11 backend\\local_agent.py",
+                          "hint": "The local agent runs on your Windows PC and handles desktop tasks. Stop calling tools for this request and inform the user."}
             )
 
         if name == "get_weather":
@@ -2002,7 +2103,11 @@ class AudioLoop:
                         "message": f"Agent {name} started in background. Results will be delivered when ready."
                     }}
                 )
-            r = await self._orchestrator.dispatch(name, **args)
+            # ponytail: cap agent dispatch — a hung agent must not hold the turn
+            try:
+                r = await asyncio.wait_for(self._orchestrator.dispatch(name, **args), timeout=45)
+            except asyncio.TimeoutError:
+                r = {"success": False, "error": f"Agent {name} timed out after 45s. Tell the user and do NOT retry silently."}
             if self.sio and name == "agent_search" and r.get("results"):
                 loop = asyncio.get_event_loop()
                 loop.create_task(self.sio.emit("search_results", {
@@ -2075,7 +2180,7 @@ class AudioLoop:
             self.sio.on("world_monitor_data_response", on_response)
             await self.sio.emit("get_world_monitor_data", {"requestId": request_id, "sections": sections})
             try:
-                await asyncio.wait_for(event.wait(), timeout=10)
+                await asyncio.wait_for(event.wait(), timeout=6)
                 result = result_container.get("data", {})
             except asyncio.TimeoutError:
                 result = {"error": "Timed out waiting for World Monitor data. Make sure the dashboard is open and loaded."}
@@ -2107,7 +2212,22 @@ class AudioLoop:
                 except Exception as e:
                     result = {"success": False, "error": str(e)}
             elif action in ("delete_items", "rename_item", "copy_item", "move_item", "list_drives", "scroll_file_list"):
-                result = await run_async(lambda: self.agent.execute_tool(action, args))
+                # File ops live in external_apis (async) — call directly.
+                if action == "delete_items":
+                    paths = args.get("paths", args.get("path", []))
+                    result = await delete_items(paths)
+                elif action == "rename_item":
+                    result = await rename_item(args.get("old_path", ""), args.get("new_path", ""))
+                elif action == "copy_item":
+                    result = await copy_item(args.get("source", ""), args.get("destination", ""))
+                elif action == "move_item":
+                    result = await move_item(args.get("source", ""), args.get("destination", ""))
+                elif action == "list_drives":
+                    result = await list_drives()
+                else:  # scroll_file_list
+                    if self.sio:
+                        await self.sio.emit("file_scroll", {"action": args.get("direction", "down")})
+                    result = {"success": True}
             else:
                 result = {"error": f"Unknown file_manager action: {action}"}
             return types.FunctionResponse(id=fc.id, name=name, response={"result": json.dumps(result)})
@@ -2257,9 +2377,9 @@ class AudioLoop:
                 try:
                     import google.genai as genai
                     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-                    resp = await asyncio.to_thread(
+                    resp = await asyncio.wait_for(asyncio.to_thread(
                         lambda: client.models.generate_content(model="models/gemini-2.5-flash", contents=eval_prompt)
-                    )
+                    ), timeout=30)
                     eval_text = resp.text or ""
                     json_match = re.search(r'```json\s*([\s\S]*?)\s*```', eval_text)
                     if json_match:
@@ -2331,9 +2451,9 @@ class AudioLoop:
                 try:
                     import google.genai as genai
                     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-                    resp = await asyncio.to_thread(
+                    resp = await asyncio.wait_for(asyncio.to_thread(
                         lambda: client.models.generate_content(model="models/gemini-2.5-flash", contents=eval_prompt)
-                    )
+                    ), timeout=30)
                     eval_text = resp.text or ""
                     json_match = re.search(r'```json\s*([\s\S]*?)\s*```', eval_text)
                     if json_match:
@@ -2384,7 +2504,9 @@ TEXT: {text}"""
                 try:
                     import google.genai as genai
                     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-                    resp = client.models.generate_content(model="models/gemini-2.5-flash", contents=prompt)
+                    resp = await asyncio.wait_for(asyncio.to_thread(
+                        lambda: client.models.generate_content(model="models/gemini-2.5-flash", contents=prompt)
+                    ), timeout=30)
                     result = json.loads(resp.text)
                 except Exception as e:
                     result = {"error": str(e), "error_count": 0, "errors": []}
@@ -2525,7 +2647,7 @@ TEXT: {text}"""
                 self._pending_frames[request_id] = future
                 try:
                     await self.sio.emit("request_frame", {"id": request_id})
-                    frame_data = await asyncio.wait_for(future, timeout=5.0)
+                    frame_data = await asyncio.wait_for(future, timeout=3.0)
                     raw = base64.b64decode(frame_data)
                     await self.session.send_realtime_input(video=types.Blob(data=raw, mime_type="image/jpeg"))
                     self._latest_image_payload = {"mime_type": "image/jpeg", "data": frame_data}
@@ -2625,18 +2747,27 @@ TEXT: {text}"""
                 password = args.get("password", "")
                 self._gmail_address = address
                 self._gmail_app_password = password
+                email_reader.set_email_config(address, password)
                 result = {"success": True, "message": f"Gmail configured for {address}. Ready to read/send emails."}
             elif action == "read":
-                if not self._gmail_address or not self._gmail_app_password:
-                    result = {"error": "Email not configured. Call email(action='config') first with your Gmail address and app password."}
+                if not email_reader.email_configured():
+                    result = {"success": False, "error": "Email not configured. " + email_reader.get_setup_instructions()}
                 else:
-                    result = await run_async(lambda: self._read_emails(
-                        query=args.get("query", "UNSEEN"),
+                    query = args.get("query", "UNSEEN")
+                    result = await email_reader.read_emails(
+                        query=query,
                         max_results=args.get("max_results", 10)
-                    ))
+                    )
+                    if self.sio and result.get("success"):
+                        loop = asyncio.get_event_loop()
+                        loop.create_task(self.sio.emit("email_data", {
+                            "emails": result.get("emails", []),
+                            "total": result.get("total", 0),
+                            "query": query,
+                        }))
             elif action == "send":
-                if not self._gmail_address or not self._gmail_app_password:
-                    result = {"error": "Email not configured. Call email(action='config') first."}
+                if not email_reader.email_configured():
+                    result = {"success": False, "error": "Email not configured. " + email_reader.get_setup_instructions()}
                 else:
                     to = args.get("to", "")
                     subject = args.get("subject", "")
@@ -2644,7 +2775,7 @@ TEXT: {text}"""
                     if not to or not subject or not body:
                         result = {"error": "Missing required fields: to, subject, body"}
                     else:
-                        result = await run_async(lambda: self._send_email(to, subject, body))
+                        result = await email_reader.send_email(to, subject, body)
             else:
                 result = {"error": f"Unknown email action: {action}"}
             return types.FunctionResponse(id=fc.id, name=name, response={"result": json.dumps(result)})

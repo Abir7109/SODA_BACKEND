@@ -91,9 +91,16 @@ async def generate_alternatives(
     )
 
     try:
-        response = _gemini_client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
+        # Sync SDK call runs off the event loop (with a hard cap) so a slow
+        # Gemini API can never freeze SODA's audio/tool pipeline.
+        response = await asyncio.wait_for(
+            asyncio.to_thread(
+                lambda: _gemini_client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=prompt,
+                )
+            ),
+            timeout=10,
         )
         text = response.text.strip()
         # Strip markdown code fences if present
