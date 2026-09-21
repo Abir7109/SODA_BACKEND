@@ -682,25 +682,34 @@ export default function App() {
   // ── Browser mic capture (web) ──
   const { micActive: browserMicActive, micError: browserMicError, start: startBrowserMic, stop: stopBrowserMic } = useBrowserMic(socket)
 
-  // ── Frontend audio playback via Web Audio API ──
+  // ── Frontend audio playback via Web Audio API (streaming ring buffer) ──
   const audioCtxRef = useRef(null)
-  const audioNextTime = useRef(0)
   const audioReadyRef = useRef(false)
+  const ringBufRef = useRef(null)
+  const writePosRef = useRef(0)
+  const readPosRef = useRef(0)
+  const scriptNodeRef = useRef(null)
 
   function stopAudio() {
-    audioNextTime.current = 0
+    if (scriptNodeRef.current) {
+      scriptNodeRef.current.disconnect()
+      scriptNodeRef.current = null
+    }
     if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
       audioCtxRef.current.close().catch(() => {})
       audioCtxRef.current = null
     }
+    ringBufRef.current = null
+    writePosRef.current = 0
+    readPosRef.current = 0
   }
 
   function initAudioCtx() {
     if (!audioCtxRef.current) {
       const AC = window.AudioContext || window.webkitAudioContext
       if (!AC) return null
-      audioCtxRef.current = new AC()
-      console.log('[Audio] Created AudioContext')
+      audioCtxRef.current = new AC({ sampleRate: 24000 })
+      console.log('[Audio] Created AudioContext @24kHz')
     }
     if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume().catch(e => console.warn('[Audio] resume failed:', e))
@@ -708,37 +717,50 @@ export default function App() {
     return audioCtxRef.current
   }
 
+  function ensureStreamNode() {
+    if (scriptNodeRef.current) return
+    const ctx = initAudioCtx()
+    if (!ctx) return
+    // Ring buffer: 5 seconds of audio at 24kHz = 120k samples
+    if (!ringBufRef.current) ringBufRef.current = new Float32Array(24000 * 5)
+    writePosRef.current = 0
+    readPosRef.current = 0
+    const bufferSize = 4096
+    const node = ctx.createScriptProcessor(bufferSize, 0, 1)
+    node.onaudioprocess = (e) => {
+      const out = e.outputBuffer.getChannelData(0)
+      const ring = ringBufRef.current
+      if (!ring) { out.fill(0); return }
+      let rp = readPosRef.current
+      const len = ring.length
+      for (let i = 0; i < out.length; i++) {
+        out[i] = ring[rp]
+        rp = (rp + 1) % len
+      }
+      readPosRef.current = rp
+    }
+    node.connect(ctx.destination)
+    scriptNodeRef.current = node
+    console.log('[Audio] Streaming ring buffer active')
+  }
+
   function playPcmBytes(bytes) {
     if (!bytes || !bytes.length) return
     const ctx = initAudioCtx()
-    if (!ctx) {
-      console.warn('[Audio] No AudioContext available')
-      return
-    }
+    if (!ctx) return
+    ensureStreamNode()
+    const ring = ringBufRef.current
+    if (!ring) return
     const len = Math.floor(bytes.length / 2)
     if (len === 0) return
-    const float32 = new Float32Array(len)
+    let wp = writePosRef.current
+    const rlen = ring.length
     for (let i = 0; i < len; i++) {
       const val = bytes[i * 2] | (bytes[i * 2 + 1] << 8)
-      float32[i] = (val << 16 >> 16) / 32768.0
+      ring[wp] = (val << 16 >> 16) / 32768.0
+      wp = (wp + 1) % rlen
     }
-    try {
-      const buffer = ctx.createBuffer(1, float32.length, 24000)
-      buffer.copyToChannel(float32, 0)
-      const source = ctx.createBufferSource()
-      source.buffer = buffer
-      source.connect(ctx.destination)
-      let startTime = audioNextTime.current
-      const behind = ctx.currentTime - startTime
-      if (behind > 0.15) {
-        // More than 150ms behind — reset to now to avoid cascade
-        startTime = ctx.currentTime
-      }
-      source.start(startTime)
-      audioNextTime.current = startTime + buffer.duration
-    } catch (e) {
-      console.warn('[Audio] Playback error:', e)
-    }
+    writePosRef.current = wp
   }
 
   const connectGuardRef = useRef(false)
