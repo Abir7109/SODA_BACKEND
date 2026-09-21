@@ -1664,5 +1664,27 @@ tools_list = [{"function_declarations": [
     navigate_world_monitor_tool,
     get_world_monitor_data_tool,
 
+    # ── Hermes Agent (AI-powered desktop control) ──
+    {
+        "name": "hermes_execute",
+        "description": (
+            "Execute a desktop task using Hermes Agent AI. "
+            "Use this for complex multi-step tasks like: opening an app and performing actions, "
+            "automating WhatsApp messages, reading screen content, controlling desktop apps, "
+            "or any task that requires visual understanding of the screen. "
+            "Hermes Agent uses computer_use to see and interact with the desktop in the background."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": "The desktop task to execute. Be specific about what to do. Examples: 'Open WhatsApp, search for John, and send hello', 'Open Notepad and type today's date', 'Take a screenshot and tell me what's on screen'",
+                },
+            },
+            "required": ["task"],
+        },
+    },
+
 ]}]
 

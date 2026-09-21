@@ -227,6 +227,8 @@ LOCAL_AGENT_TOOLS = {
     "credential",
     # Agent control
     "reconnect",
+    # Hermes Agent (AI-powered desktop control)
+    "hermes_execute",
 }
 
 
@@ -1790,6 +1792,7 @@ class AudioLoop:
                 "credential": 15.0,
                 "terminal_execute": 90.0,
                 "execute_command": 90.0,
+                "hermes_execute": 120.0,
             }
             timeout = _TOOL_TIMEOUTS.get(name, 30.0)
             log.info(f"[BRIDGE] 📤 Emitted to {agent_sid}, waiting for response (timeout={timeout}s)")

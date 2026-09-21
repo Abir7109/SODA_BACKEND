@@ -98,6 +98,7 @@ LOCAL_TOOLS = [
     "browser_command",
     "app_search", "app_scroll",
     "credential",
+    "hermes_execute",
 ]
 
 HAS_PYAUTOGUI = False
@@ -733,6 +734,19 @@ def thinking_validate(tool, args):
     return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings}
 
 
+def _hermes_call(contact: str) -> dict:
+    """Use Hermes to initiate a WhatsApp call (computer_use finds and clicks call button)."""
+    try:
+        from hermes_bridge import execute_task
+        return execute_task(
+            f"Open WhatsApp Desktop, search for the contact '{contact}', "
+            f"open the chat, and click the voice call button. "
+            f"Report whether the call was initiated successfully."
+        )
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def _dispatch(tool, args):
     """Dispatch tool execution using backend modules or fallback implementations."""
 
@@ -884,6 +898,18 @@ def _dispatch(tool, args):
         if not app:
             return {"success": False, "error": "No app name provided"}
         app_lower = app.lower().strip()
+
+        # Try Hermes first (fast timeout, falls back to cascade)
+        try:
+            from hermes_bridge import open_app as h_open
+            r = h_open(app)
+            if r and r.get("success"):
+                return r
+            if r and "fallback" not in r.get("error", ""):
+                return r  # Real error, not timeout
+        except (ImportError, Exception):
+            pass
+        log.info(f"[Fallback] Using legacy open_app cascade for '{app}'")
 
         # ── WhatsApp: just open the app, no Gemini intercept ──
         if app_lower in ("whatsapp", "whatapp", "watsapp", "whats app", "what's app", "whats"):
@@ -1401,6 +1427,15 @@ def _dispatch(tool, args):
         return {"success": False, "error": "Install mss or pyautogui for screenshots"}
 
     elif tool == "analyze_screen":
+        # Try Hermes first (fast timeout)
+        try:
+            from hermes_bridge import screenshot_and_analyze
+            r = screenshot_and_analyze(args.get("prompt", "Describe what you see on screen"))
+            if r and r.get("success"):
+                return r
+        except (ImportError, Exception):
+            pass
+        # Fallback to legacy
         cap = _dispatch("screenshot", {})
         if not cap.get("success"):
             return {"success": False, "error": cap.get("error", "Screenshot failed")}
@@ -1415,6 +1450,15 @@ def _dispatch(tool, args):
             return {"success": True, "analysis": "Screenshot captured. To analyze, ensure screen_vision module is available."}
 
     elif tool == "read_screen_text":
+        # Try Hermes first
+        try:
+            from hermes_bridge import screenshot_and_analyze
+            r = screenshot_and_analyze("Read all text visible on this screen and return exactly what you see.")
+            if r and r.get("success"):
+                return r
+        except (ImportError, Exception):
+            pass
+        # Fallback to legacy
         cap = _dispatch("screenshot", {})
         if not cap.get("success"):
             return {"success": False, "error": cap.get("error", "Screenshot failed")}
@@ -1559,9 +1603,39 @@ def _dispatch(tool, args):
                 return {"success": False, "error": str(e)}
         return {"success": False, "error": "pygetwindow or pywin32 required"}
 
-    # ── Messaging ──────────────────────────────────────────────────
+    # ── Messaging (Hermes-first, fallback to whatsapp_bridge) ──────
     elif tool in ("send_whatsapp", "whatsapp_find_and_call", "whatsapp_find_and_message",
                   "check_whatsapp", "reply_whatsapp", "read_whatsapp_chat"):
+        contact = args.get("contact", "")
+        message = args.get("message", args.get("text", ""))
+        # Try Hermes first (fast timeout, falls back automatically)
+        try:
+            from hermes_bridge import (
+                send_whatsapp as h_send, read_whatsapp as h_read,
+                check_whatsapp as h_check, reply_whatsapp as h_reply,
+            )
+            h_result = None
+            if tool in ("whatsapp_find_and_message", "send_whatsapp"):
+                h_result = h_send(contact, message)
+            elif tool == "read_whatsapp_chat":
+                h_result = h_read(contact)
+            elif tool == "check_whatsapp":
+                h_result = h_check()
+            elif tool == "reply_whatsapp":
+                h_result = h_reply(contact, message)
+            elif tool == "whatsapp_find_and_call":
+                h_result = _hermes_call(contact)
+            # If Hermes returned a real result (not fallback), use it
+            if h_result and h_result.get("success"):
+                return h_result
+            if h_result and "fallback" not in h_result.get("error", ""):
+                return h_result  # Hermes error, not timeout
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning(f"[Hermes] WhatsApp error: {e}")
+        # Fallback to legacy whatsapp_bridge
+        log.info(f"[Fallback] Using legacy whatsapp_bridge for {tool}")
         try:
             from whatsapp_bridge import whatsapp_handler
             return whatsapp_handler(tool, args)
@@ -2488,6 +2562,22 @@ def _dispatch(tool, args):
         except Exception as e:
             return {"success": False, "error": f"Spotify error: {e}"}
 
+    # ── Hermes Agent (generic desktop task) ────────────────────────
+    elif tool == "hermes_execute":
+        task = args.get("task", "") or args.get("prompt", "") or args.get("command", "")
+        if not task:
+            return {"success": False, "error": "task is required for hermes_execute"}
+        try:
+            from hermes_bridge import is_alive as hermes_alive, execute_task
+            if not hermes_alive():
+                return {"success": False, "error": "Hermes Agent not running — install it with: iex (irm https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1)"}
+            r = execute_task(task, timeout=180)
+            return r
+        except ImportError:
+            return {"success": False, "error": "hermes_bridge module not available"}
+        except Exception as e:
+            return {"success": False, "error": f"Hermes error: {e}"}
+
     # ── Fallback ──────────────────────────────────────────────────
     return {"error": f"Tool '{tool}' not implemented in local agent"}
 
@@ -2714,6 +2804,19 @@ if __name__ == "__main__":
     else:
         log(f"[AppRegistry] Using cached registry ({len(APP_REGISTRY)} apps)")
     log(f"[AppRegistry] {len(APP_REGISTRY)} apps available for instant launch")
+
+    # ── Start Hermes Agent gateway (desktop automation sub-agent) ──
+    try:
+        from hermes_bridge import start_gateway, is_alive as hermes_alive
+        hermes_started = start_gateway(timeout=15.0)
+        if hermes_started:
+            log("[Hermes] Gateway running on localhost:8642 — desktop tools routed through Hermes")
+        else:
+            log("[Hermes] Gateway not available — desktop tools use fallback automation")
+    except ImportError:
+        log("[Hermes] hermes_bridge module not found — desktop tools use fallback automation")
+    except Exception as e:
+        log(f"[Hermes] Startup error: {e} — desktop tools use fallback automation")
 
     while True:
         try:

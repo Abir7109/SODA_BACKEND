@@ -136,3 +136,15 @@ Colors, typography, and spacing are defined as CSS custom properties in
 - `run_agent_hidden.vbs` → `py -3.11 backend\local_agent.py` (no console window)
 - `open_app` tool: 7-method cascade (URI → known paths → registry → PATH → Start Menu → AppX → SendKeys)
 - Backend routes `LOCAL_AGENT_TOOLS` via `agent_execute` socket event; 10s timeout per call
+
+### Hermes Agent Integration (`backend/hermes_bridge.py`)
+- **Sub-agent** for AI-powered desktop control (WhatsApp, app automation, screen analysis)
+- Runs as gateway daemon on `localhost:8642` (OpenAI-compatible HTTP API)
+- **Free LLM**: Google Gemini 2.5 Flash via AI Studio (1,500 req/day, no credit card)
+- **Auto-start**: `backend/install_hermes_service.ps1` — Scheduled Task at logon
+- **Fallback**: If Hermes is down, desktop tools fall back to legacy automation (pyautogui/screen_vision)
+- **Tool routing**: WhatsApp, open_app, analyze_screen, read_screen_text try Hermes first, fallback to existing code
+- **Generic tool**: `hermes_execute` — Gemini can delegate any desktop task to Hermes via natural language
+- **Install**: `iex (irm https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1)`
+- **Configure**: `hermes config set GEMINI_API_KEY <key> && hermes config set API_SERVER_ENABLED true`
+- **Service install**: `py -3.11 backend/install_hermes_service.ps1 -Action setup`
