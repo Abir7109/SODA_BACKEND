@@ -682,13 +682,16 @@ export default function App() {
   // ── Browser mic capture (web) ──
   const { micActive: browserMicActive, micError: browserMicError, start: startBrowserMic, stop: stopBrowserMic } = useBrowserMic(socket)
 
-  // ── Frontend audio playback via Web Audio API ──
+  // ── Frontend audio playback via Web Audio API (AudioWorklet streaming) ──
   const audioCtxRef = useRef(null)
-  const audioNextTime = useRef(0)
   const audioReadyRef = useRef(false)
+  const workletNodeRef = useRef(null)
 
   function stopAudio() {
-    audioNextTime.current = 0
+    if (workletNodeRef.current) {
+      workletNodeRef.current.disconnect()
+      workletNodeRef.current = null
+    }
     if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
       audioCtxRef.current.close().catch(() => {})
       audioCtxRef.current = null
@@ -708,12 +711,25 @@ export default function App() {
     return audioCtxRef.current
   }
 
-  const audioDebugRef = useRef({ count: 0, bytes: 0, lastLog: 0 })
+  async function ensureWorklet() {
+    if (workletNodeRef.current) return workletNodeRef.current
+    const ctx = initAudioCtx()
+    if (!ctx) return null
+    try {
+      await ctx.audioWorklet.addModule('/audio-processor.js')
+      const node = new AudioWorkletNode(ctx, 'audio-processor')
+      node.connect(ctx.destination)
+      workletNodeRef.current = node
+      console.log('[Audio] AudioWorklet streaming active')
+      return node
+    } catch (e) {
+      console.warn('[Audio] AudioWorklet failed, falling back:', e)
+      return null
+    }
+  }
 
   function playPcmBytes(data) {
     if (!data) return
-    const ctx = initAudioCtx()
-    if (!ctx) return
 
     let bytes
     if (typeof data === 'string') {
@@ -732,31 +748,14 @@ export default function App() {
       float32[i] = (val << 16 >> 16) / 32768.0
     }
 
-    const dbg = audioDebugRef.current
-    dbg.count++
-    dbg.bytes += bytes.length
-    const now = performance.now()
-    if (now - dbg.lastLog >= 3000) {
-      console.log(`[Audio] ${dbg.count} batches, ${dbg.bytes} bytes, ctx.currentTime=${ctx.currentTime.toFixed(2)}, audioNext=${audioNextTime.current.toFixed(2)}`)
-      dbg.count = 0
-      dbg.bytes = 0
-      dbg.lastLog = now
-    }
-
-    try {
-      const buffer = ctx.createBuffer(1, float32.length, 24000)
-      buffer.copyToChannel(float32, 0)
-      const source = ctx.createBufferSource()
-      source.buffer = buffer
-      source.connect(ctx.destination)
-      let startTime = audioNextTime.current
-      if (startTime < ctx.currentTime) {
-        startTime = ctx.currentTime
-      }
-      source.start(startTime)
-      audioNextTime.current = startTime + buffer.duration
-    } catch (e) {
-      console.warn('[Audio] Playback error:', e)
+    const node = workletNodeRef.current
+    if (node) {
+      node.port.postMessage({ type: 'write', samples: float32 })
+    } else {
+      // Fallback: try to init worklet on first call
+      ensureWorklet().then((n) => {
+        if (n) n.port.postMessage({ type: 'write', samples: float32 })
+      })
     }
   }
 

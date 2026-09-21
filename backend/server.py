@@ -482,7 +482,10 @@ async def start_audio(sid, data=None):
     from soda import AudioLoop
     def on_audio_data(data_bytes):
         b64 = base64.b64encode(data_bytes).decode('ascii')
-        asyncio.create_task(sio.emit('audio_data', {'data': b64}))
+        try:
+            asyncio.create_task(sio.emit('audio_data', {'data': b64}))
+        except Exception as e:
+            log.error(f"[AUDIO EMIT ERROR] {e}")
 
     # Callback to send Transcription data to frontend
     def on_transcription(data):
