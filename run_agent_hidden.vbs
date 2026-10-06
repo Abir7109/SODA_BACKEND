@@ -8,6 +8,7 @@ scriptDir = fso.GetFile(WScript.ScriptFullName).ParentFolder.Path
 scriptPath = scriptDir & "\backend\local_agent.py"
 
 Do While True
-    CreateObject("WScript.Shell").Run "py -3.11 """ & scriptPath & """", 0, True
+    ' No BACKEND_URL pin: agent uses its default (Render) so it meets the Netlify HUD on the same server
+    CreateObject("WScript.Shell").Run "cmd /c py -3.11 """ & scriptPath & """, 0, True"
     WScript.Sleep 5000
 Loop

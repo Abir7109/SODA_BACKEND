@@ -24,6 +24,7 @@ const AiWeatherDiagnostics = lazy(() => import('./AiWeatherDiagnostics'))
 const AiTerminalCompiler  = lazy(() => import('./AiTerminalCompiler'))
 const AiSchedulerAlarm    = lazy(() => import('./AiSchedulerAlarm'))
 const GitDeployAnim       = lazy(() => import('./GitDeployAnim'))
+const ToolShowcaseAnim    = lazy(() => import('./ToolShowcaseAnim'))
 const SearchSendAnim      = lazy(() => import('./SearchSendAnim'))
 const BackgroundCommandAnim = lazy(() => import('./BackgroundCommandAnim'))
 
@@ -51,6 +52,7 @@ export const ANIMATION_MAP = {
   AiTerminalCompiler,
   AiSchedulerAlarm,
   GitDeployAnim,
+  ToolShowcaseAnim,
   SearchSendAnim,
   BackgroundCommandAnim,
 }
@@ -138,6 +140,7 @@ export const TOOL_CATEGORY = {
   get_ip_info: CATEGORIES.DATA,
   define_word: CATEGORIES.DATA,
   get_wikipedia_summary: CATEGORIES.DATA,
+  show_tools: CATEGORIES.DATA,
 
   // Git / Deploy
   plan: CATEGORIES.SYSTEM,
@@ -151,6 +154,8 @@ export const TOOL_CATEGORY = {
   // Navigation
   get_navigation_route: CATEGORIES.DATA,
 }
+
+export const ALL_TOOL_NAMES = Object.keys(TOOL_CATEGORY)
 
 export function getCategory(toolName) {
   if (!toolName) return CATEGORIES.DEFAULT

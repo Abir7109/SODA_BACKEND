@@ -68,8 +68,8 @@ _eio_payload.Payload.decode = _safe_decode
 sio = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins='*',
-    ping_interval=15,
-    ping_timeout=10,
+    ping_interval=25,
+    ping_timeout=20,
 )
 
 @asynccontextmanager
@@ -96,6 +96,20 @@ async def lifespan(_app):
 
     # ── Agent health monitor (logs every 60s) + stale agent eviction ──
     async def _agent_health_logger():
+        async def _stale_or_ping(sid, agent_info, reason):
+            """First sighting of a stale agent: ask it to re-register instead of
+            popping it (an agent only registers on socket connect, so a silent pop
+            leaves it registered-but-unroutable forever). Second sighting: evict."""
+            if agent_info.get('_stale_pinged'):
+                return True
+            agent_info['_stale_pinged'] = True
+            log.info(f"[AGENT] {agent_info.get('machine_id', sid)} {reason} — sending agent_ping (re-register)")
+            try:
+                await sio.emit('agent_ping', {'ts': datetime.now().isoformat()}, to=sid)
+            except Exception as e:
+                log.warning(f"[AGENT] agent_ping to {sid} failed: {e}")
+            return False
+
         while True:
             await asyncio.sleep(60)
             now = datetime.now()
@@ -116,7 +130,8 @@ async def lifespan(_app):
                         elapsed = (now - last_pong_dt).total_seconds()
                         log.debug(f"[AGENT] Health: {machine_id} — {tools} tools, {apps} apps, last_pong: {elapsed:.0f}s ago")
                         if elapsed > stale_threshold:
-                            stale_sids.append(sid)
+                            if await _stale_or_ping(sid, agent_info, f'no pong >{stale_threshold}s'):
+                                stale_sids.append(sid)
                     else:
                         log.debug(f"[AGENT] Health: {machine_id} — {tools} tools, {apps} apps, never ponged")
                         # Give new agents 120s grace period before marking stale
@@ -124,7 +139,8 @@ async def lifespan(_app):
                         if connected_at:
                             connected_dt = datetime.fromisoformat(connected_at)
                             if (now - connected_dt).total_seconds() > 120:
-                                stale_sids.append(sid)
+                                if await _stale_or_ping(sid, agent_info, 'never ponged >120s'):
+                                    stale_sids.append(sid)
                 for stale_sid in stale_sids:
                     stale_agent = _connected_agents.pop(stale_sid, None)
                     if stale_agent:
@@ -742,346 +758,55 @@ async def force_tool(sid, data):
         return
     log.info(f"[SERVER] force_tool: {tool} args={args}")
     try:
+        from tool_dispatch import dispatch_local_tool
+        r = await dispatch_local_tool(tool, args, sio=sio, audio_loop=audio_loop)
+        # Emit frontend-specific events for tools that need them
         if tool == 'terminal_execute':
-            from system_app import _run_terminal_command_unchecked
-            command = args.get('command', 'echo hello')
-            r = await _run_terminal_command_unchecked(command, args.get('timeout', 10))
             await sio.emit('command_output', {
-                'command': command, 'output': r.get('output', ''),
+                'command': args.get('command', ''), 'output': r.get('output', ''),
                 'success': r.get('success', False), 'forced': True,
             })
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool in ('web_search_live', 'agent_search'):
-            from agents.web_search_agent import WebSearchAgent
-            agent = WebSearchAgent()
-            query = args.get('query', 'python')
-            r = await agent.execute(query=query, num_results=args.get('num_results', 5))
+        elif tool in ('web_search_live', 'agent_search') and r.get('results'):
             await sio.emit('search_results', {
-                'query': query, 'results': r.get('results', []), 'forced': True,
+                'query': args.get('query', ''), 'results': r.get('results', []), 'forced': True,
             })
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'browse_webpage':
-            from agents.webpage_agent import WebpageAgent
-            agent = WebpageAgent()
-            url = args.get('url', '')
-            r = await agent.execute(url=url)
-            await sio.emit('webpage_content', {
-                'url': url, 'content': r.get('content', ''),
-                'success': r.get('success', False),
-                'images': r.get('images', []),
-                'forced': True,
+        elif tool == 'screenshot' and r.get('success'):
+            await sio.emit('screenshot_taken', {
+                'path': r.get('path', ''), 'width': r.get('width', 0),
+                'height': r.get('height', 0), 'size_bytes': r.get('size_bytes', 0), 'forced': True,
             })
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'agent_browse':
-            from agents.webpage_agent import WebpageAgent
-            agent = WebpageAgent()
-            url = args.get('url', '')
-            r = await agent.execute(url=url)
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'show_search_results':
-            if audio_loop and getattr(audio_loop, '_last_search_results', None):
-                await sio.emit('search_results', {
-                    'query': getattr(audio_loop, '_last_search_query', ''),
-                    'results': audio_loop._last_search_results,
-                    'forced': True,
-                })
-            await sio.emit('tool_result', {'tool': tool, 'result': {'displayed': True}, 'forced': True})
-        elif tool == 'list_files':
-            from external_apis import list_files
-            r = await list_files(args.get('path', ''))
-            await sio.emit('file_list', {
-                'path': r.get('path', ''), 'items': r.get('items', []),
-                'success': r.get('success', False), 'forced': True,
-            })
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'open_file':
-            from external_apis import open_file
-            r = await open_file(args.get('path', ''))
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'view_file':
-            path = args.get('path', '')
-            import mimetypes, base64, os
-            mime, _ = mimetypes.guess_type(path)
-            mime = mime or 'text/plain'
-            if mime.startswith('text/'):
-                with open(path, 'r', encoding='utf-8', errors='replace') as f:
-                    content = f.read()
-                payload = {'type': 'text', 'content': content, 'mime': mime, 'path': path}
-                await sio.emit('view_file_content', {'payload': payload})
-            elif mime.startswith('image/'):
-                with open(path, 'rb') as f:
-                    b64 = base64.b64encode(f.read()).decode('ascii')
-                payload = {'type': 'image', 'content': b64, 'mime': mime, 'path': path}
-                await sio.emit('view_file_content', {'payload': payload})
-            elif mime.startswith('video/'):
-                with open(path, 'rb') as f:
-                    b64 = base64.b64encode(f.read()).decode('ascii')
-                payload = {'type': 'video', 'content': b64, 'mime': mime, 'path': path}
-                await sio.emit('view_file_content', {'payload': payload})
-            else:
-                payload = {'type': 'text', 'content': f'[Binary file: {mime}]', 'mime': mime, 'path': path}
-            await sio.emit('tool_result', {'tool': tool, 'result': {'viewed': path, 'type': payload['type']}, 'forced': True})
-        elif tool == 'get_weather':
-            from external_apis import get_weather
-            r = await get_weather(args.get('location', ''), args.get('units', 'celsius'))
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool in ('get_news', 'agent_news'):
-            from agents.news_agent import NewsAgent
-            agent = NewsAgent()
-            r = await agent.execute(query=args.get('query', ''), max_results=args.get('max_results', 5))
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool in ('get_wikipedia_summary', 'agent_wikipedia'):
-            from agents.wikipedia_agent import WikipediaAgent
-            agent = WikipediaAgent()
-            r = await agent.execute(topic=args.get('topic', ''))
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool.startswith('agent_'):
-            from soda_agents import get_global_orchestrator
-            orch = get_global_orchestrator()
-            agent = orch.get_agent(tool)
-            if agent:
-                r = await agent.execute(**args)
-                await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-            else:
-                await sio.emit('error', {'msg': f'force_tool: unknown agent {tool!r}'}, room=sid)
-        elif tool == 'get_system_status':
-            from external_apis import get_system_status
-            r = await get_system_status()
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'control_system':
-            from system_control import computer_settings_action
-            r = await computer_settings_action(args.get('action', ''), args.get('value'))
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'open_browser':
-            raw_url = args.get('url', 'https://www.google.com')
-            # Canonical source for URL_ALIASES is soda.py:981 (AI tool dispatch)
-            url = raw_url
-            # Emit to frontend floating window instead of opening default browser
-            await sio.emit('open_url', {'url': url})
-            result = {'message': f'Opened {url} in floating window.', 'url': url}
-            await sio.emit('tool_result', {'tool': tool, 'result': result, 'forced': True})
-        elif tool == 'open_app':
-            from system_app import open_app
-            r = open_app(args.get('app_name', ''))
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'screenshot':
-            from system_local import take_screenshot
-            r = take_screenshot()
-            if r.get('success'):
-                await sio.emit('screenshot_taken', {'path': r.get('path', ''), 'width': r.get('width', 0), 'height': r.get('height', 0), 'size_bytes': r.get('size_bytes', 0), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
         elif tool == 'list_processes':
-            from system_local import list_processes
-            r = list_processes(args.get('limit', 10), args.get('sort_by', 'memory'))
-            await sio.emit('process_list', {'count': r.get('count', 0), 'processes': r.get('processes', []), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
+            await sio.emit('process_list', {
+                'count': r.get('count', 0), 'processes': r.get('processes', []), 'forced': True,
+            })
         elif tool == 'get_active_window':
-            from system_local import get_active_window
-            r = get_active_window()
-            await sio.emit('active_window', {'title': r.get('title', ''), 'success': r.get('success', False), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
+            await sio.emit('active_window', {
+                'title': r.get('title', ''), 'success': r.get('success', False), 'forced': True,
+            })
         elif tool == 'run_code':
-            from code_runner import run_code
-            r = run_code(args.get('code', ''), args.get('language', 'auto'), args.get('timeout', 10))
             await sio.emit('code_output', {
                 'language': r.get('language', 'python'),
                 'stdout': r.get('stdout', ''), 'stderr': r.get('stderr', ''),
                 'success': r.get('success', False), 'execution_time_ms': r.get('execution_time_ms', 0),
                 'returncode': r.get('returncode', -1), 'forced': True,
             })
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'remember_fact':
-            from user_memory import add_fact
-            r = add_fact(args.get('key', ''), args.get('value', ''))
-            await sio.emit('memory_update', {'action': 'add_fact', 'key': r.get('key', ''), 'value': r.get('value', ''), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'recall_facts':
-            from user_memory import search_facts
-            r = search_facts(args.get('query', ''))
-            await sio.emit('memory_update', {'action': 'recall', 'query': r.get('query', ''), 'matches': r.get('matches', []), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'get_user_profile':
-            from user_memory import memory_summary
-            r = memory_summary()
-            await sio.emit('memory_update', {'action': 'profile', 'summary': r, 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'set_preference':
-            from user_memory import set_preference
-            r = set_preference(args.get('key', ''), args.get('value', ''))
-            await sio.emit('memory_update', {'action': 'set_preference', 'key': args.get('key', ''), 'value': args.get('value', ''), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'forget_fact':
-            from user_memory import delete_fact
-            r = delete_fact(args.get('key', ''))
-            await sio.emit('memory_update', {'action': 'delete_fact', 'key': args.get('key', ''), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'list_memory':
-            import memory_store
-            data = memory_store.list_memory(type=args.get('type', 'all'), limit=10)
-            await sio.emit('memory_update', {'action': 'list_memory', 'data': data, 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': data, 'forced': True})
-        elif tool == 'show_memory':
-            from user_memory import list_facts, get_profile
-            import memory_store
-            profile = get_profile()
-            facts = list_facts(limit=50)
-            people = memory_store.list_people(limit=20)
-            lessons = memory_store.recall_lessons("", limit=10)
-            payload = {
-                "profile": profile,
-                "facts": facts.get("facts", []),
-                "people": people,
-                "lessons": lessons,
-            }
-            await sio.emit('tool_result', {'tool': tool, 'result': payload, 'forced': True})
-        elif tool == 'remember_person':
-            import memory_store
-            r = memory_store.remember_person(
-                args.get('name', ''), args.get('relationship', ''),
-                args.get('traits', ''), args.get('preferences', ''), args.get('notes', '')
-            )
-            await sio.emit('memory_update', {'action': 'remember_person', 'name': args.get('name', ''), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'recall_person':
-            import memory_store
-            r = memory_store.recall_person(args.get('query', ''), limit=5)
-            await sio.emit('memory_update', {'action': 'recall_person', 'query': args.get('query', ''), 'matches': r.get('matches', []), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'remember_lesson':
-            import memory_store
-            r = memory_store.remember_lesson(args.get('situation', ''), args.get('correction', ''))
-            await sio.emit('memory_update', {'action': 'remember_lesson', 'situation': args.get('situation', ''), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'analyze_screen':
-            from screen_vision import analyze_screen
-            r = await analyze_screen(args.get('prompt', 'Describe what is on the screen in detail.'))
-            if r.get('success'):
-                await sio.emit('screen_analysis', {
-                    'prompt': r.get('prompt', ''), 'analysis': r.get('analysis', ''),
-                    'screenshot': r.get('screenshot', ''), 'elapsed_ms': r.get('elapsed_ms', 0), 'forced': True,
-                })
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'read_screen_text':
-            from screen_vision import read_screen_text
-            r = await read_screen_text()
-            if r.get('success'):
-                await sio.emit('screen_text', {
-                    'text': r.get('analysis', ''), 'screenshot': r.get('screenshot', ''),
-                    'elapsed_ms': r.get('elapsed_ms', 0), 'forced': True,
-                })
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'set_reminder':
-            from reminders import set_reminder as _set_rem
-            r = _set_rem(
-                args.get('message', ''),
-                fire_at=args.get('fire_at'),
-                in_seconds=args.get('in_seconds'),
-                recurring_seconds=args.get('recurring_seconds'),
-            )
-            await sio.emit('reminder_update', {'action': 'set', 'reminder': r.get('reminder', {}), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'list_reminders':
-            from reminders import list_reminders as _list_rem
-            r = _list_rem()
-            await sio.emit('reminder_update', {'action': 'list', 'reminders': r.get('reminders', []), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'cancel_reminder':
-            from reminders import cancel_reminder as _cancel_rem
-            r = _cancel_rem(args.get('id', ''))
-            await sio.emit('reminder_update', {'action': 'cancel', 'id': args.get('id', ''), 'forced': True})
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'recognize_face':
-            from face_api import encode_face
-            from face_store import recognize_face as _match_face
-            import base64
-            request_id = str(__import__('uuid').uuid4())
-            future = asyncio.Future()
-            if hasattr(audio_loop, '_pending_face_frames'):
-                audio_loop._pending_face_frames[request_id] = future
-            await sio.emit('request_face_frame', {'id': request_id}, room=sid)
-            try:
-                frame_data = await asyncio.wait_for(future, timeout=5.0)
-                image_bytes = base64.b64decode(frame_data)
-                enc_result = await encode_face(image_bytes)
-                if "error" in enc_result:
-                    r = {"result": enc_result["error"]}
-                elif "embedding" in enc_result:
-                    match = _match_face(enc_result["embedding"])
-                    r = {"result": match.get("name") or "Face not recognized"}
-                else:
-                    r = {"result": "No face detected"}
-            except asyncio.TimeoutError:
-                r = {"result": "Camera not responding"}
-            finally:
-                if hasattr(audio_loop, '_pending_face_frames'):
-                    audio_loop._pending_face_frames.pop(request_id, None)
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'remember_face':
-            from face_api import encode_face
-            from face_store import store_face
-            import base64
-            name = args.get('name', '').strip()
-            if not name:
-                r = {"result": "Name is required"}
-            else:
-                request_id = str(__import__('uuid').uuid4())
-                future = asyncio.Future()
-                if hasattr(audio_loop, '_pending_face_frames'):
-                    audio_loop._pending_face_frames[request_id] = future
-                await sio.emit('request_face_frame', {'id': request_id}, room=sid)
-                try:
-                    frame_data = await asyncio.wait_for(future, timeout=5.0)
-                    image_bytes = base64.b64decode(frame_data)
-                    enc_result = await encode_face(image_bytes)
-                    if "error" in enc_result:
-                        r = {"result": enc_result["error"]}
-                    elif "embedding" in enc_result:
-                        store_face(name, enc_result["embedding"])
-                        r = {"result": f"Remembered {name}"}
-                    else:
-                        r = {"result": "No face detected"}
-                except asyncio.TimeoutError:
-                    r = {"result": "Camera not responding"}
-                finally:
-                    if hasattr(audio_loop, '_pending_face_frames'):
-                        audio_loop._pending_face_frames.pop(request_id, None)
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'export_data':
-            from export_service import export_data as _export
-            fmt = args.get('format', 'markdown')
-            title = args.get('title', 'soda_export')
-            path = args.get('path', None)
-            data = getattr(audio_loop, '_last_scraped_data', None) if audio_loop else None
-            if data is None:
-                await sio.emit('error', {'msg': 'No scraped data available. Search and scrape something first.'}, room=sid)
-            else:
-                if isinstance(data, str):
-                    import json
-                    try: data = json.loads(data)
-                    except: pass
-                r = await _export(data, fmt, title, path)
-                if r.get('success') and r.get('path'):
-                    mime = 'text/markdown' if fmt == 'markdown' else 'text/csv' if fmt == 'csv' else 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                    await sio.emit('view_file_content', {'payload': {'type': 'text', 'content': None, 'mime': mime, 'path': r['path']}})
-                await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        elif tool == 'camera_control':
-            action = (args or {}).get('action', '')
-            if action == 'close':
-                if audio_loop:
-                    audio_loop._camera_active = False
-                    audio_loop._latest_camera_frame = None
-                await sio.emit('camera_fullscreen_close', {})
-                r = {'result': 'Full-screen camera closed.'}
-            elif action in ('open', 'analyze', 'snapshot'):
-                if audio_loop:
-                    audio_loop._camera_active = True
-                await sio.emit('camera_fullscreen_open', {})
-                r = {'result': 'Full-screen camera opened.'}
-            else:
-                r = {'result': f'Unsupported camera_control action via UI: {action}'}
-            await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
-        else:
-            await sio.emit('error', {'msg': f'force_tool: unknown tool {tool!r}'}, room=sid)
+        elif tool in ('remember_fact', 'recall_facts', 'get_user_profile', 'set_preference',
+                       'forget_fact', 'list_memory', 'show_memory', 'remember_person',
+                       'recall_person', 'remember_lesson'):
+            await sio.emit('memory_update', {'action': tool, 'data': r, 'forced': True})
+        elif tool == 'analyze_screen' and r.get('success'):
+            await sio.emit('screen_analysis', {
+                'prompt': r.get('prompt', ''), 'analysis': r.get('analysis', ''),
+                'screenshot': r.get('screenshot', ''), 'elapsed_ms': r.get('elapsed_ms', 0), 'forced': True,
+            })
+        elif tool == 'read_screen_text' and r.get('success'):
+            await sio.emit('screen_text', {
+                'text': r.get('analysis', ''), 'screenshot': r.get('screenshot', ''),
+                'elapsed_ms': r.get('elapsed_ms', 0), 'forced': True,
+            })
+        elif tool in ('set_reminder', 'list_reminders', 'cancel_reminder'):
+            await sio.emit('reminder_update', {'action': tool, 'data': r, 'forced': True})
+        await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
     except Exception as e:
         await sio.emit('error', {'msg': f'force_tool {tool} failed: {e}'}, room=sid)
 
@@ -1152,7 +877,7 @@ async def user_input(sid, data):
         except Exception as e:
             log.error(f"Passive memory extraction error: {e}")
 
-        await audio_loop.session.send(input=text, end_of_turn=True)
+        await audio_loop.session.send_realtime_input(text=text)
         log.debug(f"[SERVER DEBUG] Message sent to model successfully.")
 
 @sio.event
@@ -1167,7 +892,7 @@ async def announce(sid, data):
             # Send as system instruction - model should just respond with acknowledgment
             # Use a special format to indicate this is announcement-only
             announcement_text = f"[ANNOUNCEMENT] {text}"
-            await audio_loop.session.send(input=announcement_text, end_of_turn=True)
+            await audio_loop.session.send_realtime_input(text=announcement_text)
             log.info("[SERVER] Announcement sent to model for TTS")
         except Exception as e:
             log.error(f"Announce error: {e}")
@@ -1288,7 +1013,7 @@ async def upload_memory(sid, data):
         log.info("Sending memory context to model...")
         context_msg = f"System Notification: The user has uploaded a long-term memory file. Please load the following context into your understanding. The format is a text log of previous conversations:\n\n{memory_text}"
         
-        await audio_loop.session.send(input=context_msg, end_of_turn=True)
+        await audio_loop.session.send_realtime_input(text=context_msg)
         log.info("Memory context sent successfully.")
         await sio.emit('status', {'msg': 'Memory Loaded into Context'})
 

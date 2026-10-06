@@ -137,6 +137,7 @@ from external_apis import (
     list_files_tool,
     open_file_tool,
     close_panel_tool,
+    show_tools_tool,
     system_status_tool,
     close_window_tool,
     notepad_open_tool,
@@ -1560,6 +1561,7 @@ tools_list = [{"function_declarations": [
     list_files_tool,
     open_file_tool,
     close_panel_tool,
+    show_tools_tool,
     system_status_tool,
     close_window_tool,
     screenshot_tool,
@@ -1664,14 +1666,46 @@ tools_list = [{"function_declarations": [
     navigate_world_monitor_tool,
     get_world_monitor_data_tool,
 
+    # ── Browser-Use (AI browser automation) ──
+    {
+        "name": "browser_use_task",
+        "description": (
+            "Execute a complex browser task using browser-use AI agent. "
+            "The agent navigates, clicks, types, scrolls, and extracts data from real web pages. "
+            "Use for multi-step browser workflows: filling forms, navigating SPAs, "
+            "extracting structured data, comparing products, booking, or any task "
+            "that requires interacting with a website step by step. "
+            "Do NOT use for simple page reads — use scrape_site or browse_webpage instead. "
+            "Do NOT use for opening a URL — use open_browser or browser_command instead. "
+            "Examples: 'Go to amazon.com and find the cheapest iPhone 15', "
+            "'Log into my GitHub and check my notifications', "
+            "'Fill out the contact form on example.com with my details'"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": "Natural language description of the browser task. Be specific about what to do, what to look for, and what to return.",
+                },
+                "max_steps": {
+                    "type": "integer",
+                    "description": "Maximum number of agent steps (clicks, navigations). Default 15. Increase for complex multi-page workflows.",
+                },
+            },
+            "required": ["task"],
+        },
+    },
+
     # ── Hermes Agent (AI-powered desktop control) ──
     {
         "name": "hermes_execute",
         "description": (
             "Execute a desktop task using Hermes Agent AI. "
             "Use this for complex multi-step tasks like: opening an app and performing actions, "
-            "automating WhatsApp messages, reading screen content, controlling desktop apps, "
+            "automating WhatsApp messages, controlling desktop apps, "
             "or any task that requires visual understanding of the screen. "
+            "Do NOT use for read-only questions like 'what is on my screen' — use analyze_screen instead. "
             "Hermes Agent uses computer_use to see and interact with the desktop in the background."
         ),
         "parameters": {
@@ -1692,8 +1726,9 @@ tools_list = [{"function_declarations": [
         "description": (
             "Control the desktop using Gemini vision AI. "
             "Takes a screenshot, analyzes it with Gemini, and performs actions (click, type, scroll, etc.). "
-            "Use for multi-step desktop tasks: opening apps, navigating UIs, filling forms, "
-            "reading screen content, automating workflows. Works like Hermes but built-in — no external agent needed."
+            "Use ONLY for multi-step DOING tasks: opening apps, navigating UIs, filling forms, automating workflows. "
+            "Do NOT use for read-only questions like 'what is on my screen/browser' — use analyze_screen instead "
+            "(one screenshot, answered in seconds). Works like Hermes but built-in — no external agent needed."
         ),
         "parameters": {
             "type": "object",

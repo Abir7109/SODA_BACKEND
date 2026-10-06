@@ -21,6 +21,51 @@ load_dotenv()
 
 from logger import log
 
+# DeepSeek AI service wrapper (OpenAI-compatible API)
+class DeepSeekService:
+    def __init__(self):
+        self.api_key = os.getenv("DEEPSEEK_API_KEY", "")
+        self.base_url = "https://api.deepseek.com/v1"
+        self.model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+        self.client = httpx.AsyncClient(timeout=30.0)
+
+    async def chat_completion(self, messages, tools=None, model=None, temperature=0.7, max_tokens=1024):
+        """Send a chat completion request to DeepSeek and return the response."""
+        if not self.api_key:
+            log.warning("[DEEPSEEK] No API key configured - returning fallback response")
+            return {"choices": [{"message": {"content": "DeepSeek API key not configured."}}]}
+
+        model = model or self.model
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if tools is not None:
+            payload["tools"] = tools
+
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/chat/completions",
+                json=payload,
+                headers={"Authorization": f"Bearer {self.api_key}"},
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            log.error(f"[DEEPSEEK] HTTP error: {e}")
+            return {"choices": [{"message": {"content": f"DeepSeek API error: {e}"}}]}
+        except Exception as e:
+            log.error(f"[DEEPSEEK] Unexpected error: {e}")
+            return {"choices": [{"message": {"content": f"DeepSeek error: {e}"}}]}
+
+    async def close(self):
+        await self.client.aclose()
+
+
+deepseek_service = DeepSeekService()
+
 # Init Supabase client on startup (if configured)
 from supabase_client import get_supabase, is_configured, get_db, ensure_tables
 _SUPABASE_AVAILABLE = is_configured()
@@ -419,7 +464,7 @@ def _build_system_prompt():
         # ── SYSTEM ARCHITECTURE ───────────────────────────────────
         "ARCHITECTURE — You run on a cloud server (Gemini API on Render). "
         "A LOCAL DESKTOP AGENT runs on Abir sir's Windows PC. "
-        "Tools like open_app, send_whatsapp, list_files, terminal_execute, "
+        "Tools like open_app, whatsapp_find_and_message, list_files, terminal_execute, "
         "mouse_click, keyboard_type, etc. ALL execute on his PC via the local agent. "
         "Trust your tools — they work. Never say 'I cannot do that' or 'I don't have access'. "
         "If a tool fails, report the error honestly.\n"
@@ -605,6 +650,246 @@ def _build_system_prompt():
         pass
     return base
 
+
+# ── Transcription Filter (addressee detection) ────────────────────────────
+# Three-layer gate: fast regex → context check → Gemini classification.
+# Fail-closed: when uncertain, block. Better to miss 1 command than reply to noise.
+
+class TranscriptionFilter:
+    """Determines if a transcription is directed at SODA or is ambient speech."""
+
+    # Layer 1 patterns — PASS (clearly device-directed)
+    _WAKE_WORDS = re.compile(
+        r'\b(soda|s\.o\.d\.a|'
+        r'oka\s*soda|ask\s*soda|hey\s*soka|'
+        r'oy\s*soda|arre\s*soda|sun\s*soda|'
+        r'હે\s*સોડા|హే\s*సోడా|'
+        r'ए\s*सोडा|ओय\s*सोडा)\b',
+        re.IGNORECASE,
+    )
+    _IMPERATIVE_START = re.compile(
+        r'^(open|run|send|start|stop|close|launch|play|search|check|'
+        r'what.s|how.s|when.s|where.s|why|who|tell|show|read|write|'
+        r'call|message|email|set|get|find|list|create|delete|move|'
+        r'copy|edit|save|download|upload|install|uninstall|'
+        r'connect|disconnect|enable|disable|activate|deactivate|'
+        r'focus|maximize|minimize|snap|resize|'
+        r'khulao|bandh|chalu|rok|chalao|dhundo|bhej|likho|padho|'
+        r'khol|bind|suru|tham|bhejo|dikhao|batao|suno|dekho)\b',
+        re.IGNORECASE,
+    )
+    _SECOND_PERSON = re.compile(
+        r'\b(can you|could you|would you|will you|do you|are you|'
+        r'have you|should i|shall i|please|'
+        r'kya tum|kya aap|tum kar|aap kar|tumhe|aapko)\b',
+        re.IGNORECASE,
+    )
+    _QUESTION_START = re.compile(
+        r'^(what|how|when|where|why|who|which|whose|whom|'
+        r'kya|kab|kahan|kyun|kaun|kaisa|kitna|'
+        r'kiya|hogya|hain|hai)\b',
+        re.IGNORECASE,
+    )
+    _SHUTDOWN = re.compile(
+        r'\b(shut\s*down|power\s*off|turn\s*off|switch\s*off|stop\s*soda|'
+        r'close\s*it|clear|never\s*mind|band\s*karo|rok\s*do)\b',
+        re.IGNORECASE,
+    )
+
+    # Layer 1 patterns — BLOCK (clearly ambient)
+    _THIRD_PARTY_ADDR = re.compile(
+        r'\b(hey\s*(john|rahul|babu|baby|babe|dude|man|bro|sis|mom|dad|'
+        r'auntie|uncle|boss|sir|madam|ji)|'
+        r'did\s*you\s*hear|listen\s*(babe|baby|bro|dude)|'
+        r'oh\s*(really|wow|nice|great)|'
+        r'he\s*said|she\s*said|they\s*said|'
+        r'i\s*told\s*him|i\s*told\s*her|'
+        r'call\s*me|text\s*me|wait\s*for\s*me|'
+        r'bye\s*(bye|take\s*care)|see\s*you|talk\s*to\s*you|'
+        r'good\s*night|good\s*morning|good\s*afternoon)\b',
+        re.IGNORECASE,
+    )
+    _PHONE_ANSWER = re.compile(
+        r'^(hello[\?\!]+\s*$|hello\s+(here|speaking)\s|'
+        r'ji\s+haan|haan\s+bol|sun\s+rahe|'
+        r'yeah[\s,]|mhm|uh\s+huh|okay\s+so|'
+        r'right\s+so|anyway|so\s+basically|'
+        r'hmm[\.\?]+|haan[\.\?]+|ji[\.\?]+)',
+        re.IGNORECASE,
+    )
+
+    def __init__(self):
+        self._conversation_history = []  # last 5 exchanges
+        self._last_soda_response_time = 0.0
+        self._last_pass_time = 0.0
+        self._gemini_client = None
+
+    def reset(self):
+        """Reset filter state on session reconnect."""
+        self._conversation_history.clear()
+        self._last_soda_response_time = 0.0
+        self._last_pass_time = 0.0
+
+    def record_exchange(self, user_text: str, soda_text: str):
+        """Record an exchange for context tracking."""
+        self._conversation_history.append({
+            "user": user_text[-200:],
+            "soda": soda_text[-200:],
+            "time": time.time(),
+        })
+        if len(self._conversation_history) > 5:
+            self._conversation_history = self._conversation_history[-5:]
+        self._last_soda_response_time = time.time()
+
+    def should_process(self, transcript: str) -> bool:
+        """Main entry point. Returns True if transcription should be processed."""
+        if not transcript or not transcript.strip():
+            return False
+
+        text = transcript.strip()
+
+        # Layer 1: Fast gate
+        layer1 = self._layer1_fast_gate(text)
+        if layer1 is not None:
+            if layer1:
+                self._last_pass_time = time.time()
+                log.info(f"[FILTER] L1 PASS: {text[:60]}")
+            else:
+                log.info(f"[FILTER] L1 BLOCK: {text[:60]}")
+            return layer1
+
+        # Layer 2: Context check
+        layer2 = self._layer2_context(text)
+        if layer2 is not None:
+            if layer2:
+                self._last_pass_time = time.time()
+                log.info(f"[FILTER] L2 PASS: {text[:60]}")
+            else:
+                log.info(f"[FILTER] L2 BLOCK: {text[:60]}")
+            return layer2
+
+        # Layer 3: DeepSeek classification
+        layer3 = self._layer3_deepseek(text)
+        if layer3:
+            self._last_pass_time = time.time()
+            log.info(f"[FILTER] L3 PASS: {text[:60]}")
+        else:
+            log.info(f"[FILTER] L3 BLOCK: {text[:60]}")
+        return layer3
+
+    def _layer1_fast_gate(self, text: str):
+        """Layer 1: Regex patterns. Returns True/False or None (uncertain)."""
+        # Always pass safety commands (highest priority)
+        if self._SHUTDOWN.search(text):
+            return True
+
+        # Always pass wake words (second highest)
+        if self._WAKE_WORDS.search(text):
+            return True
+
+        # Block third-party address patterns (before PASS patterns — "hey john" + "are you" should block)
+        if self._THIRD_PARTY_ADDR.search(text):
+            return False
+
+        # Block phone-answer patterns
+        if self._PHONE_ANSWER.search(text):
+            return False
+
+        # Block very short utterances (noise/fragments)
+        if len(text) < 4:
+            return False
+
+        # Pass imperative commands
+        if self._IMPERATIVE_START.search(text):
+            return True
+
+        # Pass second-person address
+        if self._SECOND_PERSON.search(text):
+            return True
+
+        # Pass question patterns
+        if self._QUESTION_START.search(text):
+            return True
+
+        # Block phone-answer patterns
+        if self._PHONE_ANSWER.search(text):
+            return False
+
+        return None  # Uncertain → Layer 2
+
+    def _layer2_context(self, text: str):
+        """Layer 2: Conversation context. Returns True/False or None (uncertain)."""
+        now = time.time()
+
+        # If SODA spoke recently (< 15s), user is likely responding
+        if self._last_soda_response_time > 0:
+            since_soda = now - self._last_soda_response_time
+            if since_soda < 15:
+                return True
+
+        # If last PASS was recent (< 10s), active conversation
+        if self._last_pass_time > 0:
+            since_pass = now - self._last_pass_time
+            if since_pass < 10:
+                return True
+
+        # If there's recent conversation history, check for follow-up
+        if self._conversation_history:
+            last_exchange = self._conversation_history[-1]
+            time_since = now - last_exchange.get("time", 0)
+            if time_since < 20:
+                # Check if this could be a follow-up (contains topic overlap)
+                last_soda = last_exchange.get("soda", "").lower()
+                last_user = last_exchange.get("user", "").lower()
+                text_lower = text.lower()
+                # Simple keyword overlap check
+                last_words = set(last_soda.split() + last_user.split())
+                current_words = set(text_lower.split())
+                overlap = last_words & current_words
+                if len(overlap) >= 2:
+                    return True
+
+        return None  # Uncertain → Layer 3
+
+    def _layer3_deepseek(self, text: str):
+        """Layer 3: Quick DeepSeek classification. Returns True (pass) or False (block)."""
+        try:
+            # Build context string
+            context_parts = []
+            for ex in self._conversation_history[-3:]:
+                if ex.get("user"):
+                    context_parts.append(f"User: {ex['user']}")
+                if ex.get("soda"):
+                    context_parts.append(f"SODA: {ex['soda']}")
+            context_str = "\n".join(context_parts) if context_parts else "(no recent context)"
+
+            prompt = (
+                "You are a voice assistant filter. Determine if this speech is "
+                "directed at the voice assistant 'SODA' or is ambient/background speech "
+                "(someone talking to another person, phone call, TV, etc.).\n\n"
+                f"Recent conversation:\n{context_str}\n\n"
+                f'Speech: "{text}"\n\n'
+                "Reply with ONLY one word: DEVICE_DIRECTED or AMBIENT"
+            )
+
+            # Async call to DeepSeek
+            import asyncio
+            loop = asyncio.get_event_loop()
+            response = loop.run_until_complete(
+                deepseek_service.chat_completion(
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                    max_tokens=10,
+                )
+            )
+            answer = response.get("choices", [{}])[0].get("message", {}).get("content", "").strip().upper()
+            return "DEVICE_DIRECTED" in answer
+
+        except Exception as e:
+            log.warning(f"[FILTER] L3 Gemini error: {e} — fail-closed")
+            return False  # Fail-closed on error
+
+
 class AudioLoop:
     def __init__(self, video_mode=DEFAULT_MODE, sio=None,
                  on_audio_data=None, on_transcription=None,
@@ -686,6 +971,7 @@ class AudioLoop:
         self._pentest_background_task = None
         self._orchestrator = get_global_orchestrator()
         self._orchestrator.set_inject_callback(self._deliver_agent_result)
+        self._transcription_filter = TranscriptionFilter()
 
 
     async def _deliver_agent_result(self, text: str):
@@ -1082,6 +1368,10 @@ class AudioLoop:
         """Accept PCM audio chunks from browser mic (via Socket.IO) and queue for Gemini."""
         if not self.audio_queue:
             return
+        # ponytail: echo-safe — drop browser mic while the model speaks, else it hears
+        # its own speaker output and repeats/conflicts (local mic path already mutes)
+        if self._model_is_speaking or self._idle_mode:
+            return
         try:
             self.audio_queue.put_nowait({"data": data, "mime_type": "audio/pcm"})
             self._mark_activity()
@@ -1235,12 +1525,15 @@ class AudioLoop:
         return {"mime_type": "image/jpeg", "data": base64.b64encode(buf.getvalue()).decode()}
 
     async def play_audio(self):
-        silent_ticks = 0
         was_tools_running = False
         _batch_buf = bytearray()
         _BATCH_TARGET = 4800
         _BATCH_MAX_WAIT = 0.08
         _last_flush = asyncio.get_event_loop().time()
+
+        # Wall-clock silence tracking (replaces tick-based silent_ticks)
+        _last_audio_time = time.monotonic()
+        _SILENCE_THRESHOLD = 4.0  # seconds of no audio before model is "done speaking"
 
         # Open PyAudio output stream for local speaker playback (like ada_v2)
         _stream = None
@@ -1259,8 +1552,8 @@ class AudioLoop:
 
         while True:
             try:
-                data = await asyncio.wait_for(self.audio_in_queue.get(), timeout=0.5)
-                silent_ticks = 0
+                data = await asyncio.wait_for(self.audio_in_queue.get(), timeout=0.1)
+                _last_audio_time = time.monotonic()
                 was_tools_running = bool(self._tools_running)
                 if self.on_mic_level:
                     count = len(data) // 2
@@ -1291,32 +1584,30 @@ class AudioLoop:
                     self.on_audio_data(bytes(_batch_buf))
                     _batch_buf.clear()
                     _last_flush = asyncio.get_event_loop().time()
-                silent_ticks += 1
+
+                # Wall-clock silence detection (no more tick drift)
+                elapsed_silence = time.monotonic() - _last_audio_time
                 if self._tools_running:
                     was_tools_running = True
-                elif was_tools_running:
+                elif was_tools_running and elapsed_silence > 1.0:
                     was_tools_running = False
-                    silent_ticks = 0
-                elif self._model_is_speaking and silent_ticks >= 8:
+                elif self._model_is_speaking and elapsed_silence >= _SILENCE_THRESHOLD:
                     self._model_is_speaking = False
                     if self.sio:
                         loop = asyncio.get_event_loop()
                         loop.create_task(self.sio.emit("speaking_state", {"state": "idle"}))
-                    was_tools_running = True
-                elif was_tools_running:
+                elif was_tools_running and elapsed_silence > 1.0:
                     was_tools_running = False
-                    silent_ticks = 0
-                elif self._model_is_speaking and silent_ticks >= 8:
-                    self._model_is_speaking = False
-                    if self.sio:
-                        loop = asyncio.get_event_loop()
-                        loop.create_task(self.sio.emit("speaking_state", {"state": "idle"}))
 
     async def run(self):
         retry_delay = 1
         is_reconnect = False
         start_message = self.start_message
         system_prompt = _build_system_prompt()
+        _MAX_RETRIES = 10
+        _retry_count = 0
+        _base_delay = 1
+        _max_delay = 30
         config = types.LiveConnectConfig(
             response_modalities=["AUDIO"],
             output_audio_transcription={},
@@ -1358,6 +1649,7 @@ class AudioLoop:
                     self._consecutive_tool_failures = 0
                     self._processed_fc_ids.clear()
                     self._pending_confirmations.clear()
+                    self._transcription_filter.reset()
 
                     tg.create_task(self.send_audio())
                     tg.create_task(self.send_video())
@@ -1393,28 +1685,69 @@ class AudioLoop:
                         self._last_summary_turn = self._turn_count
 
                     retry_delay = 1
+                    _retry_count = 0
+                    if is_reconnect and self.sio:
+                        try:
+                            await self.sio.emit("connection_state", {
+                                "connected": True,
+                                "reason": "reconnected",
+                            })
+                        except Exception:
+                            pass
                     await self.stop_event.wait()
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                log.error(f"Connection error: {e}")
+                _retry_count += 1
+                log.error(f"Connection error (attempt {_retry_count}/{_MAX_RETRIES}): {e}")
                 traceback.print_exc()
                 self._model_is_speaking = False
                 self._tools_running = False
                 self._last_tool_start = 0.0
+
+                # Circuit breaker — stop after max retries
+                if _retry_count >= _MAX_RETRIES:
+                    log.error(f"[CIRCUIT BREAKER] {_MAX_RETRIES} consecutive failures — giving up")
+                    if self.on_error:
+                        self.on_error(f"Gemini connection failed after {_MAX_RETRIES} attempts. Check your API key and network.")
+                    if self.sio:
+                        try:
+                            await self.sio.emit("speaking_state", {"state": "idle"})
+                            await self.sio.emit("connection_state", {
+                                "connected": False,
+                                "reason": "circuit_breaker",
+                                "retries": _retry_count,
+                            })
+                        except Exception:
+                            pass
+                    break
+
                 if self.on_error:
-                    self.on_error(f"Gemini reconnecting...")
+                    self.on_error(f"Gemini reconnecting (attempt {_retry_count}/{_MAX_RETRIES})...")
                 if self.sio:
                     try:
                         await self.sio.emit("speaking_state", {"state": "idle"})
+                        await self.sio.emit("connection_state", {
+                            "connected": False,
+                            "reason": "reconnecting",
+                            "attempt": _retry_count,
+                            "max_retries": _MAX_RETRIES,
+                            "next_retry_in": retry_delay,
+                        })
                     except Exception:
                         pass
+
                 if self.stop_event.is_set():
                     break
-                log.warning(f"Reconnecting in {retry_delay}s...")
-                await asyncio.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, 10)
+
+                # Exponential backoff with jitter
+                import random
+                jitter = random.uniform(0, retry_delay * 0.3)
+                actual_delay = retry_delay + jitter
+                log.warning(f"Reconnecting in {actual_delay:.1f}s (attempt {_retry_count})...")
+                await asyncio.sleep(actual_delay)
+                retry_delay = min(retry_delay * 2, _max_delay)
                 is_reconnect = True
             finally:
                 if self.audio_stream:
@@ -1493,6 +1826,14 @@ class AudioLoop:
                                 if transcript.startswith(self._last_input_transcription):
                                     delta = transcript[len(self._last_input_transcription):]
                                 self._last_input_transcription = transcript
+                                # ── Transcription filter gate ──
+                                # Safety commands always pass; everything else goes through the filter.
+                                _is_safety = bool(
+                                    re.search(r'\b(shut\s?down|turn\s*off|power\s*off|stop\s*soda|switch\s*off)\b', transcript, re.IGNORECASE)
+                                )
+                                if delta and not _is_safety:
+                                    if not self._transcription_filter.should_process(transcript):
+                                        continue  # Filtered — skip this transcription
                                 if delta:
                                     if re.search(r'\bshut\s?down\b', transcript, re.IGNORECASE):
                                         log.info(f"System shutdown command detected: {transcript}")
@@ -1588,15 +1929,15 @@ class AudioLoop:
                                 # freeze the Gemini session forever.
                                 raw = await asyncio.wait_for(
                                     asyncio.gather(*tasks, return_exceptions=True),
-                                    timeout=60,
+                                    timeout=120,
                                 )
                             except asyncio.TimeoutError:
-                                log.warning("[TOOLS] Turn timed out after 60s — unwedging with error responses")
+                                log.warning("[TOOLS] Turn timed out after 120s — unwedging with error responses")
                                 # ponytail: synthesize errors so Gemini gets a response per call, else it hangs mid-conv
                                 raw = [
                                     types.FunctionResponse(
                                         id=fc.id, name=fc.name,
-                                        response={"success": False, "error": f"Tool {fc.name} timed out after 60s. Tell the user and do NOT retry silently."},
+                                        response={"success": False, "error": f"Tool {fc.name} timed out after 120s. Tell the user and do NOT retry silently."},
                                     )
                                     for fc in pending_fcs
                                 ]
@@ -1717,6 +2058,9 @@ class AudioLoop:
                         if len(self._exchange_history) > 100:
                             self._exchange_history = self._exchange_history[-100:]
                         self._save_context_history()
+                    # Feed filter with this exchange for context tracking
+                    if user_text and model_text:
+                        self._transcription_filter.record_exchange(user_text, model_text)
                 if self._turn_count - self._last_refresh_turn >= self._context_refresh_interval:
                     if self._exchange_history and self.session:
                         if self._model_is_speaking:
@@ -1865,6 +2209,15 @@ class AudioLoop:
                     }
                 )
 
+        # ── file_manager scroll is a frontend panel action — emit directly ──
+        if name == "file_manager" and args.get("action") == "scroll_file_list":
+            if self.sio:
+                await self.sio.emit("file_scroll", {"action": args.get("direction", "down")})
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"result": json.dumps({"success": True})},
+            )
+
         # ── Route to local desktop agent if applicable ──
         # Pick a FRESH agent that advertises this tool. Routing to a stale /
         # zombie agent wedges the whole turn on timeout (receive_audio blocks
@@ -1936,8 +2289,10 @@ class AudioLoop:
                 "credential": 10.0,
                 "terminal_execute": 45.0,
                 "execute_command": 45.0,
-                "hermes_execute": 45.0,
-                "computer_use": 60.0,
+                "hermes_execute": 100.0,
+                "computer_use": 100.0,
+                "analyze_screen": 40.0,
+                "read_screen_text": 40.0,
             }
             timeout = _TOOL_TIMEOUTS.get(name, 20.0)
             log.info(f"[BRIDGE] 📤 Emitted to {agent_sid}, waiting for response (timeout={timeout}s)")
@@ -2194,6 +2549,15 @@ class AudioLoop:
                 await self.sio.emit("file_scroll", {"action": action})
             return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Scrolled {action}"})
 
+        elif name == "show_tools":
+            decls = tools_list[0]["function_declarations"] if isinstance(tools_list, list) and len(tools_list) > 0 and isinstance(tools_list[0], dict) and "function_declarations" in tools_list[0] else tools_list
+            tool_names = [{"name": t.get("name", "?"), "description": t.get("description", "")} for t in decls]
+            r = json.dumps([t["name"] for t in tool_names], indent=2)
+            if self.sio:
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("tool_showcase", {"tools": tool_names}))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
         elif name == "get_system_status":
             r = await get_system_status()
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
@@ -2375,12 +2739,16 @@ class AudioLoop:
                 part = int(args.get("part", 1))
                 eval_prompt = ss.analyze_response_prompt(transcript, part, question)
                 try:
-                    import google.genai as genai
-                    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-                    resp = await asyncio.wait_for(asyncio.to_thread(
-                        lambda: client.models.generate_content(model="models/gemini-2.5-flash", contents=eval_prompt)
-                    ), timeout=30)
-                    eval_text = resp.text or ""
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    resp = loop.run_until_complete(
+                        deepseek_service.chat_completion(
+                            messages=[{"role": "user", "content": eval_prompt}],
+                            temperature=0.7,
+                            max_tokens=1024,
+                        )
+                    )
+                    eval_text = resp.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
                     json_match = re.search(r'```json\s*([\s\S]*?)\s*```', eval_text)
                     if json_match:
                         eval_text = json_match.group(1)
@@ -2391,7 +2759,7 @@ class AudioLoop:
                             eval_text = eval_text[brace_start:brace_end+1]
                     evaluation = json.loads(eval_text)
                 except Exception as e:
-                    log.warning(f"Speaking eval REST API failed: {e}")
+                    log.warning(f"Speaking eval DeepSeek failed: {e}")
                     wc = len(transcript.split()) if transcript else 0
                     filler_count = sum(transcript.lower().count(w) for w in ['um','uh','like','you know','actually']) if transcript else 0
                     ob = 4.0 if wc < 30 else (5.0 if wc < 80 else (6.0 if wc < 150 else 6.5))
@@ -2449,12 +2817,16 @@ class AudioLoop:
                 task_type = args.get("task_type", "opinion")
                 eval_prompt = wa.build_evaluation_prompt(essay, task_prompt, task_type)
                 try:
-                    import google.genai as genai
-                    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-                    resp = await asyncio.wait_for(asyncio.to_thread(
-                        lambda: client.models.generate_content(model="models/gemini-2.5-flash", contents=eval_prompt)
-                    ), timeout=30)
-                    eval_text = resp.text or ""
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    resp = loop.run_until_complete(
+                        deepseek_service.chat_completion(
+                            messages=[{"role": "user", "content": eval_prompt}],
+                            temperature=0.7,
+                            max_tokens=1024,
+                        )
+                    )
+                    eval_text = resp.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
                     json_match = re.search(r'```json\s*([\s\S]*?)\s*```', eval_text)
                     if json_match:
                         eval_text = json_match.group(1)
@@ -2465,7 +2837,7 @@ class AudioLoop:
                             eval_text = eval_text[brace_start:brace_end+1]
                     evaluation = json.loads(eval_text)
                 except Exception as e:
-                    log.warning(f"Writing eval REST API failed: {e}")
+                    log.warning(f"Writing eval DeepSeek failed: {e}")
                     evaluation = {
                         "overall_band": 6.0,
                         "band_scores": {"task_achievement": 6.0, "coherence_cohesion": 6.0, "lexical_resource": 6.0, "grammatical_range": 6.0},
@@ -2502,13 +2874,19 @@ class AudioLoop:
 }}
 TEXT: {text}"""
                 try:
-                    import google.genai as genai
-                    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-                    resp = await asyncio.wait_for(asyncio.to_thread(
-                        lambda: client.models.generate_content(model="models/gemini-2.5-flash", contents=prompt)
-                    ), timeout=30)
-                    result = json.loads(resp.text)
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    resp = loop.run_until_complete(
+                        deepseek_service.chat_completion(
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=0.7,
+                            max_tokens=1024,
+                        )
+                    )
+                    result_text = resp.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
+                    result = json.loads(result_text) if result_text else {"error": "No response", "error_count": 0, "errors": []}
                 except Exception as e:
+                    log.warning(f"Grammar check DeepSeek failed: {e}")
                     result = {"error": str(e), "error_count": 0, "errors": []}
                 return types.FunctionResponse(id=fc.id, name=name, response={"result": json.dumps(result)})
 
@@ -2831,6 +3209,219 @@ TEXT: {text}"""
                 r = project_registry.remove(project_id=args.get("project_id", ""))
             else:
                 r = {"error": f"Unknown action: {action}"}
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        # ── Notepad (HUD widget) ────────────────────────────────────
+        elif name == "notepad_open":
+            raw_tabs = args.get("tabs", []) or []
+            if isinstance(raw_tabs, dict):
+                raw_tabs = [raw_tabs]
+            norm = [
+                {"title": t.get("name", t.get("title", "notes")), "content": t.get("content", "")}
+                for t in raw_tabs if isinstance(t, dict)
+            ]
+            nid = f"notepad_{uuid.uuid4().hex[:8]}"
+            self._notepad_id = nid
+            if self.sio:
+                await self.sio.emit("open_notepad", {"id": nid, "tabs": norm})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Notepad opened ({len(norm)} tabs). Use notepad_write to add content."})
+
+        elif name == "notepad_write":
+            tab = (args.get("tab", "") or "notes").strip() or "notes"
+            content = args.get("content", "") or ""
+            mode = (args.get("mode", "") or "append").strip().lower()
+            if mode == "overwrite":
+                mode = "replace"
+            if not content.strip():
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "Nothing to write — content was empty."})
+            if not getattr(self, "_notepad_id", None):
+                nid = f"notepad_{uuid.uuid4().hex[:8]}"
+                self._notepad_id = nid
+                if self.sio:
+                    await self.sio.emit("open_notepad", {"id": nid, "tabs": [{"title": tab, "content": content}]})
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Notepad opened with tab '{tab}' containing your note."})
+            if self.sio:
+                await self.sio.emit("notepad_write", {"tab": tab, "content": content, "mode": mode})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Wrote to notepad tab '{tab}'."})
+
+        elif name == "notepad_read":
+            read_id = uuid.uuid4().hex[:8]
+            future = asyncio.get_event_loop().create_future()
+            self._pending_notepad_reads[read_id] = future
+            try:
+                if self.sio:
+                    await self.sio.emit("notepad_read", {"id": read_id, "tab": args.get("tab", "") or ""})
+                data = await asyncio.wait_for(future, timeout=5.0)
+                result = {"result": data.get("content", "") if isinstance(data, dict) else str(data)}
+            except asyncio.TimeoutError:
+                result = {"result": "Notepad did not respond. It may not be open — call notepad_open first."}
+            finally:
+                self._pending_notepad_reads.pop(read_id, None)
+            return types.FunctionResponse(id=fc.id, name=name, response=result)
+
+        # ── Browser webview ───────────────────────────────────────────
+        elif name == "open_browser":
+            url = (args.get("url", "") or "").strip()
+            if not url:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "No URL provided."})
+            alias = URL_ALIASES.get(url.lower())
+            if alias:
+                url = alias
+            if not re.match(r"^https?://", url, re.IGNORECASE):
+                url = "https://" + url
+            if args.get("external"):
+                proxy = type("FC", (), {"id": fc.id, "name": "browser_command", "args": {"action": "open", "url": url}})
+                return await self._dispatch_tool(proxy)
+            if self.sio:
+                # Stable id the model can pass back to webview_action
+                webview_id = f"wv_{uuid.uuid4().hex[:8]}"
+                await self.sio.emit("open_url", {"url": url, "webview_id": webview_id})
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"result": f"Opened {url} in the floating browser window. webview_id={webview_id} — pass this id as the 'id' for webview_action."},
+                )
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Opened {url} in the floating browser window."})
+
+        elif name == "webview_action":
+            wid = args.get("id", "") or args.get("webview_id", "")
+            action = args.get("action", "") or ""
+            params = args.get("params") if isinstance(args.get("params"), dict) else {
+                k: v for k, v in args.items() if k not in ("id", "webview_id", "action")
+            }
+            if not wid or not action:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "webview_action needs an id and an action. Open a page with open_browser first."})
+            future = asyncio.get_event_loop().create_future()
+            self._pending_webview_results[wid] = future
+            try:
+                if self.sio:
+                    await self.sio.emit("webview_action", {"id": wid, "action": action, "params": params})
+                data = await asyncio.wait_for(future, timeout=10.0)
+                result = {"result": (data.get("result", data) if isinstance(data, dict) else str(data))}
+            except asyncio.TimeoutError:
+                result = {"result": f"Webview did not respond. The page may still be loading — try again in a moment."}
+            finally:
+                self._pending_webview_results.pop(wid, None)
+            return types.FunctionResponse(id=fc.id, name=name, response=result)
+
+        # ── Scrape / export ───────────────────────────────────────────
+        elif name == "scrape_site":
+            url = (args.get("url", "") or "").strip()
+            prompt = args.get("prompt", "") or "Summarize this page."
+            if not url:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "No URL provided."})
+            try:
+                from scraper_ai import extract
+                r = await asyncio.wait_for(extract(url, prompt), timeout=45)
+            except asyncio.TimeoutError:
+                r = {"success": False, "error": "Scrape timed out after 45s.", "url": url}
+            self._last_scraped_data = r
+            self._last_scraped_url = url
+            if self.sio and r.get("success") and r.get("data") is not None:
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.sio.emit("scraped_data", {"data": r, "url": url}))
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        elif name == "export_data":
+            fmt = (args.get("format", "") or "markdown").strip().lower() or "markdown"
+            title = args.get("title", "") or "soda_export"
+            path = args.get("path") or None
+            data = args.get("data")
+            if data is None:
+                data = getattr(self, "_last_scraped_data", None)
+            if data is None:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": "No data to export. Scrape a page first, or pass data directly."})
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    pass
+            from export_service import export_data as _export
+            r = await _export(data, fmt, title, path)
+            if r.get("success") and r.get("path") and self.sio:
+                mime = "text/markdown" if fmt == "markdown" else "text/csv" if fmt == "csv" else "application/json" if fmt == "json" else "text/html"
+                await self.sio.emit("view_file_content", {"payload": {"type": "text", "content": None, "mime": mime, "path": r["path"]}})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
+
+        # ── Briefings ─────────────────────────────────────────────────
+        elif name in ("brief_me_day", "day_recap", "good_night"):
+            phase = {"brief_me_day": "morning", "day_recap": "day", "good_night": "night"}[name]
+            try:
+                payload = await asyncio.wait_for(daily_routine.run_briefing(self.sio, phase), timeout=45)
+                if name == "good_night" and self.sio:
+                    await daily_routine.emit_night_winddown(self.sio)
+                spoken = _format_brief_spoken(payload) or f"{phase} briefing ready."
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": spoken})
+            except asyncio.TimeoutError:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"{phase} briefing timed out while gathering data. Tell the user and do NOT retry silently."})
+
+        elif name == "show_calendar":
+            if self.sio:
+                await self.sio.emit("open_schedule", {})
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": "Calendar opened."})
+
+        elif name == "show_agents":
+            try:
+                summary = self._orchestrator.get_agent_summary()
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": json.dumps(summary, ensure_ascii=False, default=str)})
+            except Exception as e:
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": f"Could not list agents: {e}"})
+
+        # ── Reminder / schedule ───────────────────────────────────────
+        elif name == "reminder":
+            action = (args.get("action", "") or "list").strip().lower() or "list"
+            if action == "set":
+                r = reminders.set_reminder(
+                    args.get("message", ""), fire_at=args.get("fire_at"),
+                    in_seconds=args.get("in_seconds"), recurring_seconds=args.get("recurring_seconds"),
+                )
+            elif action == "list":
+                r = reminders.list_reminders()
+            elif action == "cancel":
+                r = reminders.cancel_reminder(args.get("id", ""))
+            else:
+                r = {"error": f"Unknown reminder action: {action}"}
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": json.dumps(r, ensure_ascii=False, default=str)})
+
+        elif name == "schedule":
+            action = (args.get("action", "") or "list").strip().lower() or "list"
+            if action == "set":
+                r = schedules.set_schedule(
+                    args.get("title", ""), args.get("date", ""),
+                    args.get("time", "") or "", args.get("details", "") or "",
+                )
+            elif action == "list":
+                r = schedules.list_schedules()
+            elif action == "delete":
+                r = schedules.delete_schedule(args.get("id", ""))
+            else:
+                r = {"error": f"Unknown schedule action: {action}"}
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": json.dumps(r, ensure_ascii=False, default=str)})
+
+        # ── Browser-Use (AI browser automation) ──────────────────
+        elif name == "browser_use_task":
+            task = args.get("task", "")
+            if not task:
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"result": "No task provided. Describe what you want the browser to do."}
+                )
+            max_steps = min(args.get("max_steps", 15), 30)
+            try:
+                from browser_agent import run_browser_task
+                r = await asyncio.wait_for(
+                    run_browser_task(task, max_steps=max_steps, timeout_seconds=120),
+                    timeout=130,
+                )
+            except asyncio.TimeoutError:
+                r = {"success": False, "error": "Browser task timed out after 130s.", "result": ""}
+            except ImportError:
+                r = {
+                    "success": False,
+                    "error": "browser-use not installed. Run: pip install browser-use langchain-google-genai",
+                    "result": "",
+                }
+            except Exception as e:
+                r = {"success": False, "error": f"Browser task error: {e}", "result": ""}
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
         # ── Navigation ────────────────────────────────────────────

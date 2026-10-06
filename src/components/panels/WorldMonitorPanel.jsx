@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-const WORLD_MONITOR_URL = 'http://localhost:3000'
+const WORLD_MONITOR_URL = 'https://soda-world-monitor.netlify.app'
 
 const SECTIONS = [
   { id: 'map', label: 'MAP', path: '/' },

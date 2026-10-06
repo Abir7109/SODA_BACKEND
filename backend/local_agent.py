@@ -71,10 +71,21 @@ MACHINE_ID = os.getenv(
     or f"pc-{uuid.uuid4().hex[:8]}",
 )
 
+# Groq AI service wrapper (OpenAI-compatible API)
+import httpx
+groq_api_key = os.getenv("GROQ_API_KEY", "")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+GROQ_MODEL = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
+
+groq_client = None
+if groq_api_key:
+    groq_client = httpx.AsyncClient(timeout=30.0)
+
 sio = socketio.Client(logger=False, engineio_logger=False)
 
 LOCAL_TOOLS = [
-    "list_files", "open_file", "write_file", "read_file", "create_folder",
+    "list_files", "open_file", "write_file", "read_file", "edit_file", "create_folder",
+    "file_manager",
     "delete_items", "rename_item", "copy_item", "move_item", "list_drives",
     "scroll_file_list", "view_file",
     "terminal_execute", "execute_command", "open_app", "list_installed_apps", "refresh_app_registry", "close_window", "close_app",
@@ -83,7 +94,7 @@ LOCAL_TOOLS = [
     "mouse_get_pos", "mouse_hover", "mouse_right_click",
     "keyboard_type", "keyboard_press", "keyboard_hotkey",
     "window_focus", "window_list", "window_move",
-    "window_manage", "window_get_info",
+    "window_manage", "window_get_info", "window",
     "send_whatsapp", "whatsapp_find_and_call", "whatsapp_find_and_message",
     "check_whatsapp", "reply_whatsapp", "read_whatsapp_chat",
     "get_active_window", "list_processes", "process_kill",
@@ -91,6 +102,7 @@ LOCAL_TOOLS = [
     "analyze_screen", "read_screen_text", "recognize_face",
     "ui_find_image", "ui_click_image", "ui_click_text",
     "ui_wait_for_image", "ui_drag_drop",
+    "click_element", "type_into", "find_element",
     "system_volume", "system_brightness",
     "send_keys_window", "app_launch", "app_wait",
     "run_script", "power_control", "service_control",
@@ -369,13 +381,8 @@ _last_connected = None
 _BACKGROUND_THREADS_STARTED = False
 
 
-@sio.event
-def connect():
-    global _reconnect_count, _last_connected
-    _reconnect_count = 0
-    _last_connected = time.strftime("%Y-%m-%d %H:%M:%S")
-    log(f"[LocalAgent] ✅ Connected to {BACKEND_URL}")
-    # Register with app registry stats
+def _emit_register():
+    """Send registration payload to the backend (used on connect + agent_ping re-register)."""
     registry_info = {"count": len(APP_REGISTRY)} if APP_REGISTRY else {}
     sio.emit("agent_register", {
         "token": AGENT_TOKEN,
@@ -384,11 +391,32 @@ def connect():
         "tools": LOCAL_TOOLS,
         "app_registry": registry_info,
     })
+
+
+@sio.event
+def connect():
+    global _reconnect_count, _last_connected
+    _reconnect_count = 0
+    _last_connected = time.strftime("%Y-%m-%d %H:%M:%S")
+    log(f"[LocalAgent] ✅ Connected to {BACKEND_URL}")
+    # Register with app registry stats
+    _emit_register()
     log(f"[LocalAgent] 📋 Registered as {MACHINE_ID}")
     log(f"[LocalAgent]    Platform: {sys.platform}")
     log(f"[LocalAgent]    Tools: {len(LOCAL_TOOLS)}")
     log(f"[LocalAgent]    Apps in registry: {len(APP_REGISTRY)}")
     log(f"[LocalAgent]    Agent token: {'set' if AGENT_TOKEN else 'NOT SET'}")
+
+
+@sio.event
+def agent_ping(data=None):
+    """Backend health loop asks us to re-register (we were silent too long).
+    Keeps the agent routable instead of being evicted from the registry."""
+    log("[LocalAgent] 📡 Server ping — re-registering")
+    try:
+        _emit_register()
+    except Exception as e:
+        log(f"[LocalAgent] ⚠️  Re-register failed: {e}")
 
 
 @sio.event
@@ -403,7 +431,12 @@ def connect_error(data):
 def disconnect():
     log(f"[LocalAgent] ⚠️  Disconnected from {BACKEND_URL}")
     log(f"[LocalAgent]    Last connected: {_last_connected or 'never'}")
-    abort()
+    # Grace period: only abort in-flight tools if the socket stays down (blips auto-reconnect in ~2-3s)
+    def _maybe_abort():
+        time.sleep(5)
+        if not sio.connected:
+            abort()
+    threading.Thread(target=_maybe_abort, daemon=True).start()
 
 
 @sio.on("agent_execute")
@@ -610,7 +643,7 @@ def _launch_chrome_url(url):
     # Method 1: Open directly (if Chrome is already running, opens in existing window
     # with the currently active profile — which should be rahikulmakhtum)
     try:
-        subprocess.Popen([chrome_exe, url], shell=False)
+        subprocess.Popen([chrome_exe, "--new-tab", url], shell=False)
         time.sleep(2.0)
         return True
     except Exception as e:
@@ -747,18 +780,16 @@ def _hermes_call(contact: str) -> dict:
         return {"success": False, "error": str(e)}
 
 
-def _computer_use_loop(task: str, max_steps: int = 15) -> dict:
-    """Gemini-powered agentic desktop control loop.
+async def _computer_use_loop(task: str, max_steps: int = 15) -> dict:
+    """Groq-powered agentic desktop control loop.
 
-    Takes screenshot → sends to Gemini with task + available actions →
+    Takes screenshot → sends to Groq with task + available actions →
     executes the recommended action → repeats until task is done or max_steps.
     This is the core of Hermes's precision, implemented natively.
     """
     import base64, io, json, time as _time
-    from google import genai
-    from google.genai import types
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY", "")
     if not api_key:
         # Try loading from .env file
         env_path = os.path.join(os.path.dirname(__file__), ".env")
@@ -766,23 +797,26 @@ def _computer_use_loop(task: str, max_steps: int = 15) -> dict:
             with open(env_path) as f:
                 for line in f:
                     line = line.strip()
-                    if line.startswith("GEMINI_API_KEY="):
-                        api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    elif line.startswith("GOOGLE_API_KEY=") and not api_key:
+                    if line.startswith("GROQ_API_KEY="):
                         api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
     if not api_key:
-        return {"success": False, "error": "GEMINI_API_KEY not set"}
+        return {"success": False, "error": "GROQ_API_KEY not set"}
 
-    client = genai.Client(http_options={"api_version": "v1beta"}, api_key=api_key)
+    # Groq OpenAI-compatible API endpoint
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
 
     system_prompt = """You are a desktop automation agent. You see screenshots of a Windows desktop and must complete tasks by issuing precise actions.
 
 RULES:
 1. Analyze the screenshot carefully before acting.
 2. Issue ONE action per step as a JSON object.
-3. Wait for the next screenshot to verify your action worked.
-4. If the task is complete, return {"action": "done", "summary": "what was accomplished"}.
-5. If stuck after 3 attempts on the same action, return {"action": "done", "summary": "Could not complete: reason"}.
+3. You MAY include a "thought" field before the action to explain your reasoning, e.g., {"thought": "I need to click the button to proceed", "action": "click", ...}. If no thought is needed, return just the action JSON.
+4. Wait for the next screenshot to verify your action worked.
+5. If the task is complete, return {"action": "done", "summary": "what was accomplished"}.
+6. If stuck after 3 attempts on the same action, return {"action": "done", "summary": "Could not complete: reason"}.
 
 AVAILABLE ACTIONS (return exactly one per step):
 {"action": "click", "x": <pixel_x>, "y": <pixel_y>}  — click at coordinates
@@ -797,31 +831,39 @@ AVAILABLE ACTIONS (return exactly one per step):
 {"action": "done", "summary": "<what was accomplished>"}
 
 IMPORTANT:
-- Coordinates are in pixels from top-left of screen.
+- Coordinates are in pixels from top-left of THIS SCREENSHOT (it is downscaled — they are scaled up automatically).
 - For "type": if a text field is not focused, click it first in a previous step.
 - For "press": use key names like enter, tab, escape, backspace, delete, space, up, down, left, right, home, end.
-- For "hotkey": separate keys with +, e.g. "ctrl+c", "alt+tab", "win+l".
+- For "hotkey": separate keys with +, e.g. "ctrl+c", "alt+tab", "win+d".
 - Always verify the result by looking at the next screenshot.
-- Return ONLY the JSON object, no other text."""
+- Return a JSON object. You may format as {"thought": "...", "action": "..."} or simply {"action": "..."}. No other text."""
+
+    # ponytail: screenshots are downscaled JPEG (~150KB not MBs) so each
+    # step fits the turn budget; clicks are scaled back up to full-res.
+    _shot_scale = {"v": 1.0}  # full-screen px per screenshot px
+
+    def _shrink(pil_img):
+        w, h = pil_img.size
+        s = min(1.0, 1280.0 / max(w, h))
+        if s < 1.0:
+            pil_img = pil_img.resize((int(w * s), int(h * s)))
+        _shot_scale["v"] = s
+        buf = io.BytesIO()
+        pil_img.save(buf, format="JPEG", quality=70)
+        return base64.b64encode(buf.getvalue()).decode()
 
     def _take_screenshot():
-        """Capture screen and return base64 PNG."""
+        """Capture screen and return base64 JPEG (downscaled for speed)."""
         try:
             import mss
             with mss.mss() as sct:
                 monitor = sct.monitors[1]
                 img = sct.grab(monitor)
                 from PIL import Image as _Img
-                pil_img = _Img.frombytes("RGB", img.size, img.rgb)
-                buf = io.BytesIO()
-                pil_img.save(buf, format="PNG")
-                return base64.b64encode(buf.getvalue()).decode()
+                return _shrink(_Img.frombytes("RGB", img.size, img.rgb))
         except Exception:
             if HAS_PYAUTOGUI:
-                pil_img = pyautogui.screenshot()
-                buf = io.BytesIO()
-                pil_img.save(buf, format="PNG")
-                return base64.b64encode(buf.getvalue()).decode()
+                return _shrink(pyautogui.screenshot())
         return None
 
     def _execute_action(action: dict):
@@ -830,12 +872,14 @@ IMPORTANT:
             return "pyautogui not available"
         act = action.get("action", "")
         try:
+            # ponytail: Gemini sees the downscaled shot — scale clicks back to full-res
+            _k = 1.0 / (_shot_scale["v"] or 1.0)
             if act == "click":
-                pyautogui.click(action["x"], action["y"])
+                pyautogui.click(action["x"] * _k, action["y"] * _k)
             elif act == "double_click":
-                pyautogui.doubleClick(action["x"], action["y"])
+                pyautogui.doubleClick(action["x"] * _k, action["y"] * _k)
             elif act == "right_click":
-                pyautogui.rightClick(action["x"], action["y"])
+                pyautogui.rightClick(action["x"] * _k, action["y"] * _k)
             elif act == "type":
                 pyautogui.write(action["text"], interval=0.02)
             elif act == "press":
@@ -881,55 +925,67 @@ IMPORTANT:
         if stuck_count > 1:
             step_context += f"\nWarning: stuck {stuck_count} times on similar action. Try something different."
 
-        # 3. Call Gemini with screenshot
+        # 3. Call Groq with screenshot (OpenAI-compatible API)
         for _retry in range(3):
             try:
-                response = client.models.generate_content(
-                    model="models/gemini-3.6-flash",
-                    contents=[
-                        types.Content(
-                            parts=[
-                                types.Part(text=step_context),
-                                types.Part(inline_data={"mime_type": "image/png", "data": b64}),
-                            ]
-                        )
+                # Convert screenshot to base64 data URL
+                import base64
+                # The screenshot is already base64 encoded as b64 from earlier
+                img_b64 = b64
+
+                payload = {
+                    "model": os.getenv("GROQ_MODEL", "mixtral-8x7b-32768"),
+                    "messages": [
+                        {"role": "user", "content": step_context},
+                        {"role": "user", "content": f"image:{img_b64}"}
                     ],
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_prompt,
-                        temperature=0.2,
-                        max_output_tokens=512,
-                    ),
+                    "temperature": 0.2,
+                    "max_tokens": 512,
+                }
+
+                response = await groq_client.post(
+                    f"{GROQ_BASE_URL}/chat/completions",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {groq_api_key}"},
                 )
-                text = response.text.strip() if response and response.text else ""
+                response.raise_for_status()
+                groq_resp = response.json()
+                text = groq_resp["choices"][0]["message"]["content"].strip()
                 break
             except Exception as e:
                 err_str = str(e)
                 if "503" in err_str or "UNAVAILABLE" in err_str or "429" in err_str:
-                    log.info(f"[COMPUTER_USE] Gemini overloaded, retry {_retry+1}/3...")
+                    log.info(f"[COMPUTER_USE] Groq overloaded, retry {_retry+1}/3...")
                     _time.sleep(2 * (_retry + 1))
                     continue
-                log.warning(f"[COMPUTER_USE] Gemini call failed at step {step}: {e}")
-                return {"success": False, "error": f"Gemini error at step {step}: {e}"}
+                log.warning(f"[COMPUTER_USE] Groq call failed at step {step}: {e}")
+                return {"success": False, "error": f"Groq error at step {step}: {e}"}
         else:
-            return {"success": False, "error": f"Gemini unavailable after 3 retries at step {step}"}
+            return {"success": False, "error": f"Groq unavailable after 3 retries at step {step}"}
 
-        # 4. Parse action
+        # 4. Parse action (supports {"action": ...} or {"thought": "...", "action": ...})
         try:
-            # Extract JSON from response (may be wrapped in markdown)
             json_str = text
             if "```" in json_str:
                 json_str = json_str.split("```")[1]
                 if json_str.startswith("json"):
                     json_str = json_str[4:]
                 json_str = json_str.strip()
-            action = json.loads(json_str)
-        except (json.JSONDecodeError, IndexError):
+            parsed = json.loads(json_str)
+            # Support both {"action": "..."} and {"thought": "...", "action": "..."}
+            if "thought" in parsed and "action" in parsed:
+                action = parsed["action"]
+                thought = parsed["thought"]
+                log.info(f"[COMPUTER_USE] Step {step}: thought='{thought[:80]}...' action={action}")
+            else:
+                action = parsed
+                log.info(f"[COMPUTER_USE] Step {step}: action={action}")
+        except (json.JSONDecodeError, IndexError) as e:
             log.warning(f"[COMPUTER_USE] Could not parse action at step {step}: {text[:200]}")
             history.append({"step": step, "response": text[:500], "parsed": False})
-            # Retry with fresh screenshot
             continue
 
-        log.info(f"[COMPUTER_USE] Step {step}: {action.get('action', 'unknown')} {json.dumps({k:v for k,v in action.items() if k != 'action'})[:200]}")
+        log.info(f"[COMPUTER_USE] Step {step}: {action.get('action', 'unknown')}")
         history.append({"step": step, "action": action})
 
         # 5. Check if done
@@ -1746,6 +1802,32 @@ def _dispatch(tool, args):
         return {"success": True}
 
     # ── Windows ───────────────────────────────────────────────────
+    elif tool == "window":
+        # Consolidated `window` tool (focus/list/move) → map to the specific handlers
+        action = args.get("action", "focus")
+        if action == "list":
+            return _dispatch("window_list", args)
+        if action == "move":
+            return _dispatch("window_move", args)
+        return _dispatch("window_focus", args)
+
+    elif tool == "file_manager":
+        # Consolidated file ops → map to specific handlers (remap tool-arg keys)
+        action = args.get("action", "list_drives")
+        if action == "rename_item":
+            return _dispatch("rename_item", {
+                "old_path": args.get("source", ""),
+                "new_path": args.get("destination", args.get("new_name", "")),
+            })
+        if action in ("copy_item", "move_item"):
+            return _dispatch(action, {
+                "source": args.get("source", ""),
+                "dest": args.get("destination", ""),
+            })
+        if action in ("create_folder", "delete_items", "list_drives"):
+            return _dispatch(action, args)
+        return {"success": False, "error": f"file_manager action '{action}' runs on the server, not the agent"}
+
     elif tool == "window_focus":
         if not HAS_PYGETWINDOW:
             return {"success": False, "error": "pygetwindow required"}
@@ -1830,7 +1912,8 @@ def _dispatch(tool, args):
     # ── Messaging (Hermes-first, fallback to whatsapp_bridge) ──────
     elif tool in ("send_whatsapp", "whatsapp_find_and_call", "whatsapp_find_and_message",
                   "check_whatsapp", "reply_whatsapp", "read_whatsapp_chat"):
-        contact = args.get("contact", "")
+        # tools.py declares `contact_name`; older callers use `contact` — accept both
+        contact = args.get("contact_name", "") or args.get("contact", "")
         message = args.get("message", args.get("text", ""))
         # Try Hermes first (fast timeout, falls back automatically)
         try:
@@ -1852,8 +1935,7 @@ def _dispatch(tool, args):
             # If Hermes returned a real result (not fallback), use it
             if h_result and h_result.get("success"):
                 return h_result
-            if h_result and "fallback" not in h_result.get("error", ""):
-                return h_result  # Hermes error, not timeout
+            # Any Hermes error (timeout/empty/fallback) → fall through to legacy bridge
         except ImportError:
             pass
         except Exception as e:
@@ -2792,14 +2874,14 @@ def _dispatch(tool, args):
         if not task:
             return {"success": False, "error": "task is required for hermes_execute"}
         # Skip Hermes — it's too slow (55s+ per call). Use built-in computer_use directly.
-        return _computer_use_loop(task)
+        return _await_it(_computer_use_loop(task))
 
     # ── Built-in computer_use (Gemini-powered agentic loop) ────────
     elif tool == "computer_use":
         task = args.get("task", "") or args.get("prompt", "") or args.get("action", "")
         if not task:
             return {"success": False, "error": "task is required for computer_use"}
-        return _computer_use_loop(task)
+        return _await_it(_computer_use_loop(task))
 
     # ── Fallback ──────────────────────────────────────────────────
     return {"error": f"Tool '{tool}' not implemented in local agent"}
@@ -2935,9 +3017,18 @@ def _start_abort_monitor():
     Runs independently of the socketio callback thread so it can detect disconnection
     even while a tool is executing synchronously."""
     def monitor():
+        # ponytail: 5s fixed grace before aborting — covers Engine.IO reconnect blips;
+        # per-tool timeouts already bound the worst case
+        down_since = None
         while True:
             if not sio.connected:
-                abort()
+                if down_since is None:
+                    down_since = time.time()
+                elif time.time() - down_since >= 5:
+                    abort()
+                    down_since = None
+            else:
+                down_since = None
             time.sleep(0.2)
     t = threading.Thread(target=monitor, daemon=True)
     t.start()

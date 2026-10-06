@@ -88,6 +88,9 @@ export const TOOL_ANIMATIONS = {
   // ── Webview ──────────────────────────────────────────────────
   webview_action: { component: 'WebpageAnim', variant: 'open' },
 
+  // ── Tools Showcase ───────────────────────────────────────────
+  show_tools: { component: 'ToolShowcaseAnim', variant: 'showcase' },
+
   // ── Research Engine V2 ───────────────────────────────────────
   deep_research:   { component: 'SearchAnimation', variant: 'results', panel: 'ResearchResultsPanel', panelDir: 'right' },
   export_research: { component: 'DefaultAnimation', variant: 'default' },
