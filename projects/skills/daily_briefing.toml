@@ -1,0 +1,17 @@
+[skill]
+name = "daily_briefing"
+description = "One-shot daily briefing: current weather plus live system status (CPU/RAM/disk). Use when the user asks for a morning briefing or a quick check-in."
+user_invocable = true
+
+[skill.params]
+location = { type = "string", description = "City for the weather lookup", default = "Dhaka" }
+
+[[skill.steps]]
+tool_name = "get_weather"
+arguments_template = '{"location": "{location}"}'
+output_key = "weather"
+
+[[skill.steps]]
+tool_name = "get_system_status"
+arguments_template = '{}'
+output_key = "system"

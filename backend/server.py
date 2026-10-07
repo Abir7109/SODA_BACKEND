@@ -175,6 +175,16 @@ async def lifespan(_app):
         except Exception as e:
             log.warning(f"[SERVER] MCP startup failed: {e}")
 
+    # ── Skills (projects/skills/*.toml) → first-class Gemini tools ──
+    try:
+        from tools import tools_list
+        from skills import load_skills
+        n = load_skills(tools_list)
+        if n:
+            log.info(f"[SERVER] Skills startup done — {n} skill(s) registered")
+    except Exception as e:
+        log.warning(f"[SERVER] Skill loading failed: {e}")
+
     yield
 
     _health_task.cancel()

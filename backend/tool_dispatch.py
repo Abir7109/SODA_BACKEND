@@ -451,4 +451,10 @@ async def dispatch_local_tool(name: str, args: dict, sio=None, audio_loop=None) 
     if r is not None:
         return r
 
+    # ── Skills (projects/skills/*.toml) ──
+    from skills import call_registered as call_skill
+    r = await call_skill(name, args, sio=sio, audio_loop=audio_loop)
+    if r is not None:
+        return r
+
     return {'success': False, 'error': f'Unknown tool: {name}'}
