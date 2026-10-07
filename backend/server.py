@@ -158,6 +158,23 @@ async def lifespan(_app):
     _health_task = asyncio.create_task(_agent_health_logger())
     log.info("[SERVER] Agent health logger started (60s interval, stale eviction >90s)")
 
+    # ── MCP servers (settings.json mcp_servers[]) — blocking spawn+handshake,
+    # so run in a thread; one bad server must never block or kill startup ──
+    mcp_configs = SETTINGS.get("mcp_servers") or []
+    if mcp_configs:
+        try:
+            from tools import tools_list
+            from mcp import connect_servers
+            n = await asyncio.wait_for(
+                asyncio.to_thread(connect_servers, mcp_configs, tools_list),
+                timeout=120,
+            )
+            log.info(f"[SERVER] MCP startup done — {n} tools registered")
+        except asyncio.TimeoutError:
+            log.warning("[SERVER] MCP startup timed out after 120s — check mcp_servers config")
+        except Exception as e:
+            log.warning(f"[SERVER] MCP startup failed: {e}")
+
     yield
 
     _health_task.cancel()
@@ -173,6 +190,12 @@ async def lifespan(_app):
         except asyncio.CancelledError:
             pass
         log.info("[SERVER] Reminder scheduler stopped")
+
+    try:
+        from mcp import disconnect_all
+        disconnect_all()
+    except Exception as e:
+        log.warning(f"[SERVER] MCP shutdown error: {e}")
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -220,7 +243,8 @@ SETTINGS_FILE = str(Path(__file__).resolve().parent.parent / "settings.json")
 DEFAULT_SETTINGS = {
     "tool_permissions": {},
     "camera_flipped": False,
-    "user_native_lang": "en"
+    "user_native_lang": "en",
+    "mcp_servers": []
 }
 
 SETTINGS = DEFAULT_SETTINGS.copy()

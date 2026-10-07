@@ -35,6 +35,7 @@
         "netlify_list_deploys": true,
         "pentest_target": false
     },
+    "mcp_servers": [],
     "camera_flipped": false,
     "user_native_lang": "en",
     "idle_personality_enabled": true,

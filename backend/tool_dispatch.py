@@ -445,5 +445,10 @@ async def dispatch_local_tool(name: str, args: dict, sio=None, audio_loop=None) 
             return await agent.execute(**args)
         return {'success': False, 'error': f'Unknown agent: {name}'}
 
-    else:
-        return {'success': False, 'error': f'Unknown tool: {name}'}
+    # ── MCP tools (mcp_servers in settings.json) ──
+    from mcp import call_registered
+    r = await call_registered(name, args)
+    if r is not None:
+        return r
+
+    return {'success': False, 'error': f'Unknown tool: {name}'}
