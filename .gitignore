@@ -36,6 +36,7 @@ projects/clipboard/
 projects/long_term_memory/
 projects/code_runs/
 backend/projects/
+projects/metrics.db*
 
 # Backup directories (should not be in repo)
 soda-apk_backup/
