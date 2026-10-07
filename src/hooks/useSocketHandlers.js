@@ -569,11 +569,17 @@ export default function useSocketHandlers(cfg) {
     const onEmailData = (data) => { if (data) setEmailPanel({ visible: true, data }) }
     const onResearchData = (data) => { if (data) setResearchResultsPanel({ visible: true, data }) }
 
-    const onBgTaskStatus = (data) => {
-      if (data) setBackgroundTaskPanel(prev => ({
-        visible: true,
-        data: prev.data ? { ...prev.data, tasks: [...(prev.data.tasks || []).filter(t => t.task_id !== data.task_id), data] } : data
-      }))
+    const onBgTaskStatus = (d) => {
+      if (!d?.task_id) return
+      setBackgroundTaskPanel(prev => {
+        const prevData = prev.data || {}
+        const base = Array.isArray(prevData.tasks) ? prevData.tasks
+          : (prevData.task_id ? [prevData] : [])
+        const merged = base.some(t => t.task_id === d.task_id)
+          ? base.map(t => (t.task_id === d.task_id ? { ...t, ...d } : t))
+          : [...base, d]
+        return { ...prev, visible: true, data: { ...prevData, tasks: merged } }
+      })
     }
 
     const onOpenUrl = (data) => { if (data && data.url) openUrlInFloatingWindow(data.url, data.webview_id) }

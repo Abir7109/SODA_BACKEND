@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import SlidePanel from '../SlidePanel'
-import { Share2, Twitter, Instagram, Youtube, Music2, MessageCircle, TrendingUp, Hash, Lightbulb, Target, Clock, BarChart3, Heart, MessageSquare, Repeat2, Eye } from 'lucide-react'
+import { Share2, Twitter, Instagram, Youtube, Music2, MessageCircle, TrendingUp, Hash, Lightbulb, Target, Clock, Heart, MessageSquare, Repeat2, Eye } from 'lucide-react'
 
 const PLATFORM_CONFIG = {
   twitter: { icon: <Twitter size={14} />, color: '#1DA1F2', bg: 'rgba(29,161,242,0.08)', maxChars: 280 },
@@ -82,42 +82,6 @@ function BestTimeWidget({ platform }) {
   )
 }
 
-function EngagementMetrics({ result }) {
-  if (!result) return null
-  const estLikes = Math.floor(Math.random() * 150) + 20
-  const estComments = Math.floor(Math.random() * 30) + 2
-  const estShares = Math.floor(Math.random() * 20) + 1
-  const estReach = estLikes * 10 + Math.floor(Math.random() * 500)
-
-  return (
-    <div className="agent-engagement-section">
-      <div className="agent-engagement-header"><BarChart3 size={10} />Estimated Engagement</div>
-      <div className="agent-engagement-grid">
-        <div className="agent-engagement-item">
-          <Heart size={12} style={{ color: '#ef4444' }} />
-          <span className="agent-engagement-num">{estLikes}</span>
-          <span className="agent-engagement-label">Likes</span>
-        </div>
-        <div className="agent-engagement-item">
-          <MessageSquare size={12} style={{ color: '#3b82f6' }} />
-          <span className="agent-engagement-num">{estComments}</span>
-          <span className="agent-engagement-label">Comments</span>
-        </div>
-        <div className="agent-engagement-item">
-          <Repeat2 size={12} style={{ color: '#22c55e' }} />
-          <span className="agent-engagement-num">{estShares}</span>
-          <span className="agent-engagement-label">Shares</span>
-        </div>
-        <div className="agent-engagement-item">
-          <Eye size={12} style={{ color: '#a78bfa' }} />
-          <span className="agent-engagement-num">{estReach.toLocaleString()}</span>
-          <span className="agent-engagement-label">Reach</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function SocialPanel({ visible, data, onClose }) {
   const d = data?.result || data || {}
   const result = d.result || ''
@@ -157,8 +121,6 @@ export default function SocialPanel({ visible, data, onClose }) {
           <div className="agent-paragraph">{result}</div>
         </div>
       )}
-
-      <EngagementMetrics result={result} />
 
       <div className="agent-stats-row" style={{ marginTop: 8 }}>
         {platform && <div className="agent-stat-card"><span className="agent-stat-label">PLATFORM</span><span className="agent-stat-value">{platform}</span></div>}

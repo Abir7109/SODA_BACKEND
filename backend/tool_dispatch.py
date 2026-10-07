@@ -15,6 +15,42 @@ from datetime import datetime
 from logger import log
 
 
+async def _dispatch_bg_task(name: str, args: dict) -> dict:
+    """bg_tasks / opencode — both run headless `npx opencode --prompt` jobs.
+
+    ponytail: one id space (BackgroundAgentManager). opencode_monitor + notebook
+    stay the registry for agent_push-driven sessions started by the local agent;
+    the two launch paths are not linked.
+    """
+    from background_agent_manager import BackgroundAgentManager
+    action = args.get('action', 'list')
+    if name == 'opencode':
+        action = {'start': 'spawn', 'stop': 'kill'}.get(action, action)
+    if action == 'spawn':
+        prompt = args.get('prompt', '').strip()
+        if not prompt:
+            return {'success': False, 'error': 'prompt is required to spawn a task.'}
+        try:
+            return await BackgroundAgentManager.spawn(prompt, args.get('workdir', ''))
+        except FileNotFoundError:
+            return {'success': False,
+                    'error': 'Node/npx not found on this machine — cannot launch opencode.'}
+        except Exception as e:
+            return {'success': False, 'error': f'Failed to spawn task: {e}'}
+    if action in ('status', 'get'):
+        task_id = args.get('task_id', '')
+        if task_id:
+            st = BackgroundAgentManager.get_status(task_id)
+            return st or {'success': False, 'error': f'No such task: {task_id}'}
+        return {'tasks': BackgroundAgentManager.list_tasks()}
+    if action == 'kill':
+        st = await BackgroundAgentManager.kill(args.get('task_id', ''))
+        return st or {'success': False, 'error': f"No such task: {args.get('task_id', '')}"}
+    if action == 'list':
+        return {'tasks': BackgroundAgentManager.list_tasks()}
+    return {'success': False, 'error': f'Unknown {name} action: {action}'}
+
+
 async def dispatch_local_tool(name: str, args: dict, sio=None, audio_loop=None) -> dict:
     """
     Execute a tool locally on the server side.
@@ -298,6 +334,108 @@ async def dispatch_local_tool(name: str, args: dict, sio=None, audio_loop=None) 
         if sio:
             await sio.emit('view_file_content', {'payload': payload})
         return {'viewed': path, 'type': payload['type']}
+
+    elif name == 'recall_by_relationship':
+        import memory_store
+        return memory_store.recall_by_relationship(args.get('relationship', ''), limit=5)
+
+    elif name == 'search_youtube':
+        from system_app import search_youtube
+        return await asyncio.to_thread(search_youtube, args.get('query', ''))
+
+    elif name == 'plan':
+        import task_planner
+        action = args.get('action', 'get')
+        if action == 'create':
+            r = task_planner.plan_tasks(args.get('title', ''), args.get('tasks', []))
+        elif action == 'update':
+            r = task_planner.update_task(args.get('task_id', ''), args.get('status', 'done'), args.get('result'))
+        elif action == 'cancel':
+            r = task_planner.cancel_plan()
+        else:
+            r = task_planner.get_active_plan()
+        if sio and isinstance(r, dict) and r.get('id'):
+            await sio.emit('task_plan_update', r)
+        return r
+
+    elif name == 'cancel_plan':
+        import task_planner
+        return task_planner.cancel_plan()
+
+    elif name == 'github':
+        import github_tools as gh
+        action = args.get('action', '')
+        calls = {
+            'list_repos': lambda: gh.list_repos(args.get('owner')),
+            'create_repo': lambda: gh.create_repo(args.get('name', ''), args.get('description', ''),
+                                                   args.get('private', False), args.get('auto_init', False)),
+            'get_repo': lambda: gh.get_repo(args.get('repo', '')),
+            'create_pr': lambda: gh.create_pr(args.get('repo', ''), args.get('title', ''),
+                                              args.get('body', ''), args.get('head', ''), args.get('base', 'main')),
+            'list_issues': lambda: gh.list_issues(args.get('repo', ''), args.get('state', 'open')),
+            'create_issue': lambda: gh.create_issue(args.get('repo', ''), args.get('title', ''), args.get('body', '')),
+        }
+        if action not in calls:
+            return {'success': False, 'error': f'Unknown github action: {action}'}
+        # ponytail: `gh` CLI is blocking — run off the event loop
+        return await asyncio.to_thread(calls[action])
+
+    elif name == 'vercel':
+        import vercel_tools as vc
+        action = args.get('action', '')
+        calls = {
+            'list_projects': lambda: vc.list_projects(),
+            'deploy': lambda: vc.deploy(args.get('path', '.'), args.get('name'), args.get('prod', False)),
+            'list_deployments': lambda: vc.list_deployments(args.get('project'), args.get('limit', 20)),
+            'get_deployment': lambda: vc.get_deployment(args.get('url_or_id', '')),
+        }
+        if action not in calls:
+            return {'success': False, 'error': f'Unknown vercel action: {action}'}
+        return await asyncio.to_thread(calls[action])
+
+    elif name == 'netlify':
+        import netlify_tools as nl
+        action = args.get('action', '')
+        calls = {
+            'list_sites': lambda: nl.list_sites(),
+            'get_site': lambda: nl.get_site(args.get('site_id', '')),
+            'deploy': lambda: nl.deploy(args.get('path', '.'), args.get('prod', False), args.get('message', '')),
+            'create_site': lambda: nl.create_site(args.get('name')),
+            'list_deploys': lambda: nl.list_deploys(args.get('site_id', '')),
+        }
+        if action not in calls:
+            return {'success': False, 'error': f'Unknown netlify action: {action}'}
+        return await asyncio.to_thread(calls[action])
+
+    elif name == 'deep_research':
+        from research_engine import deep_research
+        try:
+            return await asyncio.wait_for(
+                deep_research(args.get('topic', ''), args.get('depth', 'normal')), timeout=180)
+        except asyncio.TimeoutError:
+            return {'success': False, 'error': 'Research timed out after 3 minutes. Narrow the topic and retry.'}
+
+    elif name == 'export_research':
+        from research_engine import export_research
+        raw = args.get('research_data', '')
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except Exception:
+                return {'success': False, 'error': 'research_data is not valid JSON.'}
+        return await export_research(raw, args.get('format', 'json'))
+
+    elif name == 'notebook_read':
+        from notebook import read_task
+        r = await read_task(args.get('task_id', ''))
+        return r or {'success': False, 'error': f"No notebook entry for task {args.get('task_id', '')}"}
+
+    elif name == 'notebook_search':
+        from notebook import search_tasks
+        return await search_tasks(args.get('keyword', ''))
+
+    elif name in ('opencode', 'bg_tasks'):
+        return await _dispatch_bg_task(name, args)
 
     elif name.startswith('agent_'):
         from soda_agents import get_global_orchestrator

@@ -111,6 +111,8 @@ LOCAL_TOOLS = [
     "app_search", "app_scroll",
     "credential",
     "hermes_execute", "computer_use",
+    "spotify_search", "spotify_play", "spotify_play_playlist",
+    "spotify_control", "spotify_now_playing",
 ]
 
 HAS_PYAUTOGUI = False

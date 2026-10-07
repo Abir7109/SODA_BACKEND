@@ -12,30 +12,17 @@ function DepthBadge({ depth }) {
   )
 }
 
-function RelevanceBar({ score }) {
-  const pct = Math.min(Math.max((score || 0.5) * 100, 10), 100)
-  const color = pct > 70 ? '#22c55e' : pct > 40 ? '#f59e0b' : '#6b7280'
-  return (
-    <div className="agent-rel-bar-bg">
-      <div className="agent-rel-bar-fill" style={{ width: `${pct}%`, backgroundColor: color }} />
-    </div>
-  )
-}
-
 function SourceCard({ source, index }) {
   const [expanded, setExpanded] = useState(false)
-  const relevance = useMemo(() => 0.4 + Math.random() * 0.6, [])
 
   return (
     <div className="agent-research-source" onClick={() => setExpanded(!expanded)}>
       <span className="agent-research-source-num">{index + 1}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="agent-research-source-title">{source.title || 'Untitled'}</div>
-        <RelevanceBar score={relevance} />
         {expanded && source.snippet && <div className="agent-research-source-snippet">{source.snippet}</div>}
         {source.url && <div className="agent-research-source-url">{source.url}</div>}
       </div>
-      <div className="agent-research-source-rel">{Math.round(relevance * 100)}%</div>
       {source.url && <ExternalLink size={10} className="agent-research-source-ext" onClick={(e) => { e.stopPropagation(); window.open(source.url, '_blank') }} />}
     </div>
   )

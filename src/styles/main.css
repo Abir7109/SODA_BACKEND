@@ -31,6 +31,15 @@
   --z-floating: 200;
   --z-tooltip: 300;
   --z-modal: 400;
+  /* Aliases — panel components reference --soda-* directly */
+  --soda-accent: #00fbfb;
+  --soda-text: #e0f0ff;
+  --soda-muted: #4a6a82;
+  --soda-success: #00ff88;
+  --soda-warning: #ffaa00;
+  --soda-error: #ff4466;
+  --bg: #04080B;
+  --text: #e0f0ff;
 }
 
 @layer base {

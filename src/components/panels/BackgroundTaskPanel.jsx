@@ -47,32 +47,10 @@ function TaskCard({ task }) {
 
 export default function BackgroundTaskPanel({ visible, data, onClose }) {
   const [tasks, setTasks] = useState([])
-  const [socketEvents, setSocketEvents] = useState([])
 
   useEffect(() => {
     if (data?.tasks) setTasks(data.tasks)
   }, [data])
-
-  useEffect(() => {
-    if (!visible) return
-    const socket = window._sodaSocket
-    if (!socket) return
-    const handler = (eventData) => {
-      if (eventData?.task_id) {
-        setTasks(prev => {
-          const idx = prev.findIndex(t => t.task_id === eventData.task_id)
-          if (idx >= 0) {
-            const next = [...prev]
-            next[idx] = { ...next[idx], ...eventData }
-            return next
-          }
-          return [...prev, eventData]
-        })
-      }
-    }
-    socket.on('bg_task_status', handler)
-    return () => socket.off('bg_task_status', handler)
-  }, [visible])
 
   return (
     <SlidePanel visible={visible} direction="right" title="BACKGROUND TASKS" icon={<Terminal size={11} />}

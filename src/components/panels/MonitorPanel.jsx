@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import SlidePanel from '../SlidePanel'
-import { Monitor, Activity, CheckCircle, XCircle, Clock, Zap, Globe, AlertTriangle, TrendingUp, Shield, Server, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react'
+import { Monitor, Activity, CheckCircle, XCircle, Clock, Zap, Globe, AlertTriangle, TrendingUp, Shield, Server, ChevronDown, ChevronUp } from 'lucide-react'
 
 function StatusGauge({ online }) {
   return (
@@ -15,42 +15,6 @@ function StatusGauge({ online }) {
           <div className="agent-monitor-pulse-ring delay" />
         </div>
       )}
-    </div>
-  )
-}
-
-function HistoryChart({ currentMs }) {
-  const bars = useMemo(() => {
-    const vals = []
-    for (let i = 0; i < 7; i++) {
-      vals.push(currentMs ? Math.max(10, currentMs * (0.5 + Math.random())) : Math.random() * 200 + 50)
-    }
-    return vals
-  }, [currentMs])
-
-  const max = Math.max(...bars, 1)
-  const barColors = bars.map(v => v > 4000 ? '#ef4444' : v > 2000 ? '#f59e0b' : '#22c55e')
-
-  return (
-    <div className="agent-monitor-history">
-      <div className="agent-monitor-history-header">
-        <BarChart3 size={10} />
-        Latency History (7 checks)
-      </div>
-      <div className="agent-monitor-chart">
-        {bars.map((v, i) => (
-          <div key={i} className="agent-monitor-chart-col">
-            <div className="agent-monitor-chart-bar" style={{ height: `${(v / max) * 100}%`, backgroundColor: barColors[i] }}>
-              <span className="agent-monitor-chart-val">{Math.round(v)}</span>
-            </div>
-          </div>
-        ))}
-        <div className="agent-monitor-chart-labels">
-          {['-6', '-5', '-4', '-3', '-2', '-1', 'now'].map((l, i) => (
-            <span key={i} className="agent-monitor-chart-label">{l}</span>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }
@@ -191,8 +155,6 @@ export default function MonitorPanel({ visible, data, onClose }) {
       <div className="agent-divider" />
 
       <ResponseBar ms={d.response_time_ms} />
-
-      {d.response_time_ms != null && <HistoryChart currentMs={d.response_time_ms} />}
 
       {d.summary && (
         <div className="agent-section-block">

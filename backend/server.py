@@ -35,10 +35,12 @@ from logger import log
 # Module-level reference to the audio loop, set during start_audio
 _audio_loop = None
 _scheduler_task = None
+_daily_brief_task = None
 
 # ── Local Agent Routing ──
 _connected_agents: dict[str, dict] = {}
 _pending_agent_results: dict[str, asyncio.Future] = {}
+_mobile_authed: dict[str, bool] = {}
 
 # Share with soda module for _dispatch_tool routing
 soda._connected_agents = _connected_agents
@@ -251,11 +253,6 @@ def save_settings():
 # Load on startup
 load_settings()
 
-# Force all tools auto-approved (no confirmation dialogs blocking tools)
-SETTINGS["tool_permissions"] = {}
-
-# tool_permissions is now SETTINGS["tool_permissions"]
-
 async def _wake_wsl():
     """Wake up Kali WSL on server startup (non-blocking, fire-and-forget)."""
     try:
@@ -321,6 +318,7 @@ async def connect(sid, environ):
 async def disconnect(sid):
     global audio_loop, loop_task
     log.info(f"Client disconnected: {sid}")
+    _mobile_authed.pop(sid, None)
 
     if audio_loop and getattr(audio_loop, '_owner_sid', None) == sid:
         log.info("Disconnecting - stopping audio loop owned by this client")
@@ -355,6 +353,19 @@ async def agent_register(sid, data):
     tools = data.get('tools', [])
     app_registry = data.get('app_registry', {})
     app_count = app_registry.get('count', 0)
+
+    # Fail-closed only when the server is actually configured with a token;
+    # an unset AGENT_TOKEN keeps the historical open behaviour.
+    expected_token = os.getenv('AGENT_TOKEN', '').strip()
+    if expected_token and data.get('token', '') != expected_token:
+        log.warning(f"[AGENT] Rejected registration from {machine_id}: AGENT_TOKEN mismatch")
+        await sio.emit('agent_connection_status', {
+            'connected': False,
+            'machine_id': machine_id,
+            'tools_count': 0,
+            'reason': 'auth_failed',
+        }, room=sid)
+        return
 
     # Remove stale agent entries with the same machine_id BUT fewer tools (zombie detection)
     for old_sid in list(_connected_agents.keys()):
@@ -468,7 +479,7 @@ async def agent_push(sid, data):
 
 @sio.event
 async def start_audio(sid, data=None):
-    global audio_loop, loop_task
+    global audio_loop, loop_task, _daily_brief_task
     
     log.info("Starting Audio Loop...")
 
@@ -615,6 +626,8 @@ async def start_audio(sid, data=None):
 
         # Start daily routine auto-brief background task (09:00 / 13:00 / 22:00)
         import daily_routine
+        if _daily_brief_task and not _daily_brief_task.done():
+            _daily_brief_task.cancel()
         _daily_brief_task = asyncio.create_task(
             daily_routine.daily_brief_loop(sio, audio_loop, interval=30)
         )
@@ -653,7 +666,7 @@ async def start_audio(sid, data=None):
 
 @sio.event
 async def stop_audio(sid):
-    global audio_loop, loop_task, _scheduler_task
+    global audio_loop, loop_task, _scheduler_task, _daily_brief_task
     if audio_loop:
         audio_loop.stop()
         log.info("Stopping Audio Loop")
@@ -674,6 +687,14 @@ async def stop_audio(sid):
             except asyncio.CancelledError:
                 pass
             _scheduler_task = None
+        # Cancel the daily-brief loop — it holds a reference to the dead audio_loop
+        if _daily_brief_task and not _daily_brief_task.done():
+            _daily_brief_task.cancel()
+            try:
+                await _daily_brief_task
+            except asyncio.CancelledError:
+                pass
+            _daily_brief_task = None
         await sio.emit('status', {'msg': 'SODA Stopped'})
 
 @sio.event
@@ -745,18 +766,12 @@ async def __debug_dispatch__(sid, data):
         await sio.emit('error', {'msg': f'__debug_dispatch__: unknown tool {tool!r}'})
 
 
-@sio.event
-async def force_tool(sid, data):
-    """Power-user override: restricted to localhost. Runs shell/control/GitHub tools."""
-    if not _is_local(sid):
-        await sio.emit('error', {'msg': 'force_tool: only allowed from localhost'}, room=sid)
-        return
-    tool = (data or {}).get('tool')
-    args = (data or {}).get('args') or {}
-    if not tool:
-        await sio.emit('error', {'msg': 'force_tool: missing tool name'}, room=sid)
-        return
-    log.info(f"[SERVER] force_tool: {tool} args={args}")
+async def _run_tool_and_emit(tool, args, source='force_tool'):
+    """Dispatch a tool locally and emit the frontend events that tool needs.
+
+    Shared by force_tool (localhost) and mobile_force_tool (remote app).
+    """
+    log.info(f"[SERVER] {source}: {tool} args={args}")
     try:
         from tool_dispatch import dispatch_local_tool
         r = await dispatch_local_tool(tool, args, sio=sio, audio_loop=audio_loop)
@@ -806,14 +821,89 @@ async def force_tool(sid, data):
             })
         elif tool in ('set_reminder', 'list_reminders', 'cancel_reminder'):
             await sio.emit('reminder_update', {'action': tool, 'data': r, 'forced': True})
+        elif tool == 'list_files' and isinstance(r, dict):
+            await sio.emit('file_list', {
+                'path': r.get('path', args.get('path', '')), 'items': r.get('items', []),
+                'success': r.get('success', False),
+            })
         await sio.emit('tool_result', {'tool': tool, 'result': r, 'forced': True})
     except Exception as e:
-        await sio.emit('error', {'msg': f'force_tool {tool} failed: {e}'}, room=sid)
+        log.exception(f"{source} {tool} failed")
+        await sio.emit('error', {'msg': f'{source} {tool} failed: {e}'})
+
+
+@sio.event
+async def force_tool(sid, data):
+    """Power-user override: restricted to localhost. Runs shell/control/GitHub tools."""
+    if not _is_local(sid):
+        await sio.emit('error', {'msg': 'force_tool: only allowed from localhost'}, room=sid)
+        return
+    tool = (data or {}).get('tool')
+    args = (data or {}).get('args') or {}
+    if not tool:
+        await sio.emit('error', {'msg': 'force_tool: missing tool name'}, room=sid)
+        return
+    await _run_tool_and_emit(tool, args, 'force_tool')
+
+
+# ── Mobile remote (soda-remote) ──────────────────────────────────
+# Fail-closed: without MOBILE_SECRET set on the server, no phone can control
+# this machine. mobile_force_tool reaches terminal_execute, so an open
+# endpoint here would be remote code execution.
+@sio.event
+async def mobile_auth(sid, data):
+    secret = (data or {}).get('secret', '')
+    expected = os.getenv('MOBILE_SECRET', '').strip()
+    ok = bool(expected) and secret == expected
+    _mobile_authed[sid] = ok
+    if ok:
+        log.info("[MOBILE] Remote authenticated")
+    else:
+        log.warning("[MOBILE] Rejected remote auth (MOBILE_SECRET %s)",
+                    "not configured" if not expected else "mismatch")
+    await sio.emit('auth_status', {
+        'authenticated': ok,
+        **({} if ok else {'error': 'MOBILE_SECRET not configured on server' if not expected
+                           else 'Invalid secret'}),
+    }, room=sid)
+
+
+@sio.event
+async def mobile_force_tool(sid, data):
+    if not _mobile_authed.get(sid):
+        await sio.emit('auth_status', {'authenticated': False, 'error': 'Not authenticated'}, room=sid)
+        return
+    tool = (data or {}).get('tool')
+    args = (data or {}).get('args') or {}
+    if not tool:
+        return
+    await _run_tool_and_emit(tool, args, 'mobile_force_tool')
+
+
+@sio.event
+async def mobile_voice_command(sid, data):
+    """PCM uplink from the phone — same path the browser mic uses."""
+    if not _mobile_authed.get(sid):
+        return
+    if not audio_loop:
+        await sio.emit('error', {'msg': 'Voice backend not started yet'}, room=sid)
+        return
+    raw = (data or {}).get('audio')
+    if raw is None:
+        return
+    if isinstance(raw, list):
+        raw = bytes(raw)
+    elif isinstance(raw, str):
+        try:
+            raw = base64.b64decode(raw)
+        except Exception:
+            return
+    audio_loop.feed_browser_audio(raw)
 
 @sio.event
 async def shutdown(sid, data=None):
     """Gracefully shutdown the server when the application closes."""
-    global audio_loop, loop_task, _scheduler_task
+    global audio_loop, loop_task, _scheduler_task, _daily_brief_task
     
     log.warning("========================================")
     log.warning("SHUTDOWN SIGNAL RECEIVED FROM FRONTEND")
@@ -836,8 +926,16 @@ async def shutdown(sid, data=None):
         log.info("[SERVER] Cancelling scheduler task...")
         _scheduler_task.cancel()
         _scheduler_task = None
+
+    if _daily_brief_task and not _daily_brief_task.done():
+        log.info("[SERVER] Cancelling daily brief task...")
+        _daily_brief_task.cancel()
+        _daily_brief_task = None
     
     log.info("[SERVER] Graceful shutdown complete. Terminating process...")
+    # Nothing else exits the process — without this the handler was a no-op.
+    await asyncio.sleep(0.2)
+    os._exit(0)
 
 @sio.event
 async def user_input(sid, data):

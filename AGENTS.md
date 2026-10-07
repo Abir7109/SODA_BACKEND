@@ -102,7 +102,8 @@ Colors, typography, and spacing are defined as CSS custom properties in
 - `receive_audio()`: sets `_model_is_speaking = True` on first audio data chunk. After sending tool responses, explicitly sets `_model_is_speaking = True` to keep mic muted during the post-tool grace period.
 - `_tools_running`: guards `_model_is_speaking` from premature timeout during tool execution. Tracks whether tool dispatch is in progress; `play_audio()` checks this before clearing the speaking flag.
 - `_clear_queues()`: clears `video_queue` and `_audio_buffer` when Gemini starts responding (preserves `audio_queue` — pending user audio continues to drain)
-- VAD threshold: `VAD_THRESHOLD = 400` RMS
+- VAD threshold: `VAD_THRESHOLD = 150` RMS
+- Model: `MODEL = "models/gemini-3.1-flash-live-preview"` (`backend/soda.py`)
 - Server-side VAD enabled: `automatic_activity_detection` with `start_of_speech_sensitivity=0.5`, `end_of_speech_sensitivity=0.5`, `prefix_padding_ms=500`, `silence_duration_ms=1000`
 - Interruption/barge-in is NOT implemented (mic fully muted during playback). Commands given during playback are lost — wait for S.O.D.A. to finish speaking.
 
@@ -110,7 +111,7 @@ Colors, typography, and spacing are defined as CSS custom properties in
 - `session.send()` is **deprecated** — use `send_realtime_input(audio=Blob(...))` for live audio (same websocket message, skips ordering guarantees for faster processing)
 - `send_client_content(turns=Content(...), turn_complete=True)` replaces `session.send(input=string, end_of_turn=True)` for start messages
 - **Server-side VAD is ENABLED**. No client-side `activity_start`/`activity_end` signals — the Gemini server handles voice activity detection automatically.
-- `speech_config.language_code` is **NOT supported** for `gemini-2.5-flash-native-audio-latest` — the model rejects the setup with code 1007
+- `speech_config.language_code` is **NOT supported** for the live native-audio model (`gemini-2.5-flash-native-audio-latest` earlier, now `models/gemini-3.1-flash-live-preview`) — the model rejects the setup with code 1007
 - `AudioTranscriptionConfig.languageCode` is NOT sent through pydantic serialization (LiveConnectParameters caches original schema — extra fields stripped)
 
 ### Git Push Policy
@@ -144,7 +145,7 @@ Colors, typography, and spacing are defined as CSS custom properties in
 - **Auto-start**: `backend/install_hermes_service.ps1` — Scheduled Task at logon
 - **Fallback**: If Hermes is down, desktop tools fall back to legacy automation (pyautogui/screen_vision)
 - **Tool routing**: WhatsApp, open_app, analyze_screen, read_screen_text try Hermes first, fallback to existing code
-- **Generic tool**: `hermes_execute` — Gemini can delegate any desktop task to Hermes via natural language
+- **Generic tool**: `hermes_execute` — routes to the built-in `computer_use` loop (Hermes skipped as too slow, 55s+/call). Hermes itself is still tried first for `open_app`, WhatsApp messaging, and screen analysis.
 - **Install**: `iex (irm https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1)`
 - **Configure**: `hermes config set GEMINI_API_KEY <key> && hermes config set API_SERVER_ENABLED true`
 - **Service install**: `py -3.11 backend/install_hermes_service.ps1 -Action setup`

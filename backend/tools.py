@@ -1543,6 +1543,67 @@ get_world_monitor_data_tool = {
     }
 }
 
+# ── Spotify (desktop automation via the local agent) ─────────────
+
+spotify_search_tool = {
+    "name": "spotify_search",
+    "description": "Search Spotify Desktop for tracks. Use when the user wants to find a song/artist before playing.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "query": {"type": "STRING", "description": "What to search for (song, artist, album)"},
+            "search_type": {"type": "STRING", "enum": ["track", "artist", "album"], "description": "Result type"},
+            "limit": {"type": "INTEGER", "description": "Max results. Default 5."},
+        },
+        "required": ["query"],
+    },
+}
+
+spotify_play_tool = {
+    "name": "spotify_play",
+    "description": "Play a song on Spotify Desktop. Give it either a search query (plays the first match) or a direct spotify: URI. Requires Spotify Desktop installed.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "query": {"type": "STRING", "description": "Song/artist to play"},
+            "uri": {"type": "STRING", "description": "Direct Spotify URI (spotify:track:... / spotify:playlist:...)"},
+        },
+    },
+}
+
+spotify_play_playlist_tool = {
+    "name": "spotify_play_playlist",
+    "description": "Find a playlist by name in Spotify Desktop and play it.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "playlist_name": {"type": "STRING", "description": "Name of the playlist to play"},
+        },
+        "required": ["playlist_name"],
+    },
+}
+
+spotify_control_tool = {
+    "name": "spotify_control",
+    "description": "Control Spotify playback via Windows media keys (works with the free tier).",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "enum": ["play", "pause", "toggle", "next", "previous", "volume_up", "volume_down", "mute"],
+                "description": "Playback action",
+            },
+        },
+        "required": ["action"],
+    },
+}
+
+spotify_now_playing_tool = {
+    "name": "spotify_now_playing",
+    "description": "Get the current Spotify playback status.",
+    "parameters": {"type": "OBJECT", "properties": {}},
+}
 
 
 tools_list = [{"function_declarations": [
@@ -1637,6 +1698,11 @@ tools_list = [{"function_declarations": [
     app_search_tool,
     app_scroll_tool,
     credential_tool,
+    spotify_search_tool,
+    spotify_play_tool,
+    spotify_play_playlist_tool,
+    spotify_control_tool,
+    spotify_now_playing_tool,
 
     # ── Research Engine V2 ──
     deep_research_tool,

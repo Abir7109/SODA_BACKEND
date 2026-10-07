@@ -278,6 +278,9 @@ LOCAL_AGENT_TOOLS = {
     "hermes_execute",
     # Built-in computer_use (Gemini-powered agentic loop)
     "computer_use",
+    # Spotify (desktop keyboard/media-key automation, runs on the agent's PC)
+    "spotify_search", "spotify_play", "spotify_play_playlist",
+    "spotify_control", "spotify_now_playing",
 }
 
 
@@ -1043,14 +1046,11 @@ class AudioLoop:
             log.warning(f"Failed to save context history: {e}")
 
     def _clear_queues(self):
+        # Only stale video frames. audio_queue holds mic audio not yet sent to
+        # the model — draining it truncates the user's utterance (voice cutoff).
         try:
             while self.video_queue and not self.video_queue.empty():
                 self.video_queue.get_nowait()
-        except Exception:
-            pass
-        try:
-            while self.audio_queue and not self.audio_queue.empty():
-                self.audio_queue.get_nowait()
         except Exception:
             pass
 
@@ -1455,7 +1455,6 @@ class AudioLoop:
                                     loop.create_task(self.sio.emit("background_mode", {"active": False}))
                                     loop.create_task(self.sio.emit("speaking_state", {"state": "wake"}))
                                     loop.create_task(self.sio.emit("window_restore"))
-                                asyncio.create_task(asyncio.to_thread(run_welcome_sequence))
                     except Exception as g_e:
                         log.warning(f"Gesture detection error: {g_e}")
 
@@ -3424,11 +3423,67 @@ TEXT: {text}"""
                 r = {"success": False, "error": f"Browser task error: {e}", "result": ""}
             return types.FunctionResponse(id=fc.id, name=name, response={"result": r})
 
-        # ── Navigation ────────────────────────────────────────────
-        log.warning(f"Unknown tool: {name}")
-        return types.FunctionResponse(
-            id=fc.id, name=name,
-            response={"result": f"Tool '{name}' is not implemented."},
-        )
+        # ── Pentest (background scan, gated by settings.json tool_permissions) ──
+        elif name in ("pentest_target", "pentest_browser_target"):
+            target = (args.get("target") or "").strip()
+            if name == "pentest_browser_target":
+                if not target:
+                    return types.FunctionResponse(
+                        id=fc.id, name=name,
+                        response={"success": False,
+                                  "error": "pentest_browser_target needs the current page URL. "
+                                           "Ask the user for the URL, then call pentest_target."},
+                    )
+            if not target:
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"success": False, "error": "No target provided. Ask the user what to scan."},
+                )
+            if not self.permissions.get("pentest_target", False):
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"success": False,
+                              "error": "Pentest is disabled in settings.json (tool_permissions.pentest_target "
+                                       "= false). Tell the user to enable it there to run scans."},
+                )
+            asyncio.create_task(self._run_pentest_background(target))
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"result": f"Scan started in the background for {target}. Progress streams to the "
+                                    "pentest panel; the report arrives when it finishes."},
+            )
+
+        # ── Fallback: shared server-side dispatch (memory, code, deploy, notebook, …) ──
+        # Everything not handled above used to fall through to "not implemented",
+        # which silently disabled ~26 declared tools. tool_dispatch holds their
+        # implementations and is the same path force_tool already exercises.
+        try:
+            from tool_dispatch import dispatch_local_tool
+            r = await asyncio.wait_for(
+                dispatch_local_tool(name, args, sio=self.sio, audio_loop=self),
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            log.warning(f"Tool '{name}' timed out in shared dispatch")
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"success": False,
+                          "error": f"Tool '{name}' timed out after 60s. Tell the user and do NOT retry."},
+            )
+        except Exception as e:
+            log.exception(f"Shared dispatch failed for '{name}': {e}")
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"success": False,
+                          "error": f"Tool '{name}' failed: {e}. Tell the user and do NOT retry."},
+            )
+
+        if isinstance(r, dict) and str(r.get("error", "")).startswith("Unknown tool"):
+            log.warning(f"Unknown tool: {name}")
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"result": f"Tool '{name}' is not implemented."},
+            )
+        return types.FunctionResponse(id=fc.id, name=name, response=r)
 
 
