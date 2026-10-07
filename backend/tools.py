@@ -1605,6 +1605,24 @@ spotify_now_playing_tool = {
     "parameters": {"type": "OBJECT", "properties": {}},
 }
 
+get_metrics_tool = {
+    "name": "get_metrics",
+    "description": (
+        "Get SODA's real performance metrics for a recent time window: tool call counts, "
+        "average durations and success rates, voice response latency (first audio), and "
+        "Gemini token usage. Opens the Metrics panel."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "window_hours": {
+                "type": "INTEGER",
+                "description": "Reporting window in hours (default 1, max 720).",
+            }
+        },
+    },
+}
+
 
 tools_list = [{"function_declarations": [
     write_file_tool,
@@ -1624,6 +1642,7 @@ tools_list = [{"function_declarations": [
     close_panel_tool,
     show_tools_tool,
     system_status_tool,
+    get_metrics_tool,
     close_window_tool,
     screenshot_tool,
     list_processes_tool,

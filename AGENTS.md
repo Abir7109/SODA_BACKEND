@@ -21,13 +21,16 @@
 - `web_builder_progress` (website builder build progress — payload `{progress, message, phase, timestamp}`)
 - `email_data` (after `read_emails` runs — payload `{emails: [{id, subject, from, date, body, preview}], total, query}`)
 - `background_cmd_status` (during `execute_command`/`terminal_execute` retry phases — payload `{phase, tool, command, attempt, total, output, error, success}`)
+- `metrics_data` (reply to `metrics_request` — payload `{window_hours, tools: {count, avg_duration_ms, success_rate, top: [{name, count, avg_duration_ms}]}, turns: {count, avg_first_audio_ms}, usage: {tokens_in, tokens_out}, generated_at}`)
 
 ### Socket.IO Events (Frontend -> Backend)
 - `webview_action_result` (result from a webview action — payload `{id, action, result}`)
 - `video_frame` (camera frame capture — payload `{data: base64}`)
+- `metrics_request` (on-demand metrics aggregates for MetricsPanel — payload `{window_hours?}`; answered with `metrics_data`)
 - Translation events are no longer in use (removed)
 
 ### Tools (Backend -> Gemini Function Declarations)
+- `get_metrics` — real SODA performance metrics (tool counts/durations/success rate, first-audio voice latency, Gemini token usage) from stdlib sqlite `projects/metrics.db` (`backend/metrics.py`, timing hooked at `tool_dispatch.dispatch_local_tool`). Panel: `MetricsPanel` (slide-right).
 - `get_pagespeed_insights` — calls Google PageSpeed Insights API (free), returns Lighthouse SEO/performance/accessibility scores, Core Web Vitals, and ranked optimization opportunities. Registered in `backend/tools.py` as function declaration, dispatched in `backend/soda.py:_dispatch_tool`. Panel: `PageSpeedPanel` (slide-right).
 - `read_emails` — reads Gmail inbox via IMAP (Python stdlib `imaplib`), returns subject/sender/date/body. Emits `email_data` to frontend. Panel: `EmailPanel` (slide-right). Configured via `GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD` env vars or `email_config` tool.
 - `send_email` — sends email via Gmail SMTP (Python stdlib `smtplib`). Gemini must ask user confirmation before calling.

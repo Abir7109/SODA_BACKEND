@@ -38,7 +38,7 @@ export default function useSocketHandlers(cfg) {
     fileTimerRef, setFileOutput, infoTimerRef, setInfoPanel,
     toolTimerRef, setToolPanel, setToolQueue, setParallelPanelOpen,
     setWikipediaPanel, setNewsPanel, setCodePanel, setDataPanel,
-    setTranslatePanel, setSummarizePanel, setMonitorPanel,
+    setTranslatePanel, setSummarizePanel, setMonitorPanel, setMetricsPanel,
     setSocialPanel, setResearchPanel, setAgentsPanel,
     webpageTimerRef, setWebpageSummary, fileBrowserTimerRef, setFileBrowser,
     setScrapedData,
@@ -339,6 +339,7 @@ export default function useSocketHandlers(cfg) {
           case 'BackgroundTaskPanel': setBackgroundTaskPanel({ visible: true, data: result }); return
           case 'EmailPanel': setEmailPanel({ visible: true, data: result.result || result }); return
           case 'ProjectStatsPanel': setProjectStatsPanel({ visible: true, data: result }); return
+          case 'MetricsPanel': setMetricsPanel({ visible: true, data: result }); return
         }
       }
 
@@ -568,6 +569,7 @@ export default function useSocketHandlers(cfg) {
 
     const onEmailData = (data) => { if (data) setEmailPanel({ visible: true, data }) }
     const onResearchData = (data) => { if (data) setResearchResultsPanel({ visible: true, data }) }
+    const onMetricsData = (data) => { if (data) setMetricsPanel(prev => ({ ...prev, visible: true, data })) }
 
     const onBgTaskStatus = (d) => {
       if (!d?.task_id) return
@@ -768,6 +770,7 @@ export default function useSocketHandlers(cfg) {
     socket.on('email_data', onEmailData)
     socket.on('research_data', onResearchData)
     socket.on('bg_task_status', onBgTaskStatus)
+    socket.on('metrics_data', onMetricsData)
     socket.on('open_url', onOpenUrl)
     socket.on('open_schedule', onOpenSchedule)
     socket.on('open_notepad', onOpenNotepad)
@@ -857,6 +860,7 @@ export default function useSocketHandlers(cfg) {
       socket.off('email_data', onEmailData)
       socket.off('research_data', onResearchData)
       socket.off('bg_task_status', onBgTaskStatus)
+      socket.off('metrics_data', onMetricsData)
       socket.off('world_monitor_open', onWorldMonitorOpen)
       socket.off('world_monitor_navigate', onWorldMonitorNavigate)
       socket.off('get_world_monitor_data', onWorldMonitorDataRequest)

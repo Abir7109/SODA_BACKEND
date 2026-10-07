@@ -48,6 +48,7 @@ import DataPanel from './components/panels/DataPanel'
 import TranslatePanel from './components/panels/TranslatePanel'
 import SummarizePanel from './components/panels/SummarizePanel'
 import MonitorPanel from './components/panels/MonitorPanel'
+import MetricsPanel from './components/panels/MetricsPanel'
 import SocialPanel from './components/panels/SocialPanel'
 import ResearchPanel from './components/panels/ResearchPanel'
 import AgentsPanel from './components/panels/AgentsPanel'
@@ -470,6 +471,7 @@ export default function App() {
     setCodePanel: panels.setCodePanel, setDataPanel: panels.setDataPanel,
     setTranslatePanel: panels.setTranslatePanel, setSummarizePanel: panels.setSummarizePanel,
     setMonitorPanel: panels.setMonitorPanel, setSocialPanel: panels.setSocialPanel,
+    setMetricsPanel: panels.setMetricsPanel,
     setResearchPanel: panels.setResearchPanel, setAgentsPanel: panels.setAgentsPanel,
     webpageTimerRef: panels.webpageTimerRef, setWebpageSummary: panels.setWebpageSummary,
     fileBrowserTimerRef: panels.fileBrowserTimerRef, setFileBrowser: panels.setFileBrowser,
@@ -571,6 +573,8 @@ export default function App() {
         onClose={() => panels.setSummarizePanel(prev => ({ ...prev, visible: false }))} />
       <MonitorPanel visible={panels.monitorPanel.visible} data={panels.monitorPanel.data}
         onClose={() => panels.setMonitorPanel(prev => ({ ...prev, visible: false }))} />
+      <MetricsPanel visible={panels.metricsPanel.visible} data={panels.metricsPanel.data}
+        onClose={() => panels.setMetricsPanel(prev => ({ ...prev, visible: false }))} />
       <SocialPanel visible={panels.socialPanel.visible} data={panels.socialPanel.data}
         onClose={() => panels.setSocialPanel(prev => ({ ...prev, visible: false }))} />
       <ResearchPanel visible={panels.researchPanel.visible} data={panels.researchPanel.data}

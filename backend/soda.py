@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from logger import log
+import metrics
 
 # DeepSeek AI service wrapper (OpenAI-compatible API)
 class DeepSeekService:
@@ -927,6 +928,7 @@ class AudioLoop:
         self._pending_webview_results = {}
         self._last_input_transcription = ""
         self._last_output_transcription = ""
+        self._metrics_turn_start = None
         self._model_is_speaking = False
         self._tools_running = False
         self._last_tool_start = 0.0
@@ -1781,6 +1783,16 @@ class AudioLoop:
             while True:
                 turn = self.session.receive()
                 async for response in turn:
+                    # ── Metrics: token usage (LiveServerMessage.usage_metadata) ──
+                    # Counts are whatever Gemini reports on this message (per-message
+                    # deltas for live); guarded so an absent/odd field never breaks the loop.
+                    um = getattr(response, "usage_metadata", None)
+                    if um is not None:
+                        ti = getattr(um, "prompt_token_count", None) or 0
+                        to = getattr(um, "candidates_token_count", None) or 0
+                        if ti or to:
+                            metrics.record_usage(ti, to)
+
                     if self._idle_mode:
                         if response.server_content and response.server_content.input_transcription:
                             await self._exit_idle_mode()
@@ -1791,6 +1803,10 @@ class AudioLoop:
                         if not self._model_is_speaking:
                             self._model_is_speaking = True
                             self._clear_queues()
+                            # ── Metrics: first model audio of this turn ──
+                            if self._metrics_turn_start is not None:
+                                metrics.record_turn((time.monotonic() - self._metrics_turn_start) * 1000)
+                                self._metrics_turn_start = None
                             if self.sio:
                                 loop = asyncio.get_event_loop()
                                 loop.create_task(self.sio.emit("speaking_state", {"state": "model"}))
@@ -1825,6 +1841,14 @@ class AudioLoop:
                                 if transcript.startswith(self._last_input_transcription):
                                     delta = transcript[len(self._last_input_transcription):]
                                 self._last_input_transcription = transcript
+                                # ── Metrics: stamp turn start on first/new user speech ──
+                                # delta == transcript means the text does not continue the
+                                # previous stream = a new turn; re-stamping there drops stale
+                                # stamps left by filtered/aborted turns.
+                                if not self._model_is_speaking and (
+                                    self._metrics_turn_start is None or delta == transcript
+                                ):
+                                    self._metrics_turn_start = time.monotonic()
                                 # ── Transcription filter gate ──
                                 # Safety commands always pass; everything else goes through the filter.
                                 _is_safety = bool(

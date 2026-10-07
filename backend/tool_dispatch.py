@@ -10,8 +10,10 @@ import base64
 import json
 import os
 import mimetypes
+import time
 from datetime import datetime
 
+import metrics
 from logger import log
 
 
@@ -53,7 +55,7 @@ async def _dispatch_bg_task(name: str, args: dict) -> dict:
 
 async def dispatch_local_tool(name: str, args: dict, sio=None, audio_loop=None) -> dict:
     """
-    Execute a tool locally on the server side.
+    Execute a tool locally on the server side (timed — single metrics choke point).
 
     Args:
         name: Tool name (e.g. 'terminal_execute', 'get_weather').
@@ -64,7 +66,23 @@ async def dispatch_local_tool(name: str, args: dict, sio=None, audio_loop=None) 
     Returns:
         Tool result dict.
     """
-    if name == 'terminal_execute':
+    t0 = time.perf_counter()
+    try:
+        r = await _dispatch_local_tool(name, args, sio, audio_loop)
+    except Exception:
+        metrics.record_tool_run(name, (time.perf_counter() - t0) * 1000, False)
+        raise
+    ok = not (isinstance(r, dict) and (r.get("error") or r.get("success") is False))
+    metrics.record_tool_run(name, (time.perf_counter() - t0) * 1000, ok)
+    return r
+
+
+async def _dispatch_local_tool(name: str, args: dict, sio=None, audio_loop=None) -> dict:
+    if name == 'get_metrics':
+        from metrics import get_summary
+        return {'success': True, **get_summary(args.get('window_hours', 1))}
+
+    elif name == 'terminal_execute':
         from system_app import _run_terminal_command_unchecked
         command = args.get('command', 'echo hello')
         r = await _run_terminal_command_unchecked(command, args.get('timeout', 10))

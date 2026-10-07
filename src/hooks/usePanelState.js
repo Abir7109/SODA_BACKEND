@@ -30,6 +30,7 @@ export default function usePanelState() {
   const [translatePanel, setTranslatePanel] = useState({ visible: false, data: null })
   const [summarizePanel, setSummarizePanel] = useState({ visible: false, data: null })
   const [monitorPanel, setMonitorPanel] = useState({ visible: false, data: null })
+  const [metricsPanel, setMetricsPanel] = useState({ visible: false, data: null })
   const [socialPanel, setSocialPanel] = useState({ visible: false, data: null })
   const [researchPanel, setResearchPanel] = useState({ visible: false, data: null })
   const [agentsPanel, setAgentsPanel] = useState({ visible: false, data: null })
@@ -143,6 +144,7 @@ export default function usePanelState() {
     codePanel, setCodePanel, dataPanel, setDataPanel,
     translatePanel, setTranslatePanel, summarizePanel, setSummarizePanel,
     monitorPanel, setMonitorPanel, socialPanel, setSocialPanel,
+    metricsPanel, setMetricsPanel,
     researchPanel, setResearchPanel, agentsPanel, setAgentsPanel,
     // Webpage
     webpageSummary, setWebpageSummary, webpageTimerRef, closeWebpageSummary,

@@ -880,6 +880,14 @@ async def force_tool(sid, data):
     await _run_tool_and_emit(tool, args, 'force_tool')
 
 
+@sio.event
+async def metrics_request(sid, data=None):
+    """On-demand aggregates for MetricsPanel — no polling loop."""
+    from metrics import get_summary
+    hours = (data or {}).get('window_hours', 1)
+    await sio.emit('metrics_data', await asyncio.to_thread(get_summary, hours), room=sid)
+
+
 # ── Mobile remote (soda-remote) ──────────────────────────────────
 # Fail-closed: without MOBILE_SECRET set on the server, no phone can control
 # this machine. mobile_force_tool reaches terminal_execute, so an open

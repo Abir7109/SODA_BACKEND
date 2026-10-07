@@ -136,6 +136,7 @@ export const TOOL_CATEGORY = {
   get_news: CATEGORIES.DATA,
   get_exchange_rate: CATEGORIES.DATA,
   get_system_status: CATEGORIES.DATA,
+  get_metrics: CATEGORIES.DATA,
   list_processes: CATEGORIES.DATA,
   get_ip_info: CATEGORIES.DATA,
   define_word: CATEGORIES.DATA,

@@ -79,6 +79,7 @@ export const TOOL_ANIMATIONS = {
   get_bangladeshi_news:  { component: 'DataAnim', variant: 'news' },
   get_exchange_rate:     { component: 'DataAnim', variant: 'currency', panel: 'CurrencyPanel',     panelDir: 'top' },
   get_system_status:     { component: 'AiSystemMonitor',   variant: 'default', panel: 'SystemStatusPanel', panelDir: 'right' },
+  get_metrics:           { component: 'DataAnim', variant: 'metrics', panel: 'MetricsPanel', panelDir: 'right' },
   list_processes:        { component: 'DataAnim', variant: 'processes',panel: 'ProcessListPanel',  panelDir: 'right' },
   get_ip_info:           { component: 'DataAnim', variant: 'network',  panel: 'NetworkInfoPanel',  panelDir: 'top' },
   define_word:           { component: 'DataAnim', variant: 'define' },
