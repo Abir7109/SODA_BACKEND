@@ -865,6 +865,7 @@ IMPORTANT:
                 return _shrink(_Img.frombytes("RGB", img.size, img.rgb))
         except Exception:
             if HAS_PYAUTOGUI:
+                import pyautogui
                 return _shrink(pyautogui.screenshot())
         return None
 
@@ -872,6 +873,7 @@ IMPORTANT:
         """Execute a parsed action dict via pyautogui."""
         if not HAS_PYAUTOGUI:
             return "pyautogui not available"
+        import pyautogui
         act = action.get("action", "")
         try:
             # ponytail: Gemini sees the downscaled shot — scale clicks back to full-res

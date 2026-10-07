@@ -1,0 +1,16 @@
+# Ruff — real-bug rules only (no style enforcement on legacy code).
+# Tune: any new rule must pass clean across backend/ before it lands here.
+
+target-version = "py311"
+line-length = 120
+extend-exclude = ["world-monitor", "soda-apk", "node_modules", "dist", "projects"]
+
+[lint]
+# E9: syntax/runtime errors | F63: invalid comparisons | F7: stray statements
+# F82: undefined names | F401: unused imports (imports side-effect-free here? NO —
+# SODA relies on import side effects in places, so F401 stays OFF)
+select = ["E9", "F63", "F7", "F82"]
+
+[lint.per-file-ignores]
+# _toolcheck.py is a manual diagnostic script, not imported anywhere
+"_toolcheck.py" = ["F82"]
