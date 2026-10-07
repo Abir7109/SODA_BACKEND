@@ -32,6 +32,8 @@ jobs:
           node-version: "20"
           cache: npm
       - name: Install
-        run: npm ci
+        # npm ci: lockfile is Windows-only, missing @rollup/@esbuild linux entries (npm/cli#4828).
+        # npm install resolves platform optional deps at install time.
+        run: npm install --no-audit --no-fund
       - name: Build
         run: npm run build
