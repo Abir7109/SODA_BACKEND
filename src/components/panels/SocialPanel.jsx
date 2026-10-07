@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import SlidePanel from '../SlidePanel'
-import { Share2, Twitter, Instagram, Youtube, Music2, MessageCircle, TrendingUp, Hash, Lightbulb, Target, Clock, Heart, MessageSquare, Repeat2, Eye } from 'lucide-react'
+import { Share2, Twitter, Instagram, Youtube, Music2, MessageCircle, TrendingUp, Hash, Lightbulb, Target, Clock, BarChart3, Heart, MessageSquare, Repeat2, Eye } from 'lucide-react'
 
 const PLATFORM_CONFIG = {
   twitter: { icon: <Twitter size={14} />, color: '#1DA1F2', bg: 'rgba(29,161,242,0.08)', maxChars: 280 },

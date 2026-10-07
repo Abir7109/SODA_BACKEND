@@ -745,7 +745,7 @@ class TranscriptionFilter:
             self._conversation_history = self._conversation_history[-5:]
         self._last_soda_response_time = time.time()
 
-    def should_process(self, transcript: str) -> bool:
+    async def should_process(self, transcript: str) -> bool:
         """Main entry point. Returns True if transcription should be processed."""
         if not transcript or not transcript.strip():
             return False
@@ -773,7 +773,7 @@ class TranscriptionFilter:
             return layer2
 
         # Layer 3: DeepSeek classification
-        layer3 = self._layer3_deepseek(text)
+        layer3 = await self._layer3_deepseek(text)
         if layer3:
             self._last_pass_time = time.time()
             log.info(f"[FILTER] L3 PASS: {text[:60]}")
@@ -855,7 +855,7 @@ class TranscriptionFilter:
 
         return None  # Uncertain → Layer 3
 
-    def _layer3_deepseek(self, text: str):
+    async def _layer3_deepseek(self, text: str):
         """Layer 3: Quick DeepSeek classification. Returns True (pass) or False (block)."""
         try:
             # Build context string
@@ -876,21 +876,17 @@ class TranscriptionFilter:
                 "Reply with ONLY one word: DEVICE_DIRECTED or AMBIENT"
             )
 
-            # Async call to DeepSeek
-            import asyncio
-            loop = asyncio.get_event_loop()
-            response = loop.run_until_complete(
-                deepseek_service.chat_completion(
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.0,
-                    max_tokens=10,
-                )
+            # Async call to DeepSeek — this method runs on the live loop, so await directly
+            response = await deepseek_service.chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=10,
             )
             answer = response.get("choices", [{}])[0].get("message", {}).get("content", "").strip().upper()
             return "DEVICE_DIRECTED" in answer
 
         except Exception as e:
-            log.warning(f"[FILTER] L3 Gemini error: {e} — fail-closed")
+            log.warning(f"[FILTER] L3 DeepSeek error: {e} — fail-closed", exc_info=e)
             return False  # Fail-closed on error
 
 
@@ -1855,7 +1851,7 @@ class AudioLoop:
                                     re.search(r'\b(shut\s?down|turn\s*off|power\s*off|stop\s*soda|switch\s*off)\b', transcript, re.IGNORECASE)
                                 )
                                 if delta and not _is_safety:
-                                    if not self._transcription_filter.should_process(transcript):
+                                    if not await self._transcription_filter.should_process(transcript):
                                         continue  # Filtered — skip this transcription
                                 if delta:
                                     if re.search(r'\bshut\s?down\b', transcript, re.IGNORECASE):
@@ -1967,7 +1963,7 @@ class AudioLoop:
                             batch_results = []
                             for fc, result in zip(pending_fcs, raw):
                                 if isinstance(result, Exception):
-                                    log.warning(f"Tool call failed: {result}")
+                                    log.error(f"Tool call failed: {fc.name}: {result}", exc_info=result)
                                     # ponytail: convert crashes to error responses — dropping them leaves Gemini waiting forever
                                     result = types.FunctionResponse(
                                         id=fc.id, name=fc.name,
@@ -2762,14 +2758,10 @@ class AudioLoop:
                 part = int(args.get("part", 1))
                 eval_prompt = ss.analyze_response_prompt(transcript, part, question)
                 try:
-                    import asyncio
-                    loop = asyncio.get_event_loop()
-                    resp = loop.run_until_complete(
-                        deepseek_service.chat_completion(
-                            messages=[{"role": "user", "content": eval_prompt}],
-                            temperature=0.7,
-                            max_tokens=1024,
-                        )
+                    resp = await deepseek_service.chat_completion(
+                        messages=[{"role": "user", "content": eval_prompt}],
+                        temperature=0.7,
+                        max_tokens=1024,
                     )
                     eval_text = resp.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
                     json_match = re.search(r'```json\s*([\s\S]*?)\s*```', eval_text)
@@ -2840,14 +2832,10 @@ class AudioLoop:
                 task_type = args.get("task_type", "opinion")
                 eval_prompt = wa.build_evaluation_prompt(essay, task_prompt, task_type)
                 try:
-                    import asyncio
-                    loop = asyncio.get_event_loop()
-                    resp = loop.run_until_complete(
-                        deepseek_service.chat_completion(
-                            messages=[{"role": "user", "content": eval_prompt}],
-                            temperature=0.7,
-                            max_tokens=1024,
-                        )
+                    resp = await deepseek_service.chat_completion(
+                        messages=[{"role": "user", "content": eval_prompt}],
+                        temperature=0.7,
+                        max_tokens=1024,
                     )
                     eval_text = resp.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
                     json_match = re.search(r'```json\s*([\s\S]*?)\s*```', eval_text)
@@ -2897,14 +2885,10 @@ class AudioLoop:
 }}
 TEXT: {text}"""
                 try:
-                    import asyncio
-                    loop = asyncio.get_event_loop()
-                    resp = loop.run_until_complete(
-                        deepseek_service.chat_completion(
-                            messages=[{"role": "user", "content": prompt}],
-                            temperature=0.7,
-                            max_tokens=1024,
-                        )
+                    resp = await deepseek_service.chat_completion(
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.7,
+                        max_tokens=1024,
                     )
                     result_text = resp.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
                     result = json.loads(result_text) if result_text else {"error": "No response", "error_count": 0, "errors": []}
